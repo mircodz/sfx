@@ -100,7 +100,6 @@ jobs:
         id: nuget_login
         uses: NuGet/login@v1
         with:
-          server: https://api.nuget.org/v3/index.json
           user: ${{ secrets.NUGET_USER }}
 
       - name: Push to NuGet.org
