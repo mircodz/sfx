@@ -81,6 +81,9 @@ make install    # pack and install the tool globally from source
 make publish    # self-contained single-file binary for this machine, in dist/<rid>/
 ```
 
+To try it against a real cluster, [`samples/demo-cluster`](./samples/demo-cluster) creates a throwaway one on
+Azure, full of demo applications.
+
 Releases are cut from `main` by the Release workflow, using the version in [`version`](./version).
 
 ## License

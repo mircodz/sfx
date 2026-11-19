@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationManifest ApplicationTypeName="DemoAppType" ApplicationTypeVersion="1.0.0" xmlns="http://schemas.microsoft.com/2011/01/fabric" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Parameters>
+    <Parameter Name="Counter_PartitionCount" DefaultValue="1" />
+    <Parameter Name="Counter_TargetReplicaSetSize" DefaultValue="3" />
+    <Parameter Name="Counter_MinReplicaSetSize" DefaultValue="2" />
+    <Parameter Name="Frontend_InstanceCount" DefaultValue="1" />
+  </Parameters>
+  <ServiceManifestImport>
+    <ServiceManifestRef ServiceManifestName="DemoPkg" ServiceManifestVersion="1.0.0" />
+  </ServiceManifestImport>
+  <DefaultServices>
+    <Service Name="Counter">
+      <StatefulService ServiceTypeName="CounterType" TargetReplicaSetSize="[Counter_TargetReplicaSetSize]" MinReplicaSetSize="[Counter_MinReplicaSetSize]">
+        <UniformInt64Partition PartitionCount="[Counter_PartitionCount]" LowKey="0" HighKey="1023" />
+        <LoadMetrics>
+          <LoadMetric Name="Ticks" Weight="Low" PrimaryDefaultLoad="0" SecondaryDefaultLoad="0" />
+        </LoadMetrics>
+      </StatefulService>
+    </Service>
+    <Service Name="Frontend">
+      <StatelessService ServiceTypeName="FrontendType" InstanceCount="[Frontend_InstanceCount]">
+        <SingletonPartition />
+        <LoadMetrics>
+          <LoadMetric Name="Requests" Weight="Low" DefaultLoad="0" />
+        </LoadMetrics>
+      </StatelessService>
+    </Service>
+  </DefaultServices>
+</ApplicationManifest>

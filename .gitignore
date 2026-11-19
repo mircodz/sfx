@@ -9,3 +9,5 @@ TestResults/
 .vs/
 .idea/
 .DS_Store
+samples/demo-cluster/out/
+__pycache__/
