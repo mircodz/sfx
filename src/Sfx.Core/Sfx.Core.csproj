@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Identity.Client" />
+    <PackageReference Include="Microsoft.ServiceFabric.Client.Http" />
+    <PackageReference Include="Tomlyn" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sfx.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,24 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <VersionFile>$(MSBuildThisFileDirectory)version</VersionFile>
+    <Version>$([System.IO.File]::ReadAllText('$(VersionFile)').Trim())</Version>
+    <AssemblyVersion>$([System.Text.RegularExpressions.Regex]::Match('$(Version)', '^\d+\.\d+\.\d+'))</AssemblyVersion>
+    <FileVersion>$(AssemblyVersion)</FileVersion>
+    <PackageVersion>$(Version)</PackageVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <Authors>Mirco De Zorzi</Authors>
+    <Copyright>Copyright (c) 2026 Mirco De Zorzi</Copyright>
+    <RepositoryUrl>https://github.com/mircodz/sfx</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/mircodz/sfx</PackageProjectUrl>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>

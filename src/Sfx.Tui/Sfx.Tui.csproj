@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Cellar" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sfx.Core\Sfx.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sfx.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: true
+
+jobs:
+  version-check:
+    name: version check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fail if the version is already released
+        run: |
+          VERSION="$(tr -d '[:space:]' < version)"
+          git fetch --tags --force
+          if git rev-parse --verify --quiet "refs/tags/$VERSION" >/dev/null; then
+            echo "::error file=version::Version $VERSION is already tagged. Bump the version file before merging." >&2
+            exit 1
+          fi
+          LATEST="$(git tag --list | sort -V | tail -n1)"
+          if [ -n "$LATEST" ] && [ "$(printf '%s\n%s\n' "$LATEST" "$VERSION" | sort -V | tail -n1)" != "$VERSION" ]; then
+            echo "::error file=version::Version $VERSION must be greater than the latest release, $LATEST." >&2
+            exit 1
+          fi
+          echo "Version $VERSION has no tag yet (latest release: ${LATEST:-none})."
+
+  build-and-test:
+    name: build and test ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Sfx.slnx
+
+      - name: Build (Release)
+        run: dotnet build Sfx.slnx -c Release --no-restore --warnaserror
+
+      - name: Test (Release)
+        run: dotnet test Sfx.slnx -c Release --no-build --no-restore
+
+  pack:
+    name: pack dotnet tool
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Pack
+        run: dotnet pack src/Sfx/Sfx.csproj -c Release -o artifacts
+
+      - name: Smoke test the tool
+        run: |
+          VERSION="$(tr -d '[:space:]' < version)"
+          dotnet tool install --tool-path artifacts/tool --add-source artifacts sfx --version "$VERSION"
+          test "$(artifacts/tool/sfx --version)" = "$VERSION"
+          artifacts/tool/sfx --help
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sfx-nupkg
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+
+  binaries:
+    name: binary ${{ matrix.rid }}
+    needs: build-and-test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS binaries are built on macOS so the SDK can sign them; arm64 Macs won't run unsigned code.
+          - { os: macos-latest,     rid: osx-arm64,   native: true }
+          - { os: macos-latest,     rid: osx-x64,     native: false }
+          - { os: ubuntu-latest,    rid: linux-x64,   native: true }
+          - { os: ubuntu-24.04-arm, rid: linux-arm64, native: true }
+          - { os: windows-latest,   rid: win-x64,     native: true }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish self-contained single file
+        shell: bash
+        run: |
+          dotnet publish src/Sfx/Sfx.csproj -c Release -r "${{ matrix.rid }}" --self-contained \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=none \
+            -o "publish/${{ matrix.rid }}"
+
+      - name: Smoke test
+        if: matrix.native
+        shell: bash
+        run: |
+          VERSION="$(tr -d '[:space:]' < version)"
+          exe="publish/${{ matrix.rid }}/sfx"
+          if [ "$RUNNER_OS" = "Windows" ]; then exe="$exe.exe"; fi
+          test "$("$exe" --version | tr -d '\r')" = "$VERSION"
+          "$exe" --help
+
+      - name: Archive
+        shell: bash
+        run: |
+          VERSION="$(tr -d '[:space:]' < version)"
+          name="sfx-$VERSION-${{ matrix.rid }}"
+          mkdir -p dist
+          cp README.md LICENSE "publish/${{ matrix.rid }}/"
+          cd "publish/${{ matrix.rid }}"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a -tzip "../../dist/$name.zip" sfx.exe README.md LICENSE
+          else
+            tar -czf "../../dist/$name.tar.gz" sfx README.md LICENSE
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
