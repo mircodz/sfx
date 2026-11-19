@@ -1,4 +1,5 @@
 using System.Globalization;
+using Cellar.Primitives;
 using Cellar.Text;
 using Cellar.Theming;
 using Microsoft.ServiceFabric.Common;
@@ -11,12 +12,19 @@ public static class Lines
 {
     private const string Indent = "  ";
 
-    public static IReadOnlyList<StyledText> Text(string? text) =>
-        string.IsNullOrEmpty(text)
-            ? [Styles.Muted("(empty)")]
-            : text.Replace("\r\n", "\n").Split('\n').Select(line => new StyledText(line, Theme.Current.TextStyle)).ToList();
+    /// <summary>Plain text as is; JSON and XML (manifests, configuration) indented and colored.</summary>
+    public static IReadOnlyList<StyledText> Text(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return [Styles.Muted("(empty)")];
+        }
 
-    public static IReadOnlyList<StyledText> Json(object? value) => Text(Inspect.Json(value));
+        var (pretty, format) = Inspect.TryPretty(text);
+        return Highlight.Lines(pretty, format);
+    }
+
+    public static IReadOnlyList<StyledText> Json(object? value) => Highlight.Lines(Inspect.Json(value), Inspect.Format.Json);
 
     public static IReadOnlyList<StyledText> Error(Exception error) =>
         [StyledText.Of(error.GetBaseException().Message).Fg(Theme.Current.Error)];
@@ -31,9 +39,28 @@ public static class Lines
 
         var width = list.Max(field => field.Name.Length) + 2;
         return list
-            .Select(field => StyledText.Of(field.Name.PadRight(width)).Fg(Theme.Current.Muted)
-                .Append(field.Value.Length == 0 ? "-" : field.Value).Fg(Theme.Current.Foreground))
+            .SelectMany(field => Value(StyledText.Of(field.Name.PadRight(width)).Fg(Theme.Current.Muted), field.Value, Theme.Current.Foreground))
             .ToList();
+    }
+
+    /// <summary>
+    /// A name and its value on one line; a value that's JSON or XML with more than one member goes on the lines
+    /// below instead, indented and colored, so nested objects and parameter documents can be read.
+    /// </summary>
+    private static IEnumerable<StyledText> Value(StyledText name, string value, Color color, string indent = Indent)
+    {
+        var (pretty, format) = Inspect.TryPretty(value);
+        if (format == Inspect.Format.None || pretty.Count(c => c == '\n') < 3)
+        {
+            yield return name.Append(value.Length == 0 ? "-" : value).Fg(color);
+            yield break;
+        }
+
+        yield return name;
+        foreach (var line in Highlight.Lines(pretty, format, indent))
+        {
+            yield return line;
+        }
     }
 
     /// <summary>Simple aligned columns, for short lists inside a tab.</summary>
@@ -281,8 +308,15 @@ public static class Lines
             var width = section.Parameters.Count == 0 ? 0 : section.Parameters.Max(p => p.Name.Length) + 2;
             foreach (var parameter in section.Parameters)
             {
-                lines.Add(StyledText.Of(Indent + parameter.Name.PadRight(width)).Fg(Theme.Current.Foreground)
-                    .Append(parameter.IsEncrypted ? Styles.Muted("(encrypted)") : Styles.Plain(parameter.Value)));
+                var name = StyledText.Of(Indent + parameter.Name.PadRight(width)).Fg(Theme.Current.Foreground);
+                if (parameter.IsEncrypted || parameter.Value.Length == 0)
+                {
+                    lines.Add(name.Append(parameter.IsEncrypted ? Styles.Muted("(encrypted)") : Styles.Plain(parameter.Value)));
+                }
+                else
+                {
+                    lines.AddRange(Value(name, parameter.Value, Theme.Current.Foreground, Indent + Indent));
+                }
             }
         }
         return lines;
