@@ -45,6 +45,8 @@ internal sealed class Shell : IActionHost
     private CancellationTokenSource? _loading;
     private CancellationTokenSource? _connecting;
     private DateTime? _loadedAt;
+    private TimeSpan _refreshInterval;
+    private CancellationTokenSource? _autoRefresh;
     private string? _error;
     private string? _notice;
 
@@ -88,10 +90,7 @@ internal sealed class Shell : IActionHost
         };
 
         ShowRoot(_views.Nodes());
-        if (refreshInterval > TimeSpan.Zero)
-        {
-            _ = AutoRefreshAsync(refreshInterval);
-        }
+        SetRefreshInterval(refreshInterval);
     }
 
     private IResourceView? Current =>
@@ -122,7 +121,7 @@ internal sealed class Shell : IActionHost
         new("Filter rows", General, _ => OpenPrompt(PromptMode.Filter), [KeyChord.Of('/')], Footer: "filter"),
         new("Command palette", General, _ => OpenPalette(), [KeyChord.Ctrl('p')], ["palette"], "palette"),
         new("Keys", General, _ => ShowHelp(), [KeyChord.Of('?')], ["help"], "help"),
-        new("Refresh", General, _ => Refresh(), [KeyChord.Of('r')], ["refresh"]),
+        new("Refresh now; :refresh 2s, 1m or off sets how often it refreshes on its own", General, ChangeRefresh, [KeyChord.Of('r')], ["refresh"]),
         new("Copy the selected name, or the text being read", General, _ => Copy(), [KeyChord.Of('y')], ["copy"]),
         new("Quit", General, _ => _app.Quit(), [KeyChord.Of('q'), KeyChord.Ctrl('c')], ["quit", "q"], "quit"),
 
@@ -644,18 +643,57 @@ internal sealed class Shell : IActionHost
         });
     }
 
-    private async Task AutoRefreshAsync(TimeSpan interval)
+    /// <summary><c>:refresh</c> refreshes now; <c>:refresh 2s</c> (or <c>off</c>) changes the auto-refresh interval.</summary>
+    private void ChangeRefresh(string? argument)
+    {
+        if (argument is null)
+        {
+            Refresh();
+            return;
+        }
+
+        if (!RefreshInterval.TryParse(argument, out var interval))
+        {
+            _notice = $"refresh takes an interval like 5s, 1m or off (at least {RefreshInterval.Format(RefreshInterval.Minimum)}), not '{argument}'";
+            UpdateStatus();
+            return;
+        }
+
+        SetRefreshInterval(interval);
+        _notice = interval > TimeSpan.Zero ? $"refreshing every {RefreshInterval.Format(interval)}" : "auto-refresh off; r refreshes";
+        UpdateStatus();
+    }
+
+    private void SetRefreshInterval(TimeSpan interval)
+    {
+        _autoRefresh?.Cancel();
+        _autoRefresh = null;
+        _refreshInterval = interval;
+        if (interval > TimeSpan.Zero)
+        {
+            _autoRefresh = new CancellationTokenSource();
+            _ = AutoRefreshAsync(interval, _autoRefresh.Token);
+        }
+    }
+
+    private async Task AutoRefreshAsync(TimeSpan interval, CancellationToken cancellationToken)
     {
         using var timer = new PeriodicTimer(interval);
-        while (await timer.WaitForNextTickAsync())
+        try
         {
-            Post(() =>
+            while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                if (_loading is null)
+                Post(() =>
                 {
-                    Refresh();
-                }
-            });
+                    if (_loading is null && !cancellationToken.IsCancellationRequested)
+                    {
+                        Refresh();
+                    }
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
         }
     }
 
@@ -672,12 +710,13 @@ internal sealed class Shell : IActionHost
         {
             context.Append("POWER ").Bold().Fg(Theme.Current.Error);
         }
+        var every = _refreshInterval > TimeSpan.Zero ? $" · every {RefreshInterval.Format(_refreshInterval)}" : " · auto-refresh off";
         _status.Content = (_error, _notice, _loading, _loadedAt) switch
         {
             ({ } error, _, _, _) => StyledText.Of(" " + error).Fg(Theme.Current.Error),
             (_, { } notice, _, _) => StyledText.Of(" " + notice).Fg(Theme.Current.Warning),
             (_, _, not null, _) => context.Append("loading…").Fg(Theme.Current.Muted),
-            (_, _, _, { } at) => context.Append($"updated {at:HH:mm:ss}").Fg(Theme.Current.Muted),
+            (_, _, _, { } at) => context.Append($"updated {at:HH:mm:ss}{every}").Fg(Theme.Current.Muted),
             _ => context,
         };
 

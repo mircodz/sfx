@@ -135,7 +135,7 @@ public static class SfxHost
         text.AppendLine();
         text.AppendLine("  <endpoint>              host, host:port or URL (default port 19080)");
         text.AppendLine("  --auth <methods>        auth methods, applied in order (default: none)");
-        text.AppendLine("  --refresh <seconds>     auto-refresh interval, 0 to disable (default: 5)");
+        text.AppendLine("  --refresh <interval>    auto-refresh interval: 5s, 1m, or off (default: 5s)");
         text.AppendLine("  --readonly              hide every action that changes the cluster");
         text.AppendLine("  --power                 unlock the riskiest actions (also :power in the UI)");
         text.AppendLine("  --version               print the version");

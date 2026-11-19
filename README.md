@@ -63,7 +63,7 @@ remove node state, delete…) stay hidden until unlocked with `:power`, or `--po
 | `/` | filter rows, or search the text being read (`n` / `N` step through matches) |
 | `:` | command, e.g. `:nodes`, `:apps`, `:cluster`, `:health`, `:ctx prod` |
 | `ctrl+p` | command palette |
-| `r` | refresh |
+| `r` | refresh; `:refresh 2s`, `:refresh 1m` or `:refresh off` changes how often it refreshes on its own |
 | `y` | copy the selected name, or the text being read |
 | `?` | every key on the current page |
 | `q` | quit |

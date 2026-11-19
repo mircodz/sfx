@@ -99,9 +99,9 @@ public static class CommandLine
                     context = value;
                     break;
                 case "refresh":
-                    refresh = int.TryParse(value, out var seconds) && seconds >= 0
-                        ? TimeSpan.FromSeconds(seconds)
-                        : throw new UsageException($"--refresh expects a number of seconds, got '{value}'.");
+                    refresh = RefreshInterval.TryParse(value, out var interval)
+                        ? interval
+                        : throw new UsageException($"--refresh expects an interval like 5s, 1m or off, got '{value}'.");
                     break;
                 default:
                     authOptions.Add(key, value);
