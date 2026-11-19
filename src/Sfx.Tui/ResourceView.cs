@@ -125,6 +125,14 @@ public sealed class ResourceView<T> : IResourceView
         return this;
     }
 
+    /// <summary>Sorts by another column than the first, e.g. to put what needs attention on top.</summary>
+    public ResourceView<T> Sorting(string header, SortState state = SortState.Ascending)
+    {
+        var index = Table.Columns.FindIndex(column => column.Header == header);
+        Table.SortBy(index >= 0 ? index : throw new ArgumentException($"No column '{header}'.", nameof(header)), state);
+        return this;
+    }
+
     /// <summary>Lets <c>d</c> describe the selected row; Enter does too when the row has nothing to drill into.</summary>
     public ResourceView<T> Describing(Func<T, IResourceView> describe)
     {

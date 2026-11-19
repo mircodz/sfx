@@ -1,3 +1,4 @@
+using Microsoft.ServiceFabric.Common;
 using Sfx.Core;
 using Sfx.Core.Auth;
 
@@ -94,6 +95,45 @@ public class ClusterIntegrationTests
         var node = (await queries.GetNodesAsync(ct))[0].Name;
         Assert.NotNull((await inspect.GetNodeLoadAsync(node, ct)).NodeLoadMetricInformation);
         Assert.NotNull(await deployed.GetApplicationsAsync(node, ct));
+    }
+
+    [ClusterFact]
+    public async Task Lists_only_upgrades_that_ran()
+    {
+        var queries = await ConnectAsync();
+
+        var upgrades = await new UpgradeQueries(queries).GetUpgradesAsync(CancellationToken.None);
+
+        Assert.All(upgrades, u =>
+        {
+            Assert.NotNull(u.StartedUtc);
+            Assert.InRange(u.DomainsDone, 0, u.Report.Domains.Count);
+            Assert.False(u.Report.State is nameof(UpgradeState.RollingForwardCompleted) && u.Report.Duration is null);
+        });
+    }
+
+    /// <summary>Clusters without the optional service say so at once, instead of waiting for the gateway's timeout.</summary>
+    [ClusterFact]
+    public async Task Events_and_repairs_load_or_explain_quickly_why_not()
+    {
+        var queries = await ConnectAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+
+        foreach (var load in new Func<Task>[]
+        {
+            () => new EventQueries(queries).GetEventsAsync(TimeSpan.FromHours(1), timeout.Token),
+            () => new RepairQueries(queries).GetRepairTasksAsync(timeout.Token),
+        })
+        {
+            try
+            {
+                await load();
+            }
+            catch (InvalidOperationException ex)
+            {
+                Assert.Contains("doesn't run", ex.Message);
+            }
+        }
     }
 
     /// <summary>Changes the cluster (pauses a node, then activates it), so it also needs SFX_TEST_MUTATE=1.</summary>

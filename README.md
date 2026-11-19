@@ -61,12 +61,21 @@ remove node state, delete…) stay hidden until unlocked with `:power`, or `--po
 | `d` | describe the selected row |
 | `backspace` / `h` / `esc` | back |
 | `/` | filter rows, or search the text being read (`n` / `N` step through matches) |
-| `:` | command, e.g. `:nodes`, `:apps`, `:cluster`, `:health`, `:ctx prod` |
+| `:` | command, e.g. `:nodes`, `:apps`, `:cluster`, `:health`, `:ctx prod` (below) |
 | `ctrl+p` | command palette |
 | `r` | refresh; `:refresh 2s`, `:refresh 1m` or `:refresh off` changes how often it refreshes on its own |
 | `y` | copy the selected name, or the text being read |
 | `?` | every key on the current page |
 | `q` | quit |
+
+Besides nodes and applications, `:` opens views across the whole cluster:
+
+| Command | |
+| --- | --- |
+| `:upgrades` (`:updates`) | the cluster's and every application's upgrade: versions, mode, domains done, state, running ones first |
+| `:events` | the event store's events of the last hour, newest first; `:events 6h` looks further back |
+| `:activity` | what you changed through sfx: this session's operations, running ones too, then the action log |
+| `:repairs` | repair tasks: reboots, patching and other infrastructure work, active ones first |
 
 Actions on the selected entity use the same key everywhere: `ctrl+r` restart, `ctrl+k` remove, `ctrl+d` delete,
 `m` move, `x` deactivate, `a` activate. Every change asks for confirmation and is appended to `~/.sfx/actions.log`.

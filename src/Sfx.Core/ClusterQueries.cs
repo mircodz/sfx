@@ -90,6 +90,13 @@ public sealed class ClusterQueries(IServiceFabricClient client)
             r.Address ?? "")).ToList();
     }
 
+    /// <summary>
+    /// Whether a system service runs, e.g. <c>EventStoreService</c>. Optional ones are missing on many clusters, and
+    /// asking them anything then waits for the gateway's timeout instead of failing.
+    /// </summary>
+    public async Task<bool> HasSystemServiceAsync(string name, CancellationToken cancellationToken) =>
+        (await GetServicesAsync(SystemApplicationId, cancellationToken)).Any(s => s.Name == $"{SystemApplicationName}/{name}");
+
     /// <summary>Follows continuation tokens until the last page.</summary>
     public static async Task<List<T>> PageAsync<T>(Func<ContinuationToken?, Task<PagedData<T>>> query)
     {

@@ -68,8 +68,23 @@ public sealed record UpgradeReport(
             (n.PendingSafetyChecks ?? []).Select(c => Text(c.SafetyCheck?.Kind)).ToList(),
             n.UpgradeDuration ?? "")).ToList();
 
-    private static TimeSpan? Milliseconds(string? value) =>
-        double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var ms) ? TimeSpan.FromMilliseconds(ms) : null;
+    /// <summary>Durations arrive as milliseconds or, despite the field names, as ISO 8601 ("PT0H5M26.812S").</summary>
+    internal static TimeSpan? Milliseconds(string? value)
+    {
+        if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var ms))
+        {
+            return TimeSpan.FromMilliseconds(ms);
+        }
+
+        try
+        {
+            return value is { Length: > 0 } ? System.Xml.XmlConvert.ToTimeSpan(value) : null;
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
 
     private static string Text<TEnum>(TEnum? value) where TEnum : struct, Enum => value?.ToString() ?? "";
 }
@@ -102,21 +117,67 @@ public static class ClusterSettings
     }
 }
 
+/// <summary>One line of the action log.</summary>
+public sealed record ActionLogEntry(DateTimeOffset Time, string User, string Context, string Endpoint, string Action, string Outcome)
+{
+    public bool Succeeded => Outcome == "ok";
+}
+
 /// <summary>Appends one line per action taken to a file, so there's a record of what was changed, where and when.</summary>
 public sealed class ActionLog(string path)
 {
+    private const string TimeFormat = "yyyy-MM-ddTHH:mm:sszzz";
+
     public string Path => path;
 
-    public void Append(string context, string endpoint, string action, string outcome)
+    public ActionLogEntry Append(string context, string endpoint, string action, string outcome)
     {
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path))!);
+        var now = DateTimeOffset.Now;
+        // The file keeps whole seconds; the entry matches what a later read returns.
+        var time = new DateTimeOffset(now.Ticks - now.Ticks % TimeSpan.TicksPerSecond, now.Offset);
+        var entry = new ActionLogEntry(time, Environment.UserName, context, endpoint, action, outcome.ReplaceLineEndings(" "));
         var line = string.Join('\t',
-            DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture),
-            Environment.UserName,
-            context,
-            endpoint,
-            action,
-            outcome.ReplaceLineEndings(" "));
+            entry.Time.ToString(TimeFormat, CultureInfo.InvariantCulture),
+            entry.User,
+            entry.Context,
+            entry.Endpoint,
+            entry.Action,
+            entry.Outcome);
         File.AppendAllText(path, line + Environment.NewLine);
+        return entry;
+    }
+
+    /// <summary>The last <paramref name="count"/> entries, oldest first; lines that don't parse are skipped.</summary>
+    public IReadOnlyList<ActionLogEntry> ReadLast(int count = 1000)
+    {
+        if (!File.Exists(path))
+        {
+            return [];
+        }
+
+        var last = new Queue<ActionLogEntry>(count);
+        foreach (var line in File.ReadLines(path))
+        {
+            if (Parse(line) is not { } entry)
+            {
+                continue;
+            }
+            if (last.Count == count)
+            {
+                last.Dequeue();
+            }
+            last.Enqueue(entry);
+        }
+        return last.ToList();
+    }
+
+    private static ActionLogEntry? Parse(string line)
+    {
+        var fields = line.Split('\t');
+        return fields.Length == 6
+            && DateTimeOffset.TryParseExact(fields[0], TimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var time)
+            ? new ActionLogEntry(time, fields[1], fields[2], fields[3], fields[4], fields[5])
+            : null;
     }
 }

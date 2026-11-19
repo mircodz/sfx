@@ -34,6 +34,7 @@ internal sealed class Shell : IActionHost
     private readonly Input _prompt = new();
     private readonly Slot _footer;
     private readonly ActionLog _log;
+    private readonly ActivityTracker _activity;
 
     private Widget _promptRow;
     private Widget _statusRow;
@@ -60,6 +61,7 @@ internal sealed class Shell : IActionHost
         _connector = connector;
         _store = store;
         _log = new ActionLog(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(store.Path))!, "actions.log"));
+        _activity = new ActivityTracker(_log);
         _global = GlobalActions();
 
         _promptRow = PromptRow(":");
@@ -132,6 +134,10 @@ internal sealed class Shell : IActionHost
         new("Applications", ViewsGroup, _ => ShowRoot(_views.Applications()), Commands: ["apps", "app", "applications"]),
         new("Cluster", ViewsGroup, _ => ShowRoot(_views.DescribeCluster(_session.Context.Name)), Commands: ["cluster"]),
         new("Cluster health", ViewsGroup, _ => ShowRoot(_views.DescribeCluster(_session.Context.Name, Views.ClusterHealthTab)), Commands: ["health"]),
+        new("Upgrades of the cluster and applications", ViewsGroup, _ => ShowRoot(_views.Upgrades()), Commands: ["upgrades", "updates", "up"]),
+        new("Activity: what sfx changed, this session and before", ViewsGroup, _ => ShowRoot(Views.Activity(_activity)), Commands: ["activity", "act"]),
+        new("Events of the last hour; :events 6h for longer", ViewsGroup, ShowEvents, Commands: ["events", "ev"]),
+        new("Repair tasks: reboots, patching and other infrastructure work", ViewsGroup, _ => ShowRoot(_views.Repairs()), Commands: ["repairs", "repair", "rt"]),
         new("Contexts; :ctx <name> switches", ViewsGroup, SwitchContext, [KeyChord.Of('c')], ["ctx", "context", "contexts"]),
         new("Unlock or lock power actions (recover, delete, remove node state…)", General, _ => TogglePower(), Commands: ["power"]),
 
@@ -392,6 +398,7 @@ internal sealed class Shell : IActionHost
         _notice = title + "…";
         UpdateStatus();
 
+        var tracked = _activity.Start(session.Context.Name, title);
         _ = Task.Run(async () =>
         {
             string outcome;
@@ -416,13 +423,15 @@ internal sealed class Shell : IActionHost
                 });
             }
 
+            ActionLogEntry? logged = null;
             try
             {
-                _log.Append(session.Context.Name, session.Endpoint.ToString(), title, outcome);
+                logged = _log.Append(session.Context.Name, session.Endpoint.ToString(), title, outcome);
             }
             catch (IOException)
             {
             }
+            _activity.Finish(tracked, outcome == "ok", outcome == "ok" ? "" : outcome["failed: ".Length..], logged);
         });
     }
 
@@ -641,6 +650,23 @@ internal sealed class Shell : IActionHost
                 });
             }
         });
+    }
+
+    private void ShowEvents(string? window)
+    {
+        if (window is null)
+        {
+            ShowRoot(_views.Events(Views.DefaultEventWindow));
+        }
+        else if (RefreshInterval.TryParse(window, out var span) && span > TimeSpan.Zero)
+        {
+            ShowRoot(_views.Events(span));
+        }
+        else
+        {
+            _notice = $"events takes how far back to look, like 30m, 6h or 48h, not '{window}'";
+            UpdateStatus();
+        }
     }
 
     /// <summary><c>:refresh</c> refreshes now; <c>:refresh 2s</c> (or <c>off</c>) changes the auto-refresh interval.</summary>
