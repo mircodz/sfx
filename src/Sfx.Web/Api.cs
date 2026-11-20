@@ -25,7 +25,7 @@ internal static class Api
         });
         api.MapPost("/contexts/dismiss", () => host.Dismiss());
 
-        api.MapGet("/session", async (UiSession s, CancellationToken ct) => SessionInfo(s, await s.HasEventStoreAsync(ct)));
+        api.MapGet("/session", async (UiSession s, CancellationToken ct) => SessionInfo(s, await s.GetSystemServicesAsync(ct)));
 
         api.MapPost("/session/power", async (UiSession s, PowerRequest request, CancellationToken ct) =>
         {
@@ -34,7 +34,7 @@ internal static class Api
                 throw new ActionException("This context is read-only.", StatusCodes.Status403Forbidden);
             }
             s.Power = request.On;
-            return SessionInfo(s, await s.HasEventStoreAsync(ct));
+            return SessionInfo(s, await s.GetSystemServicesAsync(ct));
         });
 
         api.MapGet("/cluster", async (UiSession s, CancellationToken ct) =>
@@ -259,8 +259,9 @@ internal static class Api
 
     public sealed record PowerRequest(bool On);
 
-    private static SessionDto SessionInfo(UiSession s, bool eventStore) =>
-        new(s.Context.Name, s.Cluster.Endpoint.ToString(), s.ReadOnly, s.Power, s.Version, eventStore, s.Context.Folder, s.Label, s.Color);
+    private static SessionDto SessionInfo(UiSession s, SystemServices services) =>
+        new(s.Context.Name, s.Cluster.Endpoint.ToString(), s.ReadOnly, s.Power, s.Version, services.EventStore, s.Context.Folder, s.Label, s.Color,
+            services.RepairManager, services.FaultAnalysis);
 
     private static NodeDto Node(UiSession s, NodeRow n) => new(
         n.Name, n.Address, n.NodeType, n.Status, Dto.Health(n.Health), n.UpgradeDomain, n.FaultDomain, n.IsSeed, n.CodeVersion,

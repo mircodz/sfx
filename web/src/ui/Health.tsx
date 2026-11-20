@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ago, plural } from "../lib/format";
 import type { Evaluation, HealthReport } from "../lib/types";
 import { Disclosure } from "./Disclosure";
+import { Icon } from "./Icon";
 import { Pill } from "./Pill";
 import { Empty, Section } from "./Section";
 import { TimelineRow } from "./Timeline";
@@ -26,12 +27,24 @@ export function Evaluations({ evaluations }: { evaluations: Evaluation[] }) {
     );
 }
 
-/** Errors and warnings, collapsed behind their counts. Renders nothing when there are none. */
-export function ErrorsAndWarnings({ evaluations }: { evaluations: Evaluation[] }) {
+/**
+ * Errors and warnings, collapsed behind their counts; with `href`, a link to where they're shown in full (the Health
+ * tab) instead. Renders nothing when there are none.
+ */
+export function ErrorsAndWarnings({ evaluations, href }: { evaluations: Evaluation[]; href?: string }) {
     if (evaluations.length === 0) return null;
     const errors = evaluations.filter((e) => e.health === "Error").length;
     const warnings = evaluations.filter((e) => e.health === "Warning").length;
     const counts = [errors ? plural(errors, "error") : null, warnings ? plural(warnings, "warning") : null].filter(Boolean).join(" · ");
+    if (href) {
+        return (
+            <a className="errors-and-warnings errors-link" href={href}>
+                <span>Errors and warnings</span>
+                <span className="disclosure-aside">{counts}</span>
+                <Icon name="chevron-right" className="link-icon" />
+            </a>
+        );
+    }
     return (
         <Disclosure label="Errors and warnings" aside={counts} className="errors-and-warnings">
             <Evaluations evaluations={evaluations} />

@@ -25,18 +25,38 @@ public sealed partial class UiSession(ClusterSession session, ActionLog log, str
     /// <summary>Whether the riskiest actions are offered; starts as the context says, then toggled from the browser.</summary>
     public bool Power { get; set; } = !session.Context.ReadOnly && session.Context.Power;
 
-    private Task<bool>? _eventStore;
+    private Task<SystemServices>? _systemServices;
 
-    /// <summary>Whether the cluster runs the event store; asked once per connection, since it rarely changes.</summary>
-    public Task<bool> HasEventStoreAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Which optional system services the cluster runs; asked once per connection (they rarely change), with one call.
+    /// A failed check isn't kept, so the next request asks again.
+    /// </summary>
+    public Task<SystemServices> GetSystemServicesAsync(CancellationToken cancellationToken)
     {
-        // A failed check isn't kept, so the next request asks again.
-        var check = _eventStore ??= Queries.HasSystemServiceAsync("EventStoreService", CancellationToken.None);
+        var check = _systemServices ??= LoadSystemServicesAsync();
         if (check.IsFaulted)
         {
-            _eventStore = null;
+            _systemServices = null;
         }
         return check.WaitAsync(cancellationToken);
+    }
+
+    /// <summary>The system services if they've been checked already; null until then (so nothing is hidden early).</summary>
+    public SystemServices? KnownSystemServices => _systemServices is { IsCompletedSuccessfully: true } done ? done.Result : null;
+
+    /// <summary>For tests: what the cluster runs, without asking it.</summary>
+    internal void KnowSystemServices(SystemServices services) => _systemServices = Task.FromResult(services);
+
+    public async Task<bool> HasEventStoreAsync(CancellationToken cancellationToken) =>
+        (await GetSystemServicesAsync(cancellationToken)).EventStore;
+
+    private async Task<SystemServices> LoadSystemServicesAsync()
+    {
+        var names = (await Queries.GetServicesAsync(ClusterQueries.SystemApplicationId, CancellationToken.None))
+            .Select(svc => svc.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        bool Has(string service) => names.Contains($"{ClusterQueries.SystemApplicationName}/{service}");
+        return new SystemServices(Has("EventStoreService"), Has("RepairManagerService"), Has("FaultAnalysisService"));
     }
 
     private (DateTime At, bool Enabled)? _defaultServicesUpgrade;

@@ -13,6 +13,10 @@ export interface Session {
     version: string;
     /** Whether the cluster runs the event store; without it, events aren't offered anywhere. */
     eventStore: boolean;
+    /** Whether it runs the repair manager; without it, there are no repair tasks to show. */
+    repairManager: boolean;
+    /** Whether it runs the Fault Analysis Service; the server only offers the actions that need it when it does. */
+    faultAnalysis: boolean;
     folder?: string;
     label?: string;
     color?: FolderColor;

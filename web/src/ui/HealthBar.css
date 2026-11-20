@@ -10,16 +10,25 @@
     font-size: 12px;
 }
 
+/* The parts fill the whole bar; a 2px gap in the card's own color separates them. Only an empty bar shows a track. */
 .health-bar-track {
     display: flex;
     gap: 2px;
     height: 8px;
     border-radius: 4px;
-    background: var(--bg-neutral);
     overflow: hidden;
+}
+
+.health-bar-track:empty {
+    background: var(--bg-neutral);
 }
 
 .health-bar-part {
     flex-basis: 0;
     min-width: 4px;
+}
+
+/* Unknown would vanish on the neutral fill; it needs a grey that reads as a part of the bar. */
+.health-bar-part.tone-neutral {
+    background: var(--border-strong);
 }

@@ -88,6 +88,21 @@ public class WebActionTests
             WebActions.RunAsync(session, action.Id, new ActionRequest(new(action.Target), null, "_Node_1", action.Signature), default));
         Assert.Equal(403, ex.Status);
     }
+
+    [Fact]
+    public async Task Fault_analysis_actions_need_the_service()
+    {
+        var session = Session(power: true);
+        var up = new Dictionary<string, string> { ["node"] = "_Node_1", ["status"] = "Up" };
+        var stop = WebActions.For(session, "node", up).Single(a => a.Id == "node.stop");
+
+        session.KnowSystemServices(new SystemServices(EventStore: false, RepairManager: false, FaultAnalysis: false));
+
+        Assert.DoesNotContain(WebActions.For(session, "node", up), a => a.Id == "node.stop");
+        var ex = await Assert.ThrowsAsync<ActionException>(() =>
+            WebActions.RunAsync(session, stop.Id, new ActionRequest(new(stop.Target), new() { ["seconds"] = "60" }, "_Node_1", stop.Signature), default));
+        Assert.Equal(409, ex.Status);
+    }
 }
 
 public class DefaultServicesTests

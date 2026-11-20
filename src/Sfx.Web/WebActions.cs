@@ -71,7 +71,8 @@ internal sealed record ActionDef(
     Func<Args, bool>? Applies = null,
     Func<Args, string>? ConfirmText = null,
     Func<Args, IReadOnlyList<ActionInputDto>>? Inputs = null,
-    bool Form = false);
+    bool Form = false,
+    bool NeedsFaultAnalysis = false);
 
 /// <summary>
 /// Everything the browser can change, mirroring the TUI's actions (src/Sfx.Tui/EntityActions.cs): read-only sessions get
@@ -163,6 +164,7 @@ internal static class WebActions
             (t, i) => $"Stop {t["node"]} for {i.Int("seconds")}s",
             (s, t, i, ct) => s.Operations.StopNodeAsync(t["node"], TimeSpan.FromSeconds(Positive(i.Int("seconds"))), ct),
             NotForProduction,
+            NeedsFaultAnalysis: true,
             Power: true,
             Applies: t => t["status"] == nameof(NodeStatus.Up),
             ConfirmText: t => t["node"],
@@ -172,6 +174,7 @@ internal static class WebActions
             (t, _) => $"Start {t["node"]}",
             (s, t, _, ct) => s.Operations.StartNodeAsync(t["node"], ct),
             NotForProduction,
+            NeedsFaultAnalysis: true,
             Power: true,
             Applies: t => t["status"] == nameof(NodeStatus.Down)),
 
@@ -203,6 +206,7 @@ internal static class WebActions
             (t, i) => $"Restart partition {t["partitionId"]} ({(i["mode"] == nameof(RestartPartitionMode.OnlyActiveSecondaries) ? "only active secondaries" : "all replicas or instances")})",
             (s, t, i, ct) => s.Operations.RestartPartitionAsync(t["serviceId"], t.Partition("partitionId"), Enum.Parse<RestartPartitionMode>(i["mode"]), ct),
             NotForProduction,
+            NeedsFaultAnalysis: true,
             Power: true,
             Inputs: _ =>
             [
@@ -420,8 +424,10 @@ internal static class WebActions
         }
 
         var args = new Args(target);
+        // Until the system services are known, offer these; running them checks again.
+        var faultAnalysis = session.KnownSystemServices?.FaultAnalysis ?? true;
         return All
-            .Where(a => a.Kind == kind && (!a.Power || session.Power) && (a.Applies?.Invoke(args) ?? true))
+            .Where(a => a.Kind == kind && (!a.Power || session.Power) && (!a.NeedsFaultAnalysis || faultAnalysis) && (a.Applies?.Invoke(args) ?? true))
             .Select(a => new ActionDto(
                 a.Id,
                 a.Title,
@@ -448,6 +454,11 @@ internal static class WebActions
         if (action.Power && !session.Power)
         {
             throw new ActionException("Unlock power actions first.", StatusCodes.Status403Forbidden);
+        }
+        if (action.NeedsFaultAnalysis && !(await session.GetSystemServicesAsync(cancellationToken)).FaultAnalysis)
+        {
+            throw new ActionException(
+                $"'{action.Title}' needs the Fault Analysis Service (FaultAnalysisService), which this cluster doesn't run.", StatusCodes.Status409Conflict);
         }
 
         // The target comes back from the browser; only run it if this server offered exactly this action on exactly this target.

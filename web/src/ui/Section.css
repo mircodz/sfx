@@ -2,8 +2,10 @@
     margin-top: var(--space-5);
 }
 
+/* Label and aside share a baseline, though the aside is smaller. */
 .section-label {
     display: flex;
+    align-items: baseline;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: var(--space-3);
@@ -19,6 +21,7 @@
 
 .group-heading {
     display: flex;
+    align-items: baseline;
     justify-content: space-between;
     gap: var(--space-3);
     margin: var(--space-4) 0 var(--space-2);

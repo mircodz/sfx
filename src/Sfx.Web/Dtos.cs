@@ -6,8 +6,14 @@ namespace Sfx.Web;
 // What the browser gets. Health is always one of the UI's words: Healthy, Warning, Error or Unknown.
 
 /// <param name="EventStore">Whether the cluster runs the event store; without it there are no events to show.</param>
+/// <param name="RepairManager">Whether it runs the repair manager; without it there are no repair tasks.</param>
+/// <param name="FaultAnalysis">Whether it runs the Fault Analysis Service, which stopping nodes and restarting partitions need.</param>
 public sealed record SessionDto(
-    string Context, string Endpoint, bool ReadOnly, bool Power, string Version, bool EventStore, string? Folder, string? Label, string? Color);
+    string Context, string Endpoint, bool ReadOnly, bool Power, string Version, bool EventStore, string? Folder, string? Label, string? Color,
+    bool RepairManager, bool FaultAnalysis);
+
+/// <summary>The optional system services a cluster may run; what isn't there isn't offered.</summary>
+public sealed record SystemServices(bool EventStore, bool RepairManager, bool FaultAnalysis);
 
 public sealed record EvaluationDto(int Depth, string Kind, string Health, string Description);
 

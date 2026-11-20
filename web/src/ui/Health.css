@@ -48,3 +48,19 @@
 .text-button:hover {
     color: var(--text-primary);
 }
+
+.errors-link {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.errors-link:hover > span:first-child {
+    text-decoration: underline;
+}
+
+.errors-link .link-icon {
+    align-self: center;
+}

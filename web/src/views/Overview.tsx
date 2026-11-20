@@ -118,7 +118,7 @@ export function Overview() {
                                             <HealthBar label="Applications" healths={a.map((x) => x.health)} href={href.apps} />
                                             <HealthBar label="Partitions" healths={[...partitions.values()]} href={href.replicas({ view: "Partitions" })} />
                                             <HealthBar label="Replicas" healths={r.map((x) => x.health)} href={href.replicas()} />
-                                            <ErrorsAndWarnings evaluations={c.health.evaluations} />
+                                            <ErrorsAndWarnings evaluations={c.health.evaluations} href={`${href.overview}?tab=health`} />
                                         </Card>
 
                                         <Card title="Unhealthy" aside={plural(badApps.length + badNodes.length, "entity", "entities")} span={8}>

@@ -76,6 +76,11 @@
     font-size: 13px;
 }
 
+/* Values end where the heading's totals end. */
+.load-row > :last-child {
+    text-align: right;
+}
+
 .card-more {
     margin-top: var(--space-3);
     font-size: 12px;

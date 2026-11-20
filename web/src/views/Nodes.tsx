@@ -18,6 +18,7 @@ import { SearchBox, Toolbar } from "../ui/Toolbar";
 import { CountTab, Tabs, useTab } from "../ui/Tabs";
 import { LoadView } from "./LoadView";
 import { Repairs } from "./Repairs";
+import { useRepairsAvailable } from "../lib/session";
 
 const layouts = ["List", "Map"] as const;
 type Layout = (typeof layouts)[number];
@@ -33,6 +34,7 @@ export function Nodes() {
     const [search, setSearch] = useQueryParam("q", "");
     const [selected, setSelected] = useState<string | null>(null);
     const [tab, setTab] = useTab(["nodes", "load", "repairs"] as const);
+    const repairsAvailable = useRepairsAvailable();
 
     return (
         <Load resource={nodes}>
@@ -58,11 +60,11 @@ export function Nodes() {
                             tabs={[
                                 { id: "nodes", label: <CountTab label="Nodes" count={all.length} /> },
                                 { id: "load", label: "Load" },
-                                { id: "repairs", label: "Repairs" },
+                                { id: "repairs", label: "Repairs", hidden: !repairsAvailable },
                             ]}
                         >
                         {tab === "load" && <LoadView />}
-                        {tab === "repairs" && <Repairs />}
+                        {tab === "repairs" && repairsAvailable && <Repairs />}
                         {tab === "nodes" && (
                         <>
                         <div className="section">
