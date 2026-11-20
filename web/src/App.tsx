@@ -5,7 +5,7 @@ import { RefreshContext, useResource } from "./lib/resource";
 import { usePath } from "./lib/router";
 import { Notice } from "./ui/Notice";
 import { Empty } from "./ui/Section";
-import { TopBar } from "./TopBar";
+import { Sidebar } from "./Sidebar";
 import { Activity } from "./views/Activity";
 import { ApplicationDetail } from "./views/ApplicationDetail";
 import { Applications } from "./views/Applications";
@@ -100,17 +100,21 @@ export function App() {
             <SessionContext.Provider value={session.data}>
             <OperationsContext.Provider value={operations}>
             <NoticeContext.Provider value={notify}>
-                <div className="shell">
-                    <TopBar session={session.data} current={path[0] ?? ""} onSessionChange={session.reload} />
-                    {outcome && (
-                        <Notice tone={outcome.ok ? "success" : "danger"} onDismiss={() => setOutcome(null)}>
-                            {outcome.text}
-                        </Notice>
-                    )}
-                    <main className="view">
-                        {/* The gallery runs on fixtures, so it works without a cluster (and without the token). */}
-                        {path[0] === "gallery" ? <Gallery /> : session.data ? <Page path={path} /> : session.error ? <Notice tone="danger">{session.error}</Notice> : null}
-                    </main>
+                <div className="app">
+                    <Sidebar session={session.data} current={path[0] ?? ""} onSessionChange={session.reload} />
+                    <div className="main">
+                        <div className="main-inner">
+                            {outcome && (
+                                <Notice tone={outcome.ok ? "success" : "danger"} onDismiss={() => setOutcome(null)}>
+                                    {outcome.text}
+                                </Notice>
+                            )}
+                            <main className="view">
+                                {/* The gallery runs on fixtures, so it works without a cluster (and without the token). */}
+                                {path[0] === "gallery" ? <Gallery /> : session.data ? <Page path={path} /> : session.error ? <Notice tone="danger">{session.error}</Notice> : null}
+                            </main>
+                        </div>
+                    </div>
                 </div>
             </NoticeContext.Provider>
             </OperationsContext.Provider>

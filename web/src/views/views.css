@@ -75,3 +75,31 @@
     gap: var(--space-4);
     font-size: 13px;
 }
+
+.card-more {
+    margin-top: var(--space-3);
+    font-size: 12px;
+}
+
+/* Inside a card the node map's cells can be smaller: it's a glance, the Nodes page has the full map. */
+.card .node-cell {
+    height: 52px;
+}
+
+.card .node-map {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+
+.card .group-heading:first-child {
+    margin-top: 0;
+}
+
+.upgrade-summary .domains {
+    margin-top: var(--space-2);
+}
+
+.card-facts {
+    margin-top: var(--space-3);
+    font-size: 12px;
+    color: var(--text-secondary);
+}

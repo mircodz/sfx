@@ -1,0 +1,25 @@
+.health-bar + .health-bar {
+    margin-top: var(--space-4);
+}
+
+.health-bar-head {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-1);
+    font-size: 12px;
+}
+
+.health-bar-track {
+    display: flex;
+    gap: 2px;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--bg-neutral);
+    overflow: hidden;
+}
+
+.health-bar-part {
+    flex-basis: 0;
+    min-width: 4px;
+}

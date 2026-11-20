@@ -224,8 +224,8 @@ internal static class WebActions
 
         new("service.scale", "service", "Scale", Risk.Confirm,
             (t, i) => t["kind"] == nameof(ServiceKind.Stateful)
-                ? $"Scale {t["name"]} to {i.Int("count")} replicas" + (i.Optional("min") is { } min ? $" (min {min})" : "")
-                : $"Scale {t["name"]} to {(i.Int("count") == -1 ? "every node" : $"{i.Int("count")} instances")}",
+                ? $"Scale {t["name"]} to {Count(i.Int("count"), "replica")}" + (i.Optional("min") is { } min ? $" (min {min})" : "")
+                : $"Scale {t["name"]} to {(i.Int("count") == -1 ? "every node" : Count(i.Int("count"), "instance"))}",
             (s, t, i, ct) => t["kind"] == nameof(ServiceKind.Stateful)
                 ? s.Operations.ScaleStatefulServiceAsync(t["serviceId"], i.Int("count"), i.Optional("min") is null ? null : i.Int("min"), ct)
                 : s.Operations.ScaleStatelessServiceAsync(t["serviceId"], i.Int("count"), ct),
@@ -495,6 +495,8 @@ internal static class WebActions
 
     private static string Describe(Args replica) =>
         replica["role"] == "Instance" ? $"instance {replica["replicaId"]}" : $"{replica["role"].ToLowerInvariant()} replica {replica["replicaId"]}";
+
+    private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
 
     private static int Positive(int n) => n > 0 ? n : throw new ActionException("Must be more than 0.");
 

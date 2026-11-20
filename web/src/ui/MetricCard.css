@@ -4,9 +4,10 @@
     gap: var(--space-3);
 }
 
+/* As many across as fit, at least 150px each: four on a laptop, six on a wide screen. */
 @media (min-width: 720px) {
     .metrics {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
 }
 

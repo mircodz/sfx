@@ -208,22 +208,25 @@ CSS variables for every color	Hard-coded hex values in components
 Sections 1 to 12 describe the look. This section lists every component the web app (`sfx ui`, in web/) is built from, so new screens are assembled from these and nothing else. If a screen needs something that isn't here, add it here first.
 
 13.1 Decisions
-    Lists are card rows (6. List rows), not tables. They stay comfortable to scan; density comes from putting facts on the secondary line, not from columns.
-    Navigation is one top bar. Cluster status lives on the overview, not in a persistent strip.
+    sfx ui is a desktop control plane first: it's kept open on wide screens and has to show a lot at a glance. Phones still work, but they're the fallback, not the design target (sections 5 and 6 above were written for a 380px widget; where they disagree, this section wins).
+    Navigation is a left sidebar. Cluster status lives on the overview, which is a dashboard of cards.
+    Lists are dense: one bordered card per list with single-line rows in aligned columns (name, facts, reason) once the list is wide enough, wrapping to two lines when narrow.
     Every entity (cluster, node, application, service, partition) gets the same detail page: header, then tabs.
-    Simple actions confirm in a small dialog. Changes with a form (parameters, version, scaling, later config and upgrade policy) open a side panel with two steps: edit, then review.
-    Light, dark and system themes. The theme toggle sets data-theme on <html>; tokens are defined for both.
+    Simple actions confirm in a small dialog. Changes with a form (parameters, version, scaling, cluster upgrades) open a side panel with two steps: edit, then review.
+    Light, dark and system themes. The theme toggle sets data-theme on <html>; tokens are defined for both with light-dark().
     Unhealthy state is called "Errors and warnings" everywhere. Never "Why", "Issues" or "Problems".
+    Page summaries state facts about the thing ("17 applications · 2 error"), never what the page is for, and never plumbing like config paths; when data was loaded goes in the refresh button's tooltip.
 
 13.2 Shell
 
-Top bar
-Sticky, --surface-1 background, hairline bottom border, 48px tall, wraps on narrow screens.
-Left: "sfx" (500) and the context name (13px, secondary). Then the mode, only when it isn't normal: a neutral pill "Read-only", or the power chip.
-Middle: view links (Overview, Nodes, Applications, Upgrades, Activity) as chips; the current one has aria-current="page" and the active chip background.
-Right: the power chip (hidden in read-only contexts) and the theme button.
-Power chip: a chip with aria-pressed. When on, it uses the warning pair (--bg-warning, --text-warning) so a risky mode is never subtle. Label "Power actions".
-Theme button: an icon button cycling system, light, dark (ti-device-desktop, ti-sun, ti-moon), aria-label "Theme: system".
+Sidebar
+232px wide, full height, sticky; hairline right border, --surface-1.
+Top to bottom: "sfx" in Cascadia Code's cursive italic (the one flourish); the context block (folder path in 11px secondary, the context name in 500 with its folder label pill; links to the Contexts page, also "c"); the pages, each an 18px Tabler icon and a 13px label, 34px tall, the current one with the ghost background and 500; at the bottom, after a hairline, the power toggle (amber pair while on, or a Read-only row), the theme button, and the version in muted 11px.
+A running-operations count sits on Activity as a small accent badge.
+Under 1100px the sidebar collapses to 60px of icons with tooltips; under 640px it becomes a scrolling strip across the top.
+
+Page
+Fluid beside the sidebar, 32px side padding (24px under 1100px), content up to 1600px wide. Base text is 13px.
 
 Notice
 A one-line message under the top bar for the outcome of an action. Background and text from a status pair: success for "requested" and "done", danger for failures. Ends with a period. Has a close icon button. Success notices leave after 8 seconds; failures stay until closed. At most one at a time; a new one replaces the old.
@@ -254,7 +257,7 @@ Inside a list: 12px secondary label (node type, application) with the group's co
 
 Metric card: as 6. Metric cards. A card that links somewhere is an <a> and gets --border-strong on hover. The note line may use a status text color when it reports something unhealthy ("2 down").
 
-Row: as 6. List rows, with two variants that look the same:
+Row: as 6. List rows, but dense: consecutive rows join into one card with hairlines between them, 40px tall, and once a row is 820px wide (a container query, so it works in dashboard cards too) its name, facts and reason sit in aligned columns on one line; pills have a fixed 72px width so the columns line up. Two variants that look the same:
     Disclosure row: a <button> with aria-expanded and ti-chevron-down; reveals details beneath.
     Link row: an <a> to another page with ti-chevron-right.
 Anatomy, left to right: icon (18px, secondary), name (14px, 500) over facts (12px, secondary, " · "), optional reason line (12px, in the status text color) when the entity is unhealthy, then a right-aligned value (12px, secondary, e.g. "3 of 3"), the status pill, the chevron. Pills and chevrons are vertically centered on the first line, never stretched.
@@ -339,7 +342,11 @@ In the review step: one row per change. Name (mono, 12px), then old value (secon
 
 List page: page header (no breadcrumb), metric cards when they help, list toolbar, grouped rows.
 Detail page: page header with breadcrumb, actions and refresh; tabs. The Overview tab shows errors and warnings (collapsed), key facts (fields), load (meters), then children as link rows.
-Overview (the cluster's page): page header (cluster name, version, updated), metric cards, errors and warnings (collapsed), unhealthy entities as link rows with their reasons, then running upgrades (upgrade cards without actions) and recent events (timeline) in two columns on wide screens. The cluster manifest and cluster actions are on the cluster's tabs and menu, like any other entity.
+Overview (the cluster's page): a dashboard. Metric cards across (nodes, applications, services, partitions, replicas, upgrades running), then a 12-column grid of cards: Health (a stacked health bar per entity kind, then errors and warnings, collapsed) and Unhealthy (link rows with reasons); Nodes (a compact map by upgrade domain, with the cluster's node types, domains and seed nodes in a line under it) and Upgrades (running ones with their domain strips); Load (meters for metrics with a capacity), Recent changes (one line per change) and Events (only when the cluster has an event store). Every card's aside links to the page with the rest. The cluster manifest and cluster actions are on the cluster's tabs and menu, like any other entity.
+
+Card: a dashboard tile on --surface-2 with a hairline border and 12px radius; title (13px, 500) and aside (12px, secondary, often a link) on one line, then the content. Spans 3 to 12 of the dashboard's 12 columns on wide screens; half width under 1100px; full width on a phone.
+
+Health bar: an entity kind's name, its counts in words ("1 error · 2 warning · 13 healthy"), and one 8px stacked bar of the status backgrounds. Color is never the only signal: the words are always there.
 
 13.7 Code
 

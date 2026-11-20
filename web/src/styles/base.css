@@ -9,9 +9,9 @@ body {
     background: var(--surface-1);
     color: var(--text-primary);
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 400;
-    line-height: 1.4;
+    line-height: 1.45;
     -webkit-font-smoothing: antialiased;
 }
 

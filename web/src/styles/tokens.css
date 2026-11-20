@@ -49,6 +49,8 @@
     --space-4: 12px;
     --space-5: 16px;
     --space-6: 24px;
+
+    --sidebar-width: 232px;
 }
 
 :root[data-theme="light"] {
