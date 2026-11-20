@@ -1,8 +1,22 @@
 # sfx
 
+<div align="center">
+    <img width="640" alt="sfx" src="https://raw.githubusercontent.com/mircodz/sfx/main/docs/img/3.png" /><br>
+</div>
+
+# Introduction
+
 An explorer for [Azure Service Fabric](https://learn.microsoft.com/azure/service-fabric/) clusters, in the terminal
 and in the browser. Browse nodes, applications, services, partitions and replicas; read health, manifests, upgrades
 and load; and run cluster operations, with confirmations and an action log.
+
+In the terminal, `sfx`:
+
+<img width="1912" height="1163" alt="sfx in the terminal: the applications of a cluster, with their type, version, status and health" src="https://raw.githubusercontent.com/mircodz/sfx/main/docs/img/1.png" />
+
+In the browser, `sfx ui`:
+
+<img width="1744" height="1004" alt="sfx ui in the browser: a cluster's overview, with counts, health by kind, unhealthy applications and why, nodes, upgrades, load and recent changes" src="https://raw.githubusercontent.com/mircodz/sfx/main/docs/img/2.png" />
 
 ## Installation
 
