@@ -44,7 +44,7 @@ export function Parameters({ parameters }: { parameters: Parameter[] }) {
                         fields={shown.map((p) => ({
                             name: p.name,
                             value: p.value,
-                            note: p.overridden ? (p.default !== undefined && p.default !== p.value ? `default ${p.default || "empty"}` : undefined) : "default",
+                            note: p.overridden ? (p.default != null && p.default !== p.value ? `default ${p.default || "empty"}` : p.default == null ? "no default" : undefined) : "default",
                         }))}
                     />
                 </>

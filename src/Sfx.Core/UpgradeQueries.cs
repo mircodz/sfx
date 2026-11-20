@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.ServiceFabric.Common;
+using Microsoft.ServiceFabric.Common.Exceptions;
 
 namespace Sfx.Core;
 
@@ -35,33 +36,64 @@ public sealed class UpgradeQueries(ClusterQueries queries)
     /// <summary>The cluster's last upgrade and every application's, leaving out what was never upgraded.</summary>
     public async Task<IReadOnlyList<UpgradeRow>> GetUpgradesAsync(CancellationToken cancellationToken)
     {
-        var client = queries.Client;
-        var cluster = client.Cluster.GetClusterUpgradeProgressAsync(cancellationToken: cancellationToken);
+        var cluster = queries.Client.Cluster.GetClusterUpgradeProgressAsync(cancellationToken: cancellationToken);
         var apps = (await queries.GetApplicationsAsync(cancellationToken))
             .Where(a => a.Id != ClusterQueries.SystemApplicationId)
             .ToList();
+        var upgrades = await GetApplicationUpgradesAsync(apps, cancellationToken);
 
+        var rows = new List<UpgradeRow> { new("cluster", "cluster", null, "", UpgradeReport.From(await cluster)) };
+        rows.AddRange(upgrades);
+        return rows.Where(HasRun).ToList();
+    }
+
+    /// <summary>
+    /// Only the upgrades under way: the cluster's when it's running, pending or failed, and those of the applications
+    /// listed as upgrading, so a large cluster costs one call per running upgrade rather than one per application.
+    /// </summary>
+    public async Task<IReadOnlyList<UpgradeRow>> GetRunningUpgradesAsync(CancellationToken cancellationToken)
+    {
+        var cluster = queries.Client.Cluster.GetClusterUpgradeProgressAsync(cancellationToken: cancellationToken);
+        var upgrading = (await queries.GetApplicationsAsync(cancellationToken))
+            .Where(a => a.Id != ClusterQueries.SystemApplicationId && a.Status == nameof(ApplicationStatus.Upgrading))
+            .ToList();
+        var upgrades = await GetApplicationUpgradesAsync(upgrading, cancellationToken);
+
+        var rows = new List<UpgradeRow>();
+        var clusterReport = UpgradeReport.From(await cluster);
+        if (clusterReport.InProgress || clusterReport.State == nameof(UpgradeState.Failed))
+        {
+            rows.Add(new UpgradeRow("cluster", "cluster", null, "", clusterReport));
+        }
+        rows.AddRange(upgrades);
+        return rows;
+    }
+
+    /// <summary>Each application's last upgrade, at most <see cref="Parallelism"/> asked at a time; ones deleted meanwhile are left out.</summary>
+    private async Task<IReadOnlyList<UpgradeRow>> GetApplicationUpgradesAsync(IReadOnlyList<ApplicationRow> apps, CancellationToken cancellationToken)
+    {
         using var gate = new SemaphoreSlim(Parallelism);
         var upgrades = await Task.WhenAll(apps.Select(async app =>
         {
             await gate.WaitAsync(cancellationToken);
             try
             {
-                var upgrade = await client.Applications.GetApplicationUpgradeAsync(app.Id, cancellationToken: cancellationToken);
+                var upgrade = await queries.Client.Applications.GetApplicationUpgradeAsync(app.Id, cancellationToken: cancellationToken);
                 var report = UpgradeReport.From(upgrade);
                 // While an upgrade runs the application still reports the version it's leaving.
                 var from = app.TypeVersion != report.Target ? app.TypeVersion : "";
                 return new UpgradeRow(app.Name, "application", app.Id, from, report);
+            }
+            catch (ServiceFabricException ex) when (ClusterQueries.IsGone(ex))
+            {
+                return null;
             }
             finally
             {
                 gate.Release();
             }
         }));
-
-        var rows = new List<UpgradeRow> { new("cluster", "cluster", null, "", UpgradeReport.From(await cluster)) };
-        rows.AddRange(upgrades);
-        return rows.Where(HasRun).ToList();
+        return upgrades.OfType<UpgradeRow>().ToList();
     }
 
     /// <summary>What was never upgraded still reports a completed upgrade, but one that never started.</summary>

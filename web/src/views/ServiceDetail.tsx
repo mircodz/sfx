@@ -1,6 +1,6 @@
 import { ActionGroup } from "../actions/ActionGroup";
 import { api } from "../lib/api";
-import { plural, shortName } from "../lib/format";
+import { duration, partitionKey, plural, shortName } from "../lib/format";
 import { useResource } from "../lib/resource";
 import { useEventsAvailable } from "../lib/session";
 import { href } from "../lib/router";
@@ -14,6 +14,7 @@ import { LinkRow } from "../ui/Row";
 import { Section } from "../ui/Section";
 import { CountTab, HealthTab, Tabs, useTab } from "../ui/Tabs";
 import { EntityEvents } from "./Events";
+import { Limited } from "../ui/ShowMore";
 import { Placement } from "./Placement";
 
 const tabs = ["overview", "placement", "health", "events", "manifest", "details"] as const;
@@ -65,24 +66,26 @@ export function ServiceDetail({ appId, serviceId }: { appId: string; serviceId: 
                                 <>
                                     <ErrorsAndWarnings evaluations={d.health.evaluations} />
                                     <Section label="Partitions" aside={<Link href={href.replicas({ service: s.name })}>Replicas</Link>}>
-                                        {d.partitions.map((p) => (
+                                        <Limited items={byKey(d.partitions)}>
+                                            {(p) => (
                                             <LinkRow
                                                 key={p.id}
                                                 href={href.partition(appId, serviceId, p.id)}
                                                 icon="layout-grid"
                                                 name={<span className="mono">{p.id}</span>}
-                                                sub={`${p.scheme} · ${p.status} · ${replicaSet(s.kind, p.replicaSet)}`}
+                                                sub={`${partitionKey(p)} · ${p.status} · ${replicaSet(s.kind, p.replicaSet)}`}
                                                 reason={p.reason}
                                                 status={p.health}
                                             />
-                                        ))}
+                                            )}
+                                        </Limited>
                                     </Section>
                                     <Section label="Description">
-                                        <Fields fields={d.description} />
+                                        <Fields fields={d.description.map((f) => ({ ...f, value: seconds(f.value) }))} />
                                     </Section>
                                 </>
                             )}
-                            {tab === "placement" && <Placement serviceId={serviceId} />}
+                            {tab === "placement" && <Placement appId={appId} serviceId={serviceId} />}
                             {tab === "health" && <HealthPanel health={d.health} />}
                             {tab === "events" && <EntityEvents entity={s.name} />}
                             {tab === "manifest" && <Document cacheKey={`service-manifest:${serviceId}`} load={() => api.serviceManifest(appId, serviceId)} name={s.typeName} />}
@@ -93,4 +96,18 @@ export function ServiceDetail({ appId, serviceId }: { appId: string; serviceId: 
             }}
         </Load>
     );
+}
+
+/** Ranged partitions in key order rather than by id. Keys are 64-bit, so compared as BigInt. */
+function byKey<T extends { lowKey?: string | null }>(partitions: T[]) {
+    if (!partitions.every((p) => p.lowKey != null && /^-?\d+$/.test(p.lowKey))) return partitions;
+    return [...partitions].sort((a, b) => (BigInt(a.lowKey!) < BigInt(b.lowKey!) ? -1 : BigInt(a.lowKey!) > BigInt(b.lowKey!) ? 1 : 0));
+}
+
+/** "1800s" as "30m"; a wait of decades is SF's way of saying never. */
+function seconds(value: string) {
+    const m = /^(\d+)s$/.exec(value);
+    if (!m) return value;
+    const n = Number(m[1]);
+    return n >= 10 * 365 * 86400 ? "No limit" : duration(n);
 }

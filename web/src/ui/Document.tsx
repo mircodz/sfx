@@ -40,15 +40,18 @@ export function Document({ cacheKey, load, name }: { cacheKey: string; load: () 
                     <div className="document-toolbar">
                         <span className="secondary">{d.format === "none" ? "Text" : d.format.toUpperCase()}</span>
                         <span className="spacer" />
-                        <button type="button" className="chip" aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
-                            Wrap lines
-                        </button>
                         <IconButton
                             icon={copied ? "check" : "copy"}
                             label={copied ? "Copied" : "Copy"}
-                            onClick={() => navigator.clipboard.writeText(d.text).then(() => setCopied(true))}
+                            onClick={() => navigator.clipboard.writeText(d.text).then(() => {
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 2000);
+                            })}
                         />
                         <IconButton icon="download" label="Download" onClick={() => download(d.text, `${name}.${d.format === "none" ? "txt" : d.format}`)} />
+                        <button type="button" className="chip" aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
+                            Wrap lines
+                        </button>
                     </div>
                     <Code text={d.text} format={d.format} wrap={wrap} />
                 </div>

@@ -51,6 +51,13 @@ export function Replicas() {
     const [app, setApp] = useQueryParam("app", "");
     const [service, setService] = useQueryParam("service", "");
     const [limit, setLimit] = useState(pageSize);
+    // A new filter starts from the top again rather than keeping however far the last one was paged.
+    const filterKey = [view, role, health, grouping, search, node, app, service].join("\0");
+    const [limitFor, setLimitFor] = useState(filterKey);
+    if (limitFor !== filterKey) {
+        setLimitFor(filterKey);
+        setLimit(pageSize);
+    }
 
     return (
         <Load resource={replicas}>
@@ -58,7 +65,7 @@ export function Replicas() {
                 const q = search.toLowerCase();
                 const scoped = all.filter((r) => (!node || r.node === node) && (!app || r.application === app) && (!service || r.service === service));
                 const shown = scoped.filter(
-                    (r) => roleMatches(role, r) && matches(health, r.health) && (!q || `${r.service} ${r.node} ${r.role} ${r.status} ${r.partitionId}`.toLowerCase().includes(q)),
+                    (r) => roleMatches(role, r) && matches(health, view === "Partitions" ? r.partitionHealth : r.health) && (!q || `${r.service} ${r.node} ${r.role} ${r.status} ${r.partitionId}`.toLowerCase().includes(q)),
                 );
                 const scope = [node && `on ${node}`, app && `in ${app}`, service && `of ${service}`].filter(Boolean).join(" ");
                 return (

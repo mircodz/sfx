@@ -204,10 +204,10 @@ function ContextRow({
                         {c.endpoint} · {c.auth.join(", ")}
                         {c.folder ? ` · ${folderLabel(c.folder)}` : ""}
                         {!c.saved ? " · from the command line" : ""}
+                        {c.readOnly ? " · read-only" : ""}
                     </span>
                 </span>
                 <ContextLabel label={c.label} color={c.color} />
-                {c.readOnly && <span className="pill tone-neutral">Read-only</span>}
                 {current ? <span className="pill tone-accent">Connected</span> : connecting && !connecting.error ? <span className="pill tone-neutral">Connecting</span> : <Icon name="chevron-right" className="row-chevron" />}
             </button>
             {connecting && (

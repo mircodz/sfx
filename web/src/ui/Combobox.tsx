@@ -51,7 +51,9 @@ export function Combobox({
         } else if (e.key === "Enter") {
             e.preventDefault();
             pick(shown[active]);
-        } else if (e.key === "Escape" && open) {
+        } else if (e.key === "Escape" && shown.length > 0) {
+            // Close the list, and only the list: not the panel it's in.
+            e.preventDefault();
             e.stopPropagation();
             setOpen(false);
         }

@@ -115,6 +115,10 @@ public static class ClusterSettings
                         .ToList()))
                 .ToList();
     }
+
+    /// <summary>The config version a cluster manifest is, from its root <c>Version</c>; null when it doesn't say.</summary>
+    public static string? ConfigVersion(string manifest) =>
+        XDocument.Parse(manifest).Root?.Attribute("Version")?.Value is { Length: > 0 } version ? version : null;
 }
 
 /// <summary>One line of the action log.</summary>

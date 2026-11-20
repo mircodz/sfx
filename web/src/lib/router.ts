@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 // Hash routing: #/apps/orders/services/orders~Counter?tab=health. The path picks the page; the query holds the page's
 // own state (tab, filters) so links and reloads keep it.
@@ -37,19 +37,21 @@ export function usePath() {
     return path;
 }
 
-/** One query parameter as state. Setting it to the default removes it from the URL. */
+function subscribe(onChange: () => void) {
+    window.addEventListener("hashchange", onChange);
+    window.addEventListener(changed, onChange);
+    return () => {
+        window.removeEventListener("hashchange", onChange);
+        window.removeEventListener(changed, onChange);
+    };
+}
+
+/**
+ * One query parameter as state, read straight from the URL (so back, forward, links and edits to the address all
+ * show). Setting it to the default removes it from the URL.
+ */
 export function useQueryParam<T extends string = string>(name: string, fallback: NoInfer<T>): [T, (value: T) => void] {
-    const read = () => (readQuery().get(name) as T | null) ?? fallback;
-    const [value, setValue] = useState<T>(read);
-    useEffect(() => {
-        const onChange = () => setValue(read());
-        window.addEventListener("hashchange", onChange);
-        window.addEventListener(changed, onChange);
-        return () => {
-            window.removeEventListener("hashchange", onChange);
-            window.removeEventListener(changed, onChange);
-        };
-    });
+    const value = (useSyncExternalStore(subscribe, () => readQuery().get(name)) as T | null) ?? fallback;
     const set = (next: T) => {
         const query = readQuery();
         if (next === fallback || next === "") query.delete(name);

@@ -39,7 +39,7 @@ internal static class ApiReasons
         UiSession s, string kind, IReadOnlyList<T> rows, Func<T, string> id, Func<T, string> health, Func<T, string, T> withReason,
         CancellationToken cancellationToken)
     {
-        var unhealthy = rows.Where(r => health(r) is "Warning" or "Error").Select(id).ToList();
+        var unhealthy = rows.Where(r => health(r) is "Warning" or "Error").Select(r => (id(r), health(r))).ToList();
         if (unhealthy.Count == 0)
         {
             return rows;

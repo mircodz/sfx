@@ -1,5 +1,5 @@
 import { api } from "../lib/api";
-import { plural } from "../lib/format";
+import { natural, plural } from "../lib/format";
 import { useResource } from "../lib/resource";
 import { href } from "../lib/router";
 import type { ClusterReplica } from "../lib/types";
@@ -7,21 +7,24 @@ import { Load } from "../ui/Load";
 import { Empty, Section } from "../ui/Section";
 import "./Placement.css";
 
-const letter = (role: string) => (role === "Primary" ? "P" : role === "Instance" ? "I" : role.endsWith("Secondary") ? "S" : role.slice(0, 1));
+/** P primary, S active secondary, s idle secondary (still building), I instance, ? anything else. */
+const letter = (role: string) => (role === "Primary" ? "P" : role === "Instance" ? "I" : role === "ActiveSecondary" ? "S" : role === "IdleSecondary" ? "s" : "?");
 
 /**
  * Where a service's replicas are: partitions as rows, nodes as columns, each cell the replica's role. Shows
  * imbalance, partitions short of replicas, and what a node going down would cost.
  */
-export function Placement({ serviceId }: { serviceId: string }) {
-    const replicas = useResource("replicas", api.replicas);
+export function Placement({ appId, serviceId }: { appId: string; serviceId: string }) {
+    const replicas = useResource(`service-replicas:${serviceId}`, () => api.serviceReplicas(appId, serviceId));
     return (
         <Load resource={replicas} shape="rows">
             {(all) => {
-                const mine = all.filter((r) => r.serviceId === serviceId);
+                const mine = all;
                 if (mine.length === 0) return <Empty>This service has no replicas placed.</Empty>;
-                const nodes = [...new Set(all.map((r) => r.node))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+                // Only nodes that host this service: on a 400-node cluster, a column for every node says nothing.
+                const nodes = [...new Set(mine.map((r) => r.node))].sort(natural);
                 const partitions = [...new Set(mine.map((r) => r.partitionId))];
+                const firstOf = new Map(mine.map((r) => [r.partitionId, r]));
                 const at = new Map<string, ClusterReplica[]>();
                 for (const r of mine) at.set(`${r.partitionId}|${r.node}`, [...(at.get(`${r.partitionId}|${r.node}`) ?? []), r]);
                 return (
@@ -42,7 +45,7 @@ export function Placement({ serviceId }: { serviceId: string }) {
                                 </thead>
                                 <tbody>
                                     {partitions.map((p) => {
-                                        const first = mine.find((r) => r.partitionId === p)!;
+                                        const first = firstOf.get(p)!;
                                         return (
                                             <tr key={p}>
                                                 <th scope="row">
@@ -61,6 +64,7 @@ export function Placement({ serviceId }: { serviceId: string }) {
                                                                     title={`${r.role} · ${r.status} · ${r.health}`}
                                                                 >
                                                                     {letter(r.role)}
+                                                                    {r.status === "Down" ? " down" : r.health === "Error" ? " error" : ""}
                                                                 </span>
                                                             ))}
                                                         </td>
@@ -72,7 +76,7 @@ export function Placement({ serviceId }: { serviceId: string }) {
                                 </tbody>
                             </table>
                         </div>
-                        <p className="placement-legend secondary small">P primary · S secondary · I instance · red when down or in error · empty: none on that node</p>
+                        <p className="placement-legend secondary small">P primary · S secondary · s idle secondary (still building) · I instance · "down" or "error" in red when a replica is · only the nodes hosting this service.</p>
                     </Section>
                 );
             }}

@@ -33,6 +33,7 @@ public sealed partial class UiSession
     /// </summary>
     internal OperationDto Track(string actionId, string title, Args target, Args inputs)
     {
+        ForgetUpgrades();
         var started = DateTime.UtcNow;
         OperationProbe? probe;
         try

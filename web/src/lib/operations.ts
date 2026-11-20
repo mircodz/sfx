@@ -34,10 +34,14 @@ export function useOperationsPoll(generation: number, onSettled: (op: Operation)
                 () => {},
             );
         load();
-        const id = setInterval(load, running ? 3000 : 15000);
+        // Hidden tabs don't need to know; they catch up when shown.
+        const id = setInterval(() => document.visibilityState === "visible" && load(), running ? 3000 : 15000);
+        const onVisible = () => document.visibilityState === "visible" && load();
+        document.addEventListener("visibilitychange", onVisible);
         return () => {
             live = false;
             clearInterval(id);
+            document.removeEventListener("visibilitychange", onVisible);
         };
     }, [running, generation]);
 

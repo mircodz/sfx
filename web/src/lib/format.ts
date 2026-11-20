@@ -6,15 +6,25 @@ export function count<T>(items: T[], pred: (t: T) => boolean) {
     return items.filter(pred).length;
 }
 
-export function number(n: number) {
-    return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 1 });
+/** Whole numbers as they are; fractions with enough digits that a small load doesn't read as 0. */
+/** A load metric as people say it: the built-in ones without their "servicefabric:/_" prefix. */
+export function metricName(name: string) {
+    return name.replace(/^servicefabric:\/_/, "");
 }
+
+export function number(n: number) {
+    if (Number.isInteger(n)) return n.toLocaleString();
+    return n.toLocaleString(undefined, Math.abs(n) < 1 ? { maximumSignificantDigits: 2 } : { maximumFractionDigits: 1 });
+}
+
+/** Natural order for names with numbers in them: _Node_2 before _Node_10. */
+export const natural = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
 export function duration(seconds: number) {
     const m = Math.floor(seconds / 60);
     const h = Math.floor(m / 60);
     const d = Math.floor(h / 24);
-    if (d > 0) return plural(d, "day");
+    if (d > 0) return h % 24 ? `${plural(d, "day")} ${h % 24}h` : plural(d, "day");
     if (h > 0) return m % 60 ? `${h}h ${m % 60}m` : `${h}h`;
     if (m > 0) return `${m}m`;
     return `${Math.floor(seconds)}s`;
@@ -58,4 +68,11 @@ export function shortName(name: string, parent: string) {
 /** First letter lowercased unless it's an acronym or a name: "Restart" + "Replica 12" reads "Restart replica 12". */
 export function lowerFirst(text: string) {
     return /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
+}
+
+/** A partition's key: "keys 0 to 9", "named west", or the scheme alone for a singleton. */
+export function partitionKey(p: { scheme: string; lowKey?: string | null; highKey?: string | null; name?: string | null }) {
+    if (p.name) return `named ${p.name}`;
+    if (p.lowKey != null && p.highKey != null) return p.lowKey === p.highKey ? `key ${p.lowKey}` : `keys ${p.lowKey} to ${p.highKey}`;
+    return p.scheme;
 }

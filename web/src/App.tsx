@@ -47,7 +47,7 @@ function Page({ path }: { path: string[] }) {
         case "contexts":
             return <Contexts />;
         default:
-            return <Empty>There's no page here. Pick one from the top bar.</Empty>;
+            return <Empty>There's no page here. Pick one from the sidebar.</Empty>;
     }
 }
 
@@ -77,12 +77,20 @@ export function App() {
         if (generation > 0) reloadSession();
     }, [generation, reloadSession]);
 
-    // "c" opens the contexts, as in the terminal; not while typing or in a dialog.
+    // As in the terminal: "c" opens the contexts, "/" finds the page's filter box; not while typing or in a dialog.
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             const el = e.target as HTMLElement;
-            if (e.key !== "c" || e.metaKey || e.ctrlKey || e.altKey || el.closest("input, textarea, select, [contenteditable], dialog")) return;
-            location.hash = "#/contexts";
+            if (e.metaKey || e.ctrlKey || e.altKey || el.closest("input, textarea, select, [contenteditable], dialog")) return;
+            if (e.key === "c" && !location.hash.startsWith("#/contexts")) {
+                location.hash = "#/contexts";
+            } else if (e.key === "/" || e.key === "c") {
+                const search = document.querySelector<HTMLInputElement>("main input[type=search]");
+                if (!search) return;
+                e.preventDefault();
+                search.focus();
+                search.select();
+            }
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);

@@ -40,10 +40,12 @@
     gap: var(--space-2);
 }
 
+/* One line however deep: the earlier crumbs shrink and truncate first, the nearest parent stays readable. */
 .crumbs {
     list-style: none;
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    min-width: 0;
     align-items: center;
     margin: 0 0 var(--space-1);
     padding: 0;
@@ -54,8 +56,17 @@
 .crumbs li {
     display: inline-flex;
     align-items: center;
+    flex: 0 1 auto;
     min-width: 0;
     max-width: 100%;
+}
+
+.crumbs li:last-child {
+    flex-shrink: 0.2;
+}
+
+.crumb-sep {
+    flex: none;
 }
 
 .crumbs a {

@@ -35,9 +35,19 @@ export function ScaleEditor({ action, onClose }: { action: Action; onClose: () =
     const draft = {
         changes,
         errors: (countError ? 1 : 0) + (minError ? 1 : 0),
-        effect:
-            `Applied right away, without an upgrade or restarts: the cluster ${n > Number(count0) ? "builds new" : "removes"} ${noun} to match.` +
-            (raisesMin ? " Partitions with fewer replicas up than the new minimum stop accepting writes until enough come back." : ""),
+        effect: [
+            "Applied right away, without an upgrade or restarts.",
+            count !== count0 &&
+                (n === -1
+                    ? `The cluster places one instance on every node it may use.`
+                    : Number(count0) === -1
+                      ? `The cluster keeps ${n} ${noun} instead of one on every node, removing the rest.`
+                      : `The cluster ${n > Number(count0) ? "builds new" : "removes"} ${noun} to match.`),
+            raisesMin && "Partitions with fewer replicas up than the new minimum stop accepting writes until enough come back.",
+            stateful && min !== min0 && !raisesMin && "A lower minimum lets partitions keep accepting writes with fewer replicas up, at less safety.",
+        ]
+            .filter(Boolean)
+            .join(" "),
         inputs: (stateful && min !== min0 ? { count, min } : { count }) as Record<string, string>,
         submitLabel: `Scale ${action.target.name ?? ""}`,
     };

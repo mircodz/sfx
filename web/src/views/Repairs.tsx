@@ -36,7 +36,7 @@ export function Repairs() {
                             </>
                         }
                         detail={r.description || undefined}
-                        status={active(r.state) ? "In progress" : r.result && r.result !== "Succeeded" ? "Failed" : "Done"}
+                        status={active(r.state) ? "In progress" : r.result === "Cancelled" || r.result === "Interrupted" ? "Cancelled" : r.result && r.result !== "Succeeded" ? "Failed" : "Done"}
                     />
                 );
                 return (

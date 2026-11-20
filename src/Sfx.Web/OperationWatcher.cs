@@ -23,17 +23,7 @@ internal static class OperationWatcher
                 replicas.Select(r => (r.Id, r.NodeName, r.Role)).ToList());
         },
 
-        "service.scale" => async ct =>
-        {
-            var requested = inputs.Int("count");
-            var partitions = await s.Queries.GetPartitionsAsync(target["serviceId"], ct);
-            var counts = await Task.WhenAll(partitions.Select(async p =>
-            {
-                var replicas = await s.Queries.GetReplicasAsync(p.Id, ct);
-                return (p.Status, replicas.Count(r => r.Status == nameof(ReplicaStatus.Ready) && CountedRoles.Contains(r.Role)));
-            }));
-            return SettleChecks.ScaleProgress(requested, counts, target["kind"] == nameof(ServiceKind.Stateful));
-        },
+        "service.scale" => ScaleProbe(s, target, inputs),
 
         "node.deactivate" or "node.remove-data" => NodeReaches(s, target["node"], nameof(NodeStatus.Disabled)),
         "node.activate" or "node.start" => NodeReaches(s, target["node"], nameof(NodeStatus.Up)),
@@ -77,6 +67,33 @@ internal static class OperationWatcher
 
         _ => null,
     };
+
+    /// <summary>
+    /// Counts ready replicas in every partition, <see cref="Bounded.Parallelism"/> at a time. A big service takes a call per
+    /// partition, so it's counted every partitions/100 seconds (at least every 3); polls in between get the last count.
+    /// </summary>
+    private static OperationProbe ScaleProbe(UiSession s, Args target, Args inputs)
+    {
+        (string State, string? Detail)? last = null;
+        var next = DateTime.MinValue;
+        return async ct =>
+        {
+            if (last is { } previous && DateTime.UtcNow < next)
+            {
+                return previous;
+            }
+            var requested = inputs.Int("count");
+            var partitions = await s.Queries.GetPartitionsAsync(target["serviceId"], ct);
+            var counts = await Bounded.SelectAsync(partitions, async p =>
+            {
+                var replicas = await s.Queries.GetReplicasAsync(p.Id, ct);
+                return (p.Status, replicas.Count(r => r.Status == nameof(ReplicaStatus.Ready) && CountedRoles.Contains(r.Role)));
+            });
+            next = DateTime.UtcNow + TimeSpan.FromSeconds(Math.Max(3, partitions.Count / 100.0));
+            last = SettleChecks.ScaleProgress(requested, counts, target["kind"] == nameof(ServiceKind.Stateful));
+            return last.Value;
+        };
+    }
 
     private static OperationProbe NodeReaches(UiSession s, string node, string expected) => async ct =>
         SettleChecks.NodeStatus(expected, (await s.Inspector.GetNodeAsync(node, ct)).NodeStatus?.ToString() ?? "");

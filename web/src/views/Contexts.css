@@ -19,7 +19,15 @@
 }
 
 .folder-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-weight: 500;
+}
+
+.folder-heading > .secondary {
+    white-space: nowrap;
 }
 
 .folder-chevron {
@@ -37,6 +45,7 @@
 
 .context-row.current {
     border-color: var(--border-accent);
+    box-shadow: inset 0 0 0 1px var(--border-accent);
 }
 
 .sign-in {

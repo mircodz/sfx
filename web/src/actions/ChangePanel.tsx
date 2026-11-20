@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Action } from "../lib/types";
 import { Button } from "../ui/Button";
@@ -43,6 +43,14 @@ export function ChangePanel({
     const [running, setRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const dirty = draft.changes.length > 0;
+    // A double click on "Review changes" mustn't land on the button that replaces it and submit unseen.
+    const reviewedAt = useRef(0);
+    const [, rerender] = useState(0);
+    const toReview = () => {
+        reviewedAt.current = Date.now();
+        setStep("review");
+        setTimeout(() => rerender((n) => n + 1), 450);
+    };
 
     const submit = async () => {
         setRunning(true);
@@ -67,24 +75,26 @@ export function ChangePanel({
                 </ol>
             }
             onClose={onClose}
-            onCancel={() => !dirty || running || confirm("Discard your changes?")}
-            footer={
+            onCancel={() => !running && (!dirty || confirm("Discard your changes?"))}
+            footer={(close) =>
                 step === "edit" ? (
                     <>
-                        <Button variant="primary" disabled={!dirty || draft.errors > 0} onClick={() => setStep("review")}>
+                        <Button key="review" variant="primary" disabled={!dirty || draft.errors > 0} onClick={toReview}>
                             Review changes
                         </Button>
-                        <Button onClick={onClose}>Cancel</Button>
+                        <Button key="cancel" onClick={close}>
+                            Cancel
+                        </Button>
                         <span className="panel-status">
                             {draft.errors > 0 ? "Fix the highlighted fields to continue." : dirty ? `${draft.changes.length} ${draft.changes.length === 1 ? "change" : "changes"}.` : "Nothing changed yet."}
                         </span>
                     </>
                 ) : (
                     <>
-                        <Button variant="primary" disabled={running} onClick={submit}>
+                        <Button key="submit" variant="primary" disabled={running || draft.errors > 0 || Date.now() - reviewedAt.current < 400} onClick={submit}>
                             {running ? "Working…" : draft.submitLabel}
                         </Button>
-                        <Button disabled={running} onClick={() => setStep("edit")}>
+                        <Button key="back" disabled={running} onClick={() => setStep("edit")}>
                             Back
                         </Button>
                     </>

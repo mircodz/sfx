@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ActionGroup } from "../actions/ActionGroup";
 import { api } from "../lib/api";
-import { plural, shortName } from "../lib/format";
+import { partitionKey, plural, shortName } from "../lib/format";
 import { useResource } from "../lib/resource";
 import { useEventsAvailable } from "../lib/session";
 import { href } from "../lib/router";
@@ -34,7 +34,8 @@ export function PartitionDetail({ appId, serviceId, partitionId }: { appId: stri
             {(d) => {
                 const p = d.partition;
                 const s = d.service;
-                const appName = s.name.split("/").slice(0, -1).join("/");
+                // From the route's id, not by cutting the service name: nested applications (fabric:/a/b) have more slashes.
+                const appName = `fabric:/${appId.replaceAll("~", "/")}`;
                 const noun = s.kind === "Stateful" ? "replica" : "instance";
                 return (
                     <>
@@ -43,7 +44,7 @@ export function PartitionDetail({ appId, serviceId, partitionId }: { appId: stri
                         </h2>
                         <PageHeader
                             title={<span className="mono">{p.id}</span>}
-                            summary={`${p.scheme} · ${p.status} · ${replicaSet(s.kind, p.replicaSet)}`}
+                            summary={`${partitionKey(p)} · ${p.status} · ${replicaSet(s.kind, p.replicaSet)}`}
                             crumbs={[
                                 { label: "Applications", href: href.apps },
                                 { label: appName, href: href.app(appId) },

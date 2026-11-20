@@ -12,12 +12,12 @@
     --bg-neutral: light-dark(#f1efe8, #3a3a37);
     --text-primary: light-dark(#1f1e1d, #f1efe8);
     --text-secondary: light-dark(#5f5e5a, #b4b2a9);
-    --text-muted: #888780;
+    --text-muted: light-dark(#6f6e69, #9c9a92);
     --border: light-dark(rgba(0, 0, 0, 0.12), rgba(255, 255, 255, 0.14));
     --border-strong: light-dark(rgba(0, 0, 0, 0.28), rgba(255, 255, 255, 0.32));
     --border-accent: light-dark(#185fa5, #85b7eb);
     --fill-ghost-selected: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
-    --backdrop: rgba(0, 0, 0, 0.35);
+    --backdrop: light-dark(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.55));
 
     /* Status roles: background and text pairs */
     --bg-success: light-dark(#c0dd97, #27500a);
@@ -28,9 +28,16 @@
     --text-danger: light-dark(#791f1f, #f7c1c1);
     --bg-accent: light-dark(#b5d4f4, #0c447c);
     --text-accent: light-dark(#0c447c, #b5d4f4);
+    /* Status as a filled bar: the dark theme's pill backgrounds are too close to each other and the card for that. */
+    --bar-success: light-dark(#c0dd97, #639922);
+    --bar-warning: light-dark(#fac775, #ba7517);
+    --bar-danger: light-dark(#f7c1c1, #e24b4a);
 
     /* Progress and meters */
     --fill-accent: light-dark(#185fa5, #378add);
+    /* Behind white text: the dark theme's brighter accent is too light for it (3.6:1), this one is 6.5:1. */
+    --fill-button: #185fa5;
+    --text-on-fill: #ffffff;
     --fill-warning: light-dark(#ba7517, #ef9f27);
 
     --focus-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--border-accent);

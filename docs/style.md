@@ -271,7 +271,11 @@ A key-value list (<dl>). Two columns of pairs on wide screens, one on narrow. La
 
 Status pill: as 6. Status pills. Two additions for real data: "Unknown" (neutral pair) when the cluster doesn't report health, and the overall upgrade words "In progress", "Paused", "Complete", "Rolled back" (accent, warning, success, neutral).
 
-Meter: as 6. Progress and meters, with the value on the right of the label line ("74 of 100 · 74%"). Metrics without a capacity are shown as fields, not meters.
+Meter: as 6. Progress and meters, with the value on the right of the label line ("74 of 100 · 74%"). Metrics without a capacity are shown as fields, not meters. The one exception is comparing nodes on the Load tab: there a metric without a capacity gets grey bars relative to the busiest node (never the accent fill, which means "how full"), and a metric no node reports is one line, not a list of zeros. Metric names drop the built-in "servicefabric:/_" prefix everywhere.
+
+Primary button: white text on --fill-button (#185fa5) in both themes; the dark theme's lighter accent is too pale behind white text.
+
+Loading placeholders: in the shape of what's coming. A page gets crumbs, title, summary and the tab line, then joined 40px rows; the Overview gets six metric cards and dashboard cards. A first load that fails says so as a sentence ("Can't reach the cluster. Connection refused.") with Try again.
 
 Node map: as 6. Map cells.
 

@@ -1,9 +1,9 @@
 // Mirrors src/Sfx.Web/Dtos.cs and WebActions.cs.
 
 export type Health = "Healthy" | "Warning" | "Error" | "Unknown";
-export type DomainState = "Done" | "Upgrading" | "Verifying" | "Pending" | "Failed";
+export type DomainState = "Done" | "Upgrading" | "Verifying" | "Pending" | "Failed" | "Rolled back";
 /** "In progress" is an operation or upgrade still running. */
-export type Status = Health | DomainState | "In progress";
+export type Status = Health | DomainState | "In progress" | "Rolling back" | "Cancelled" | "Complete" | "Paused";
 
 export interface Session {
     context: string;
@@ -235,6 +235,11 @@ export interface Partition {
     status: string;
     health: Health;
     replicaSet: string;
+    /** Int64Range partitions: the key range, as strings since 64-bit keys don't fit a JS number. */
+    lowKey?: string | null;
+    highKey?: string | null;
+    /** Named partitions: the name. */
+    name?: string | null;
     /** Why it is unhealthy, for Warning and Error. */
     reason?: string;
 }
@@ -397,5 +402,29 @@ export interface LoadMetric {
     clusterLoad: number;
     clusterCapacity?: number;
     balanced?: boolean;
+    /** Empty unless asked for with ?nodes=true (one call per node, so only on the Load tab). */
     nodes: { node: string; load: number; capacity?: number }[];
+    minNode?: string;
+    minLoad?: number;
+    maxNode?: string;
+    maxLoad?: number;
+}
+
+/** How many entities of a kind are in each health state, from the cluster's health statistics. */
+export interface HealthCount {
+    kind: "Node" | "Application" | "Service" | "Partition" | "Replica";
+    healthy: number;
+    warning: number;
+    error: number;
+}
+
+/** Everything the overview needs, from a handful of calls however big the cluster is. */
+export interface Overview {
+    name: string;
+    endpoint: string;
+    codeVersion: string;
+    health: HealthReport;
+    counts: HealthCount[];
+    load: Omit<LoadMetric, "nodes">[];
+    runningUpgrades: Upgrade[];
 }

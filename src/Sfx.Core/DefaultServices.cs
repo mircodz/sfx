@@ -7,7 +7,7 @@ namespace Sfx.Core;
 /// A parameter that an application manifest's default service uses, e.g. <c>[Counter_TargetReplicaSetSize]</c> in
 /// the Counter service's <c>TargetReplicaSetSize</c>.
 /// </summary>
-/// <param name="Service">The default service's name, e.g. "Counter".</param>
+/// <param name="Service">The default service's (or service group's) name, e.g. "Counter".</param>
 /// <param name="Setting">The attribute that uses it, e.g. "TargetReplicaSetSize" or "PartitionCount".</param>
 /// <param name="Partitioning">It sets how the service is partitioned, which can never change once the service exists.</param>
 public sealed record DefaultServiceUse(string Parameter, string Service, string Setting, bool Partitioning);
@@ -21,7 +21,7 @@ public static partial class DefaultServices
     private static readonly HashSet<string> PartitionElements =
         ["UniformInt64Partition", "NamedPartition", "SingletonPartition"];
 
-    /// <summary>Every use of a parameter by a default service in an application manifest.</summary>
+    /// <summary>Every use of a parameter by a default service or service group in an application manifest.</summary>
     public static IReadOnlyList<DefaultServiceUse> ParameterUses(string applicationManifest)
     {
         var root = XDocument.Parse(applicationManifest).Root;
@@ -32,7 +32,7 @@ public static partial class DefaultServices
         }
 
         var uses = new List<DefaultServiceUse>();
-        foreach (var service in section.Descendants().Where(e => e.Name.LocalName == "Service"))
+        foreach (var service in section.Elements().Where(e => e.Name.LocalName is "Service" or "ServiceGroup"))
         {
             var name = (string?)service.Attribute("Name") ?? "";
             foreach (var element in service.DescendantsAndSelf())
@@ -57,6 +57,24 @@ public static partial class DefaultServices
         }
         return uses.Distinct().ToList();
     }
+
+    /// <summary>
+    /// The parameters whose value the application has after an upgrade differs from the one it has now. A parameter
+    /// the application doesn't set follows its version's default, so a default that changed between versions counts too.
+    /// Parameters new in the target version are left out: nothing running uses them yet.
+    /// </summary>
+    /// <param name="current">What the application sets today.</param>
+    /// <param name="currentDefaults">The defaults of the version it runs.</param>
+    /// <param name="upgraded">What the upgrade sets.</param>
+    /// <param name="targetDefaults">The defaults of the version it upgrades to; also every parameter that version has.</param>
+    public static IReadOnlyList<string> ChangedParameters(
+        IReadOnlyDictionary<string, string> current, IReadOnlyDictionary<string, string> currentDefaults,
+        IReadOnlyDictionary<string, string> upgraded, IReadOnlyDictionary<string, string> targetDefaults) =>
+        targetDefaults.Keys
+            .Where(name => (current.GetValueOrDefault(name) ?? currentDefaults.GetValueOrDefault(name)) is { } before
+                && before != (upgraded.GetValueOrDefault(name) ?? targetDefaults[name]))
+            .Order(StringComparer.Ordinal)
+            .ToList();
 
     /// <summary>The DefaultServices section as written, to tell whether two versions declare them differently.</summary>
     public static string Declaration(string applicationManifest)

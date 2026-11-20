@@ -65,4 +65,16 @@ public class CachedTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => abandoned);
         Assert.Equal("done", await waiting);
     }
+
+    [Fact]
+    public async Task Loads_again_once_invalidated()
+    {
+        var loads = 0;
+        var cached = new Cached<int>(TimeSpan.FromMinutes(1), _ => Task.FromResult(Interlocked.Increment(ref loads)));
+
+        Assert.Equal(1, await cached.GetAsync(default));
+        cached.Invalidate();
+        Assert.Equal(2, await cached.GetAsync(default));
+        Assert.Equal(2, await cached.GetAsync(default));
+    }
 }

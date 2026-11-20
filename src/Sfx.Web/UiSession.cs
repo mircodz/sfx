@@ -73,12 +73,48 @@ public sealed partial class UiSession(ClusterSession session, ActionLog log, str
         return enabled;
     }
 
-    private readonly Cached<IReadOnlyList<ClusterReplicaDto>> _replicas =
-        new(TimeSpan.FromSeconds(15), ct => ClusterReplicas.LoadAsync(session.Queries, ct));
+    private static readonly TimeSpan ServiceReplicasLifetime = TimeSpan.FromSeconds(15);
 
-    /// <summary>Every replica in the cluster; one walk serves every tab for 15 seconds.</summary>
+    private readonly StaleCache<IReadOnlyList<ClusterReplicaDto>> _replicas =
+        new(TimeSpan.FromMinutes(2), ct => ClusterReplicas.LoadAsync(session.Queries, ct));
+
+    /// <summary>
+    /// Every replica in the cluster. One walk serves every tab for 2 minutes; after that the last walk is still served
+    /// while one new walk runs in the background, so a slow walk never holds up a poll.
+    /// </summary>
     public Task<IReadOnlyList<ClusterReplicaDto>> GetClusterReplicasAsync(CancellationToken cancellationToken) =>
         _replicas.GetAsync(cancellationToken);
+
+    private readonly Lock _serviceReplicasLock = new();
+    private readonly Dictionary<string, (DateTime At, Task<IReadOnlyList<ClusterReplicaDto>> Load)> _serviceReplicas = [];
+
+    /// <summary>The replicas of one service; asked at most once per 15 seconds, shared by every tab.</summary>
+    public Task<IReadOnlyList<ClusterReplicaDto>> GetServiceReplicasAsync(string applicationId, string serviceId, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        Task<IReadOnlyList<ClusterReplicaDto>> load;
+        lock (_serviceReplicasLock)
+        {
+            foreach (var stale in _serviceReplicas.Where(kv => kv.Value.Load.IsCompleted && now - kv.Value.At >= ServiceReplicasLifetime).Select(kv => kv.Key).ToList())
+            {
+                _serviceReplicas.Remove(stale);
+            }
+
+            var key = $"{applicationId}\n{serviceId}";
+            // A failed load isn't kept, so the next poll asks again.
+            if (!_serviceReplicas.TryGetValue(key, out var entry) || entry.Load.IsFaulted || entry.Load.IsCanceled)
+            {
+                entry = (now, Task.Run(async () =>
+                {
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+                    return await ClusterReplicas.LoadServiceAsync(session.Queries, applicationId, serviceId, timeout.Token);
+                }));
+                _serviceReplicas[key] = entry;
+            }
+            load = entry.Load;
+        }
+        return load.WaitAsync(cancellationToken);
+    }
 
     private readonly Lock _logLock = new();
     private readonly byte[] _signingKey = RandomNumberGenerator.GetBytes(32);

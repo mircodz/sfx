@@ -1,7 +1,21 @@
 using Microsoft.ServiceFabric.Client;
 using Microsoft.ServiceFabric.Common;
+using Microsoft.ServiceFabric.Common.Exceptions;
 
 namespace Sfx.Core;
+
+/// <summary>
+/// Values for the health queries' <c>…HealthStateFilter</c> parameters. Asking for no children's states keeps a large
+/// cluster's answer small: an entity's own evaluations still say which children are unhealthy and why.
+/// </summary>
+public static class HealthFilter
+{
+    public const int None = 1;
+    public const int WarningOrError = 4 | 8;
+}
+
+/// <summary>The entity asked about isn't on the cluster; the message says which, in plain words.</summary>
+public sealed class NotFoundException(string message, Exception? inner = null) : Exception(message, inner);
 
 /// <summary>Fetches the details of one entity: its info, health, manifests, load and upgrade state.</summary>
 public sealed class ClusterInspector(IServiceFabricClient client)
@@ -11,7 +25,7 @@ public sealed class ClusterInspector(IServiceFabricClient client)
     // Nodes
 
     public Task<NodeInfo> GetNodeAsync(string node, CancellationToken cancellationToken) =>
-        client.Nodes.GetNodeInfoAsync(new NodeName(node), cancellationToken: cancellationToken);
+        Required(() => client.Nodes.GetNodeInfoAsync(new NodeName(node), cancellationToken: cancellationToken), $"There's no node {node} on this cluster.");
 
     public async Task<HealthReport> GetNodeHealthAsync(string node, CancellationToken cancellationToken) =>
         HealthReport.From(await client.Nodes.GetNodeHealthAsync(new NodeName(node), cancellationToken: cancellationToken));
@@ -22,10 +36,14 @@ public sealed class ClusterInspector(IServiceFabricClient client)
     // Applications
 
     public Task<ApplicationInfo> GetApplicationAsync(string applicationId, CancellationToken cancellationToken) =>
-        client.Applications.GetApplicationInfoAsync(applicationId, excludeApplicationParameters: false, cancellationToken: cancellationToken);
+        Required(
+            () => client.Applications.GetApplicationInfoAsync(applicationId, excludeApplicationParameters: false, cancellationToken: cancellationToken),
+            $"There's no application {NameOf(applicationId)} on this cluster.");
 
     public async Task<HealthReport> GetApplicationHealthAsync(string applicationId, CancellationToken cancellationToken) =>
-        HealthReport.From(await client.Applications.GetApplicationHealthAsync(applicationId, cancellationToken: cancellationToken));
+        HealthReport.From(await client.Applications.GetApplicationHealthAsync(
+            applicationId, deployedApplicationsHealthStateFilter: HealthFilter.None, servicesHealthStateFilter: HealthFilter.None,
+            excludeHealthStatistics: true, cancellationToken: cancellationToken));
 
     public async Task<string> GetApplicationManifestAsync(string typeName, string typeVersion, CancellationToken cancellationToken)
     {
@@ -47,13 +65,16 @@ public sealed class ClusterInspector(IServiceFabricClient client)
     // Services
 
     public Task<ServiceInfo> GetServiceAsync(string applicationId, string serviceId, CancellationToken cancellationToken) =>
-        client.Services.GetServiceInfoAsync(applicationId, serviceId, cancellationToken: cancellationToken);
+        Required(
+            () => client.Services.GetServiceInfoAsync(applicationId, serviceId, cancellationToken: cancellationToken),
+            $"There's no service {NameOf(serviceId)} in {NameOf(applicationId)} on this cluster.");
 
     public Task<ServiceDescription> GetServiceDescriptionAsync(string serviceId, CancellationToken cancellationToken) =>
         client.Services.GetServiceDescriptionAsync(serviceId, cancellationToken: cancellationToken);
 
     public async Task<HealthReport> GetServiceHealthAsync(string serviceId, CancellationToken cancellationToken) =>
-        HealthReport.From(await client.Services.GetServiceHealthAsync(serviceId, cancellationToken: cancellationToken));
+        HealthReport.From(await client.Services.GetServiceHealthAsync(
+            serviceId, partitionsHealthStateFilter: HealthFilter.None, excludeHealthStatistics: true, cancellationToken: cancellationToken));
 
     /// <summary>The manifest of the service package that provides <paramref name="serviceTypeName"/>.</summary>
     public async Task<string> GetServiceManifestAsync(
@@ -78,10 +99,13 @@ public sealed class ClusterInspector(IServiceFabricClient client)
     // Partitions and replicas
 
     public Task<ServicePartitionInfo> GetPartitionAsync(PartitionId partitionId, CancellationToken cancellationToken) =>
-        client.Partitions.GetPartitionInfoAsync(partitionId, cancellationToken: cancellationToken);
+        Required(
+            () => client.Partitions.GetPartitionInfoAsync(partitionId, cancellationToken: cancellationToken),
+            $"There's no partition {partitionId} on this cluster.");
 
     public async Task<HealthReport> GetPartitionHealthAsync(PartitionId partitionId, CancellationToken cancellationToken) =>
-        HealthReport.From(await client.Partitions.GetPartitionHealthAsync(partitionId, cancellationToken: cancellationToken));
+        HealthReport.From(await client.Partitions.GetPartitionHealthAsync(
+            partitionId, replicasHealthStateFilter: HealthFilter.None, excludeHealthStatistics: true, cancellationToken: cancellationToken));
 
     public Task<PartitionLoadInformation> GetPartitionLoadAsync(PartitionId partitionId, CancellationToken cancellationToken) =>
         client.Partitions.GetPartitionLoadInformationAsync(partitionId, cancellationToken: cancellationToken);
@@ -97,8 +121,24 @@ public sealed class ClusterInspector(IServiceFabricClient client)
     public Task<ClusterVersion> GetClusterVersionAsync(CancellationToken cancellationToken) =>
         client.Cluster.GetClusterVersionAsync(cancellationToken: cancellationToken);
 
+    /// <summary>The cluster's own events and evaluations, without every node's and application's state.</summary>
     public async Task<HealthReport> GetClusterHealthAsync(CancellationToken cancellationToken) =>
-        HealthReport.From(await client.Cluster.GetClusterHealthAsync(cancellationToken: cancellationToken));
+        HealthReport.From(await client.Cluster.GetClusterHealthAsync(
+            nodesHealthStateFilter: HealthFilter.None, applicationsHealthStateFilter: HealthFilter.None,
+            excludeHealthStatistics: true, cancellationToken: cancellationToken));
+
+    /// <summary>
+    /// The cluster's evaluations and unhealthy events, with how many nodes, applications, services, partitions and replicas
+    /// (system ones included) are in each state, but no per-entity states.
+    /// </summary>
+    public Task<ClusterHealth> GetClusterHealthSummaryAsync(CancellationToken cancellationToken) =>
+        client.Cluster.GetClusterHealthAsync(
+            nodesHealthStateFilter: HealthFilter.None,
+            applicationsHealthStateFilter: HealthFilter.None,
+            eventsHealthStateFilter: HealthFilter.WarningOrError,
+            excludeHealthStatistics: false,
+            includeSystemApplicationHealthStatistics: true,
+            cancellationToken: cancellationToken);
 
     public async Task<string> GetClusterManifestAsync(CancellationToken cancellationToken) =>
         (await client.Cluster.GetClusterManifestAsync(cancellationToken: cancellationToken)).Manifest;
@@ -126,6 +166,25 @@ public sealed class ClusterInspector(IServiceFabricClient client)
 
     public Task<ClusterLoadInfo> GetClusterLoadAsync(CancellationToken cancellationToken) =>
         client.Cluster.GetClusterLoadAsync(cancellationToken: cancellationToken);
+
+    /// <summary>"fabric:/orders/Counter" for the id "orders~Counter": ids are names without "fabric:/" and with '~' for '/'.</summary>
+    public static string NameOf(string id) => "fabric:/" + id.Replace('~', '/');
+
+    /// <summary>
+    /// The cluster answers a lookup of something that isn't there with nothing at all (HTTP 204) or with a not-found
+    /// error, depending on the query; both become a <see cref="NotFoundException"/> saying what's missing.
+    /// </summary>
+    internal static async Task<T> Required<T>(Func<Task<T?>> query, string missing) where T : class
+    {
+        try
+        {
+            return await query() ?? throw new NotFoundException(missing);
+        }
+        catch (ServiceFabricException ex) when (ClusterQueries.IsGone(ex))
+        {
+            throw new NotFoundException(missing, ex);
+        }
+    }
 
     private static void RequireUserApplication(string applicationTypeName)
     {

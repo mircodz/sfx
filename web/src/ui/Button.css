@@ -19,13 +19,13 @@
 }
 
 .btn-primary {
-    background: var(--fill-accent);
-    border-color: var(--fill-accent);
-    color: var(--surface-2);
+    background: var(--fill-button);
+    border-color: var(--fill-button);
+    color: var(--text-on-fill);
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: var(--fill-accent);
+    background: var(--fill-button);
     filter: brightness(1.08);
 }
 

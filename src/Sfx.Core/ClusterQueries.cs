@@ -1,5 +1,6 @@
 using Microsoft.ServiceFabric.Client;
 using Microsoft.ServiceFabric.Common;
+using Microsoft.ServiceFabric.Common.Exceptions;
 
 namespace Sfx.Core;
 
@@ -25,22 +26,43 @@ public sealed class ClusterQueries(IServiceFabricClient client)
             n.FaultDomain ?? "",
             n.IsSeedNode ?? false,
             n.CodeVersion ?? "",
-            long.TryParse(n.NodeUpTimeInSeconds, out var seconds) ? TimeSpan.FromSeconds(seconds) : null)).ToList();
+            long.TryParse(n.NodeUpTimeInSeconds, out var seconds) ? TimeSpan.FromSeconds(seconds) : null,
+            n.Id?.Id ?? "")).ToList();
     }
 
     /// <summary>User applications, with the system application first (the cluster doesn't list it).</summary>
     public async Task<IReadOnlyList<ApplicationRow>> GetApplicationsAsync(CancellationToken cancellationToken)
     {
+        var system = GetSystemApplicationHealthAsync(cancellationToken);
         var apps = await PageAsync(token => client.Applications.GetApplicationInfoListAsync(
             excludeApplicationParameters: true, continuationToken: token, cancellationToken: cancellationToken));
 
         var rows = new List<ApplicationRow>
         {
-            new(SystemApplicationId, SystemApplicationName, "System", "", "Ready", HealthState.Unknown),
+            new(SystemApplicationId, SystemApplicationName, "System", "", "Ready", await system),
         };
         rows.AddRange(apps.Select(a => new ApplicationRow(
             a.Id, a.Name.ToString(), a.TypeName ?? "", a.TypeVersion ?? "", Text(a.Status), a.HealthState ?? HealthState.Unknown)));
         return rows;
+    }
+
+    /// <summary>
+    /// The system application's health, which the application list doesn't carry: one small call that leaves out its
+    /// events, services and deployed applications. Unknown when the cluster won't say.
+    /// </summary>
+    private async Task<HealthState> GetSystemApplicationHealthAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var health = await client.Applications.GetApplicationHealthAsync(
+                SystemApplicationId, eventsHealthStateFilter: HealthFilter.None, deployedApplicationsHealthStateFilter: HealthFilter.None,
+                servicesHealthStateFilter: HealthFilter.None, excludeHealthStatistics: true, cancellationToken: cancellationToken);
+            return health?.AggregatedHealthState ?? HealthState.Unknown;
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return HealthState.Unknown;
+        }
     }
 
     public async Task<IReadOnlyList<ServiceRow>> GetServicesAsync(string applicationId, CancellationToken cancellationToken)
@@ -68,7 +90,10 @@ public sealed class ClusterQueries(IServiceFabricClient client)
                 StatefulServicePartitionInfo s => $"{s.TargetReplicaSetSize}/{s.MinReplicaSetSize}",
                 StatelessServicePartitionInfo s => s.InstanceCount == -1 ? "all nodes" : $"{s.InstanceCount}",
                 _ => "",
-            })).ToList();
+            },
+            (p.PartitionInformation as Int64RangePartitionInformation)?.LowKey,
+            (p.PartitionInformation as Int64RangePartitionInformation)?.HighKey,
+            (p.PartitionInformation as NamedPartitionInformation)?.Name)).ToList();
     }
 
     public async Task<IReadOnlyList<ReplicaRow>> GetReplicasAsync(PartitionId partitionId, CancellationToken cancellationToken)
@@ -96,6 +121,17 @@ public sealed class ClusterQueries(IServiceFabricClient client)
     /// </summary>
     public async Task<bool> HasSystemServiceAsync(string name, CancellationToken cancellationToken) =>
         (await GetServicesAsync(SystemApplicationId, cancellationToken)).Any(s => s.Name == $"{SystemApplicationName}/{name}");
+
+    /// <summary>
+    /// Whether a node in this status can have anything deployed on it to ask about: Up, but also Disabling and Disabled
+    /// (deactivated nodes keep their replicas and code packages until moved off) and Enabling; not Down, Removed or unknown.
+    /// </summary>
+    public static bool MayHostReplicas(string nodeStatus) =>
+        nodeStatus is nameof(NodeStatus.Up) or nameof(NodeStatus.Disabling) or nameof(NodeStatus.Disabled) or nameof(NodeStatus.Enabling);
+
+    /// <summary>Whether the cluster says the entity doesn't exist, e.g. because it was deleted since its parent was listed.</summary>
+    public static bool IsGone(ServiceFabricException ex) =>
+        ex.ErrorCode.ToString() is var code && (code.Contains("NOT_FOUND", StringComparison.Ordinal) || code.Contains("DOES_NOT_EXIST", StringComparison.Ordinal));
 
     /// <summary>Follows continuation tokens until the last page.</summary>
     public static async Task<List<T>> PageAsync<T>(Func<ContinuationToken?, Task<PagedData<T>>> query)

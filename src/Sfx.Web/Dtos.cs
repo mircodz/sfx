@@ -23,6 +23,32 @@ public sealed record HealthDto(string Health, IReadOnlyList<EvaluationDto> Evalu
 
 public sealed record ClusterDto(string Name, string Endpoint, string CodeVersion, HealthDto Health, IReadOnlyList<ActionDto> Actions);
 
+/// <summary>How many entities of one <paramref name="Kind"/> (Node, Application, Service, Partition or Replica) are in each state.</summary>
+public sealed record HealthCountDto(string Kind, long Healthy, long Warning, long Error);
+
+/// <summary>One load metric across the cluster, without each node's load.</summary>
+/// <param name="ClusterCapacity">Null when unlimited.</param>
+/// <param name="Balanced">Whether the resource balancer found the metric balanced on its last run.</param>
+/// <param name="MinNode">
+/// The name of the node with the least load (its id when the node isn't known); null when the cluster doesn't say, or
+/// when no node has any of this load.
+/// </param>
+/// <param name="MaxNode">The name of the node with the most load, likewise.</param>
+public sealed record LoadSummaryDto(
+    string Name, double ClusterLoad, double? ClusterCapacity, bool? Balanced, string? MinNode, double? MinLoad, string? MaxNode, double? MaxLoad);
+
+/// <summary>The cluster at a glance, cheap to ask even of a large cluster.</summary>
+/// <param name="Health">The cluster's evaluations and unhealthy events.</param>
+/// <param name="RunningUpgrades">The cluster's upgrade when it's running, pending or failed, and the applications' that are running.</param>
+public sealed record OverviewDto(
+    string Name,
+    string Endpoint,
+    string CodeVersion,
+    HealthDto Health,
+    IReadOnlyList<HealthCountDto> Counts,
+    IReadOnlyList<LoadSummaryDto> Load,
+    IReadOnlyList<UpgradeDto> RunningUpgrades);
+
 public sealed record NodeDto(
     string Name, string Address, string NodeType, string Status, string Health, string UpgradeDomain, string FaultDomain,
     bool IsSeed, string CodeVersion, long? UptimeSeconds, IReadOnlyList<ActionDto> Actions, string? Reason = null);
@@ -89,7 +115,13 @@ public sealed record ServiceDetailDto(
 
 public sealed record FieldDto(string Name, string Value);
 
-public sealed record PartitionDto(string Id, string Kind, string Scheme, string Status, string Health, string ReplicaSet, string? Reason = null);
+/// <param name="Scheme">Singleton, Int64Range or Named.</param>
+/// <param name="LowKey">An Int64Range partition's lowest key, as a string (it may not fit a JavaScript number); else null.</param>
+/// <param name="HighKey">An Int64Range partition's highest key.</param>
+/// <param name="Name">A Named partition's name; else null.</param>
+public sealed record PartitionDto(
+    string Id, string Kind, string Scheme, string Status, string Health, string ReplicaSet, string? Reason = null,
+    string? LowKey = null, string? HighKey = null, string? Name = null);
 
 public sealed record ReplicaDto(string Id, string NodeName, string Role, string Status, string Health, string Address, IReadOnlyList<ActionDto> Actions);
 
@@ -162,9 +194,22 @@ internal static class Dto
         Health(report.State),
         report.Evaluations.Select(Evaluation).ToList(),
         report.Events
-            .OrderBy(e => e.State == HealthState.Ok)
+            .OrderBy(e => e.State switch { HealthState.Error => 0, HealthState.Warning => 1, HealthState.Ok => 2, _ => 3 })
+            .ThenByDescending(e => e.LastModifiedUtc)
             .Select(e => new HealthEventDto(e.Source, e.Property, Health(e.State), e.Description, e.LastModifiedUtc, e.IsExpired))
             .ToList());
+
+    private static readonly EntityKind[] CountedKinds = [EntityKind.Node, EntityKind.Application, EntityKind.Service, EntityKind.Partition, EntityKind.Replica];
+
+    /// <summary>The counts of nodes, applications, services, partitions and replicas, in that order; other kinds are left out.</summary>
+    public static IReadOnlyList<HealthCountDto> HealthCounts(HealthStatistics? statistics)
+    {
+        var counts = statistics?.HealthStateCountList ?? [];
+        return CountedKinds
+            .SelectMany(kind => counts.Where(c => c.EntityKind == kind).Take(1).Select(c => new HealthCountDto(
+                kind.ToString(), c.HealthStateCount?.OkCount ?? 0, c.HealthStateCount?.WarningCount ?? 0, c.HealthStateCount?.ErrorCount ?? 0)))
+            .ToList();
+    }
 
     public static EvaluationDto Evaluation(HealthEvaluationRow e) => new(e.Depth, e.Kind, Health(e.State), e.Description);
 
@@ -172,7 +217,8 @@ internal static class Dto
 
     public static ServiceDto Service(ServiceRow s) => new(s.Id, s.Name, s.TypeName, s.Kind, s.Status, Health(s.Health));
 
-    public static PartitionDto Partition(PartitionRow p) => new(p.Id.ToString(), p.Kind, p.PartitionKind, p.Status, Health(p.Health), p.ReplicaSet);
+    public static PartitionDto Partition(PartitionRow p) => new(
+        p.Id.ToString(), p.Kind, p.PartitionKind, p.Status, Health(p.Health), p.ReplicaSet, LowKey: p.LowKey, HighKey: p.HighKey, Name: p.Name);
 
     public static UpgradeDto Upgrade(UpgradeRow row, IReadOnlyList<ActionDto> actions)
     {

@@ -212,8 +212,11 @@
 
 /* A phone: the sidebar becomes a strip across the top. */
 @media (max-width: 640px) {
+    /* The strip keeps its height; the page takes the rest, not half of it. */
     .app {
         grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 1fr;
+        align-content: start;
     }
 
     .sidebar {
@@ -225,6 +228,8 @@
         border-right: 0;
         border-bottom: 0.5px solid var(--border);
         overflow-x: auto;
+        /* A fade at the right edge says the strip scrolls. */
+        mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
     }
 
     .sidebar-nav,

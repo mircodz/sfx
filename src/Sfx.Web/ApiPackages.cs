@@ -30,8 +30,20 @@ internal static class ApiPackages
     public static void Map(RouteGroupBuilder api) =>
         api.MapGet("/nodes/{name}/packages", async (UiSession s, string name, CancellationToken ct) =>
         {
-            var node = await s.Inspector.GetNodeAsync(name, ct);
-            return node.NodeStatus == NodeStatus.Up ? await LoadAsync(s, name, ct) : [];
+            var status = (await s.Inspector.GetNodeAsync(name, ct)).NodeStatus?.ToString() ?? "";
+            if (!ClusterQueries.MayHostReplicas(status))
+            {
+                return [];
+            }
+            try
+            {
+                return await LoadAsync(s, name, ct);
+            }
+            // A disabled or disabling node still hosts packages but may not answer for them; show none rather than fail.
+            catch (Exception) when (status != nameof(NodeStatus.Up) && !ct.IsCancellationRequested)
+            {
+                return [];
+            }
         });
 
     private static async Task<IReadOnlyList<DeployedPackageDto>> LoadAsync(UiSession s, string node, CancellationToken ct)

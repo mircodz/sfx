@@ -1,4 +1,7 @@
+/* As wide as the matrix, not the page: a few nodes shouldn't leave a long empty frame. */
 .placement-scroll {
+    width: fit-content;
+    max-width: 100%;
     overflow-x: auto;
     border: 0.5px solid var(--border);
     border-radius: var(--radius);

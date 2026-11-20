@@ -15,13 +15,15 @@
 .evaluation-status {
     flex: 0 0 64px;
     display: flex;
+    justify-content: center;
 }
 
 .evaluation-indent {
     flex: none;
     align-self: stretch;
-    width: 12px;
-    margin: calc(-1 * var(--space-1)) 0 calc(-1 * var(--space-1)) var(--space-1);
+    /* With the row's gap, one level is 16px in. */
+    width: 4px;
+    margin: calc(-1 * var(--space-1)) 0;
     border-left: 0.5px solid var(--border-strong);
 }
 
@@ -39,14 +41,14 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--text-secondary);
+    color: var(--text-accent);
     font-size: 12px;
-    text-decoration: underline;
+    text-decoration: none;
     cursor: pointer;
 }
 
 .text-button:hover {
-    color: var(--text-primary);
+    text-decoration: underline;
 }
 
 .errors-link {

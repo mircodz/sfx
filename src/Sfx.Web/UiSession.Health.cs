@@ -1,4 +1,5 @@
 using Microsoft.ServiceFabric.Common;
+using Sfx.Core;
 
 namespace Sfx.Web;
 
@@ -14,10 +15,12 @@ public sealed partial class UiSession
     private readonly SemaphoreSlim _reasonGate = new(8);
 
     /// <summary>
-    /// Why each entity is unhealthy, by id, for ids of one <paramref name="kind"/> (node, application, service or partition).
-    /// Each is asked at most once per 30 seconds; ones whose reason can't be had are left out.
+    /// Why each entity is unhealthy, by id, for entities of one <paramref name="kind"/> (node, application, service or
+    /// partition) with the health they're listed with. Each is asked at most once per 30 seconds, and again as soon as its
+    /// health changes; ones whose reason can't be had are left out.
     /// </summary>
-    internal async Task<IReadOnlyDictionary<string, string>> GetReasonsAsync(string kind, IEnumerable<string> ids, CancellationToken cancellationToken)
+    internal async Task<IReadOnlyDictionary<string, string>> GetReasonsAsync(
+        string kind, IEnumerable<(string Id, string Health)> entities, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
         var pending = new List<(string Id, Task<string?> Reason)>();
@@ -28,9 +31,9 @@ public sealed partial class UiSession
                 _reasons.Remove(stale);
             }
 
-            foreach (var id in ids.Distinct())
+            foreach (var (id, health) in entities.DistinctBy(e => e.Id))
             {
-                var key = $"{kind}\n{id}";
+                var key = ReasonKey(kind, id, health);
                 // A failed lookup isn't kept, so the next poll asks again.
                 if (!_reasons.TryGetValue(key, out var entry) || entry.Reason.IsFaulted || entry.Reason.IsCanceled)
                 {
@@ -58,6 +61,9 @@ public sealed partial class UiSession
         return reasons;
     }
 
+    /// <summary>Keyed by health too, so an entity going from warning to error isn't explained by its old reason.</summary>
+    internal static string ReasonKey(string kind, string id, string health) => $"{kind}\n{id}\n{health}";
+
     private async Task<string?> FetchReasonAsync(string kind, string id)
     {
         await _reasonGate.WaitAsync();
@@ -65,12 +71,20 @@ public sealed partial class UiSession
         {
             using var timeout = new CancellationTokenSource(ReasonTimeout);
             var client = Queries.Client;
+            // Only the entity's own evaluations and unhealthy events: no children's states, which on a large application
+            // or service would be most of the answer.
+            const int none = HealthFilter.None, unhealthy = HealthFilter.WarningOrError;
             EntityHealth health = kind switch
             {
-                "node" => await client.Nodes.GetNodeHealthAsync(new NodeName(id), cancellationToken: timeout.Token),
-                "application" => await client.Applications.GetApplicationHealthAsync(id, cancellationToken: timeout.Token),
-                "service" => await client.Services.GetServiceHealthAsync(id, cancellationToken: timeout.Token),
-                "partition" => await client.Partitions.GetPartitionHealthAsync(new PartitionId(Guid.Parse(id)), cancellationToken: timeout.Token),
+                "node" => await client.Nodes.GetNodeHealthAsync(new NodeName(id), eventsHealthStateFilter: unhealthy, cancellationToken: timeout.Token),
+                "application" => await client.Applications.GetApplicationHealthAsync(
+                    id, eventsHealthStateFilter: unhealthy, deployedApplicationsHealthStateFilter: none, servicesHealthStateFilter: none,
+                    excludeHealthStatistics: true, cancellationToken: timeout.Token),
+                "service" => await client.Services.GetServiceHealthAsync(
+                    id, eventsHealthStateFilter: unhealthy, partitionsHealthStateFilter: none, excludeHealthStatistics: true, cancellationToken: timeout.Token),
+                "partition" => await client.Partitions.GetPartitionHealthAsync(
+                    new PartitionId(Guid.Parse(id)), eventsHealthStateFilter: unhealthy, replicasHealthStateFilter: none,
+                    excludeHealthStatistics: true, cancellationToken: timeout.Token),
                 _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
             };
             return Reasons.From(health);

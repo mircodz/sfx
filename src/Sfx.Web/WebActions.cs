@@ -277,22 +277,13 @@ internal static class WebActions
                 var parameters = (current.Parameters ?? new Dictionary<string, string>())
                     .Where(kv => allowed.Contains(kv.Key))
                     .ToDictionary(kv => kv.Key, kv => kv.Value);
-                var currentDefaults = versions.FirstOrDefault(v => v.Version == current.TypeVersion)?.DefaultParameterList ?? new Dictionary<string, string>();
-                var changed = new List<string>();
                 foreach (var (key, value) in i.Values.Where(kv => kv.Key.StartsWith("param:", StringComparison.Ordinal)))
                 {
                     var name = key["param:".Length..];
                     parameters[allowed.Contains(name) ? name : throw new ActionException($"Version {i["version"]} has no parameter '{name}'.")] = value;
-                    // New in the target version: nothing running uses it yet, so it can't change an existing service.
-                    var was = current.Parameters?.GetValueOrDefault(name) ?? currentDefaults.GetValueOrDefault(name);
-                    if (was is not null && was != value)
-                    {
-                        changed.Add(name);
-                    }
                 }
 
                 // "reset:Name" takes a value off the application, so the parameter follows its version's default again.
-                var targetDefaults = versions.First(v => v.Version == i["version"]).DefaultParameterList ?? new Dictionary<string, string>();
                 foreach (var key in i.Values.Keys.Where(k => k.StartsWith("reset:", StringComparison.Ordinal)))
                 {
                     var name = key["reset:".Length..];
@@ -301,18 +292,22 @@ internal static class WebActions
                         throw new ActionException($"'{name}' can't be both set and reset to its default.");
                     }
                     parameters.Remove(name);
-                    if (current.Parameters?.GetValueOrDefault(name) is { } was && was != targetDefaults.GetValueOrDefault(name))
-                    {
-                        changed.Add(name);
-                    }
                 }
+
+                // What a parameter is worth before and after, defaults included: one left unset follows the target
+                // version's default, so a default that changed between versions changes the services that use it too.
+                var currentDefaults = versions.FirstOrDefault(v => v.Version == current.TypeVersion)?.DefaultParameterList ?? new Dictionary<string, string>();
+                var targetDefaults = versions.First(v => v.Version == i["version"]).DefaultParameterList ?? new Dictionary<string, string>();
+                var changed = DefaultServices.ChangedParameters(
+                    current.Parameters ?? new Dictionary<string, string>(), currentDefaults, parameters, targetDefaults);
 
                 // Catch what the cluster would refuse with only "aka.ms/upgrade-defaultservices", and say why.
                 // Only services that exist can be refused; default services new in the target version are simply created.
                 var existing = (await s.Queries.GetServicesAsync(t["applicationId"], ct))
                     .Select(svc => svc.Name[(t["name"].Length + 1)..])
                     .ToHashSet();
-                var uses = DefaultServices.ParameterUses(await s.Inspector.GetApplicationManifestAsync(current.TypeName, i["version"], ct));
+                var targetManifest = await s.Inspector.GetApplicationManifestAsync(current.TypeName, i["version"], ct);
+                var uses = DefaultServices.ParameterUses(targetManifest);
                 var enabled = await s.DefaultServicesUpgradeEnabledAsync(ct);
                 foreach (var use in uses.Where(u => changed.Contains(u.Parameter) && existing.Contains(u.Service)))
                 {
@@ -336,7 +331,8 @@ internal static class WebActions
 
                 try
                 {
-                    await s.Operations.UpgradeApplicationAsync(t["applicationId"], t["name"], i["version"], parameters, mode, failure, policy, ct);
+                    await s.Operations.UpgradeApplicationAsync(
+                        t["applicationId"], t["name"], i["version"], parameters, mode, failure, policy, targetManifest, ct);
                 }
                 catch (Exception ex) when (DefaultServices.IsRefusal(ex))
                 {

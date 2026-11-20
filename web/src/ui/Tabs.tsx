@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { toneOf } from "../lib/health";
 import { useQueryParam } from "../lib/router";
@@ -25,10 +26,17 @@ export function Tabs<T extends string>({
     children: ReactNode;
 }) {
     const shown = tabs.filter((t) => !t.hidden);
+    // A link (or an old bookmark) to a tab this entity doesn't have lands on the first one it does.
+    const missing = !shown.some((t) => t.id === value);
+    useEffect(() => {
+        if (missing && shown[0]) onChange(shown[0].id);
+    });
     const onKey = (e: KeyboardEvent, i: number) => {
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        const target =
+            e.key === "ArrowRight" ? (i + 1) % shown.length : e.key === "ArrowLeft" ? (i + shown.length - 1) % shown.length : e.key === "Home" ? 0 : e.key === "End" ? shown.length - 1 : -1;
+        if (target < 0) return;
         e.preventDefault();
-        const next = shown[(i + (e.key === "ArrowRight" ? 1 : shown.length - 1)) % shown.length];
+        const next = shown[target];
         onChange(next.id);
         document.getElementById(`tab-${next.id}`)?.focus();
     };
@@ -53,7 +61,7 @@ export function Tabs<T extends string>({
                 ))}
             </div>
             <div role="tabpanel" id={`panel-${value}`} aria-labelledby={`tab-${value}`} className="tab-panel">
-                {children}
+                {missing ? null : children}
             </div>
         </>
     );

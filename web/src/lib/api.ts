@@ -19,6 +19,7 @@ import type {
     DeployedPackage,
     Repairs,
     LoadMetric,
+    Overview,
 } from "./types";
 
 // sfx ui opens the page as /?token=…; keep the token for this tab and take it out of the address bar.
@@ -90,7 +91,9 @@ export const api = {
     operations: () => get<Operation[]>("/operations"),
     packages: (node: string) => get<DeployedPackage[]>(`/nodes/${seg(node)}/packages`),
     repairs: () => get<Repairs>("/repairs"),
-    load: () => get<{ metrics: LoadMetric[] }>("/load"),
+    load: (nodes = false) => get<{ metrics: LoadMetric[] }>(`/load${nodes ? "?nodes=true" : ""}`),
+    overview: () => get<Overview>("/overview"),
+    serviceReplicas: (appId: string, serviceId: string) => get<ClusterReplica[]>(`/applications/${seg(appId)}/services/${seg(serviceId)}/replicas`),
     clusterUpgradeOptions: () => get<ClusterUpgradeOptions>("/cluster/upgrade-options"),
     replicas: () => get<ClusterReplica[]>("/replicas"),
     run: (action: Action, inputs: Record<string, string>, confirm?: string) =>

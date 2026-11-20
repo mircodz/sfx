@@ -13,17 +13,22 @@ const tones: Record<Status, Tone> = {
     Pending: "neutral",
     Failed: "danger",
     "In progress": "accent",
+    "Rolling back": "warning",
+    "Rolled back": "neutral",
+    Cancelled: "neutral",
+    Complete: "success",
+    Paused: "warning",
 };
 
 export function toneOf(status: Status | DomainState): Tone {
     return tones[status] ?? "neutral";
 }
 
-export const healthFilters = ["All", "Healthy", "Warning", "Error"] as const;
+export const healthFilters = ["All", "Unhealthy", "Healthy", "Warning", "Error"] as const;
 export type HealthFilter = (typeof healthFilters)[number];
 
 export function matches(filter: HealthFilter, health: Health) {
-    return filter === "All" || filter === health;
+    return filter === "All" || filter === health || (filter === "Unhealthy" && (health === "Warning" || health === "Error"));
 }
 
 const rank: Record<Health, number> = { Error: 0, Warning: 1, Unknown: 2, Healthy: 3 };

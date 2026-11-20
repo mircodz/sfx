@@ -27,3 +27,13 @@
     font-size: 12px;
     color: var(--text-secondary);
 }
+
+.meter-foot {
+    margin-top: var(--space-1);
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.fill.relative {
+    background: var(--border-strong);
+}

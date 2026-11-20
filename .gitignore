@@ -11,3 +11,4 @@ TestResults/
 .DS_Store
 samples/demo-cluster/out/
 __pycache__/
+sfx-*.zip

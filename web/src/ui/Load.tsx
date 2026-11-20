@@ -3,22 +3,42 @@ import { clock } from "../lib/format";
 import { Notice } from "./Notice";
 import "./Load.css";
 
-type Shape = "page" | "rows" | "lines";
+type Shape = "page" | "dashboard" | "rows" | "lines";
 
 /** Placeholder shapes in the content's layout while it first loads; no spinner, no animation. */
 export function Skeleton({ shape = "rows" }: { shape?: Shape }) {
     return (
         <div aria-busy="true" aria-label="Loading">
-            {shape === "page" && (
+            {(shape === "page" || shape === "dashboard") && (
                 <>
+                    <div className="skeleton skeleton-crumbs" />
                     <div className="skeleton skeleton-title" />
                     <div className="skeleton skeleton-line short" />
-                    <div className="skeleton skeleton-tabs" />
+                    <div className="skeleton-tabs" />
                 </>
             )}
-            {shape === "lines"
-                ? Array.from({ length: 8 }, (_, i) => <div key={i} className="skeleton skeleton-line" />)
-                : Array.from({ length: 4 }, (_, i) => <div key={i} className="skeleton skeleton-row" />)}
+            {shape === "dashboard" ? (
+                <>
+                    <div className="skeleton-metrics">
+                        {Array.from({ length: 6 }, (_, i) => (
+                            <div key={i} className="skeleton skeleton-metric" />
+                        ))}
+                    </div>
+                    <div className="skeleton-cards">
+                        {Array.from({ length: 4 }, (_, i) => (
+                            <div key={i} className="skeleton skeleton-card" />
+                        ))}
+                    </div>
+                </>
+            ) : shape === "lines" ? (
+                Array.from({ length: 8 }, (_, i) => <div key={i} className="skeleton skeleton-line" />)
+            ) : (
+                <div className="skeleton-list">
+                    {Array.from({ length: 6 }, (_, i) => (
+                        <div key={i} className="skeleton skeleton-row" />
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
@@ -32,21 +52,32 @@ export function Load<T>({
     shape = "page",
     children,
 }: {
-    resource: { data?: T; error?: string; at?: Date };
+    resource: { data?: T; error?: string; at?: Date; loading?: boolean; reload?: () => void };
     shape?: Shape;
     children: (data: T) => ReactNode;
 }) {
     if (resource.data === undefined) {
-        return resource.error ? <Notice tone="danger">{resource.error}</Notice> : <Skeleton shape={shape} />;
+        if (!resource.error) return <Skeleton shape={shape} />;
+        return (
+            <Notice tone="danger" onRetry={resource.loading ? undefined : resource.reload}>
+                {sentence(resource.error)}
+            </Notice>
+        );
     }
     return (
         <>
             {resource.error && (
                 <Notice tone="danger">
-                    {resource.error.replace(/\.$/, "")}. Showing data from {resource.at ? clock(resource.at) : "earlier"}.
+                    {sentence(resource.error).replace(/\.$/, "")}. Showing data from {resource.at ? clock(resource.at) : "earlier"}.
                 </Notice>
             )}
             {children(resource.data)}
         </>
     );
+}
+
+/** A failure as a sentence: what it means first when the cluster can't be reached, and a full stop. */
+export function sentence(error: string) {
+    const text = /[.!?]$/.test(error.trim()) ? error.trim() : `${error.trim()}.`;
+    return /refused|timed out|unreachable|no such host|name or service not known|network/i.test(text) && !/^can't reach/i.test(text) ? `Can't reach the cluster. ${text}` : text;
 }

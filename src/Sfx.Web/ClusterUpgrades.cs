@@ -22,19 +22,52 @@ internal static class ClusterUpgrades
         api.MapGet("/cluster/upgrade-options", async (UiSession s, CancellationToken ct) =>
         {
             var version = s.Inspector.GetClusterVersionAsync(ct);
-            var upgrade = s.Inspector.GetClusterUpgradeAsync(ct);
+            var upgrade = ProgressAsync(s, ct);
             var codes = s.Inspector.GetProvisionedCodeVersionsAsync(ct);
             var configs = s.Inspector.GetProvisionedConfigVersionsAsync(ct);
             var azure = await s.IsAzureManagedAsync(ct);
             var progress = await upgrade;
             return new ClusterUpgradeOptionsDto(
-                (await version).Version ?? progress.CodeVersion ?? "",
-                progress.ConfigVersion ?? "",
+                (await version).Version ?? progress?.CodeVersion ?? "",
+                await CurrentConfigVersionAsync(s, progress, ct),
                 Newest(await codes),
                 Newest(await configs),
                 azure,
                 azure ? UiSession.AzureManagedNote : null);
         });
+    }
+
+    /// <summary>The cluster's last upgrade, or null when it can't say (as with no upgrade yet on some versions).</summary>
+    private static async Task<ClusterUpgradeProgressObject?> ProgressAsync(UiSession s, CancellationToken ct)
+    {
+        try
+        {
+            return await s.Inspector.GetClusterUpgradeAsync(ct);
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The config version the cluster runs. Before its first upgrade there's no upgrade to report one, so it's read from
+    /// the cluster manifest instead; empty only when neither says.
+    /// </summary>
+    private static async Task<string> CurrentConfigVersionAsync(UiSession s, ClusterUpgradeProgressObject? progress, CancellationToken ct)
+    {
+        if (!string.IsNullOrEmpty(progress?.ConfigVersion))
+        {
+            return progress.ConfigVersion;
+        }
+        try
+        {
+            return ClusterSettings.ConfigVersion(await s.Inspector.GetClusterManifestAsync(ct)) ?? "";
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            return "";
+        }
     }
 
     public static string Describe(Args inputs, string modeLabel, UpgradeMode mode)
@@ -64,7 +97,9 @@ internal static class ClusterUpgrades
             throw new ActionException($"Config version {config} isn't provisioned in this cluster.", StatusCodes.Status409Conflict);
         }
 
-        await s.Operations.UpgradeClusterAsync(code, config, mode, failure, policy, ct);
+        // Health policy fields left out keep the cluster's current values, which only its manifest has.
+        var manifest = policy is { HasClusterHealthPolicy: true } ? await s.Inspector.GetClusterManifestAsync(ct) : null;
+        await s.Operations.UpgradeClusterAsync(code, config, mode, failure, policy, manifest, ct);
     }
 
     private static (string? Code, string? Config) Versions(Args inputs)

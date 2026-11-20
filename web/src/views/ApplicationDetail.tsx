@@ -13,6 +13,7 @@ import { LinkRow } from "../ui/Row";
 import { Empty, Section } from "../ui/Section";
 import { CountTab, HealthTab, Tabs, useTab } from "../ui/Tabs";
 import { EntityEvents } from "./Events";
+import { isRunning } from "../lib/upgrades";
 import { Parameters } from "./Parameters";
 import { UpgradeCard } from "./UpgradeCard";
 
@@ -56,7 +57,7 @@ export function ApplicationDetail({ appId }: { appId: string }) {
                             {tab === "overview" && (
                                 <>
                                     <ErrorsAndWarnings evaluations={d.health.evaluations} />
-                                    {d.upgrade && d.upgrade.state !== "RollingForwardCompleted" && (
+                                    {d.upgrade && (isRunning(d.upgrade) || d.upgrade.state === "Failed") && (
                                         <Section label="Upgrade">
                                             <UpgradeCard upgrade={d.upgrade} />
                                         </Section>

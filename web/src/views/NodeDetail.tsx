@@ -19,6 +19,9 @@ import { EntityEvents } from "./Events";
 import { CodePackages } from "./CodePackages";
 import { nodeFacts } from "./Nodes";
 
+/** Up, but also disabling or disabled nodes, still run what's on them; only down ones (or unknown) don't. */
+export const hosting = (status: string) => !["Down", "Invalid", "Unknown"].includes(status);
+
 const tabs = ["overview", "packages", "health", "events", "details"] as const;
 
 export function NodeDetail({ name }: { name: string }) {
@@ -53,7 +56,7 @@ export function NodeDetail({ name }: { name: string }) {
                             onChange={setTab}
                             tabs={[
                                 { id: "overview", label: "Overview" },
-                                { id: "packages", label: "Code packages", hidden: n.status !== "Up" },
+                                { id: "packages", label: "Code packages", hidden: !hosting(n.status) },
                                 { id: "health", label: <HealthTab health={d.health.health} /> },
                                 { id: "events", label: "Events", hidden: !eventsAvailable },
                                 { id: "details", label: "Details" },
@@ -80,9 +83,9 @@ export function NodeDetail({ name }: { name: string }) {
                                         <Meters metrics={d.load} />
                                     </Section>
                                     <Section label="Replicas on this node" aside={<Link href={href.replicas({ node: n.name })}>{plural(d.replicas.length, "replica")}</Link>}>
-                                        {n.status !== "Up" && <Empty>The node isn't up, so nothing is deployed on it.</Empty>}
+                                        {!hosting(n.status) && <Empty>The node is {n.status.toLowerCase()}, so nothing runs on it.</Empty>}
                                         {d.replicas.length > 0 && <SearchBox value={search} onChange={setSearch} placeholder="Filter by service, role or application" />}
-                                        {n.status === "Up" && replicas.length === 0 && <Empty>No replicas match.</Empty>}
+                                        {hosting(n.status) && replicas.length === 0 && <Empty>No replicas match.</Empty>}
                                         {apps.map((appId) => {
                                             const group = replicas.filter((r) => r.applicationId === appId);
                                             return (

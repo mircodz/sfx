@@ -36,9 +36,16 @@ export function Menu({ label, items }: { label: string; items: MenuItem[] }) {
 
     return (
         <div className="menu-anchor" ref={anchor}>
-            <IconButton icon="dots" label={label} bordered aria-haspopup="menu" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)} />
+            <IconButton icon="dots" label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)} />
             {open && (
-                <div ref={list} id={id} className="menu" role="menu" onKeyDown={onKey}>
+                <div
+                    ref={list}
+                    id={id}
+                    className="menu"
+                    role="menu"
+                    onKeyDown={onKey}
+                    onBlur={(e) => !anchor.current?.contains(e.relatedTarget as Node | null) && setOpen(false)}
+                >
                     {ordered.map((item, i) => (
                         <div key={item.id}>
                             {i === firstDanger && i > 0 && <div className="menu-divider" role="separator" />}
@@ -48,6 +55,8 @@ export function Menu({ label, items }: { label: string; items: MenuItem[] }) {
                                 className={`menu-item ${item.danger ? "text-danger" : ""}`}
                                 onClick={() => {
                                     setOpen(false);
+                                    // Focus back on "More actions" first, so a dialog opened from here returns it there.
+                                    anchor.current?.querySelector<HTMLButtonElement>("button")?.focus();
                                     item.onPick();
                                 }}
                             >

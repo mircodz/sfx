@@ -11,6 +11,12 @@ function useModal(onClose: () => void, onCancel?: () => boolean) {
     const ref = useRef<HTMLDialogElement>(null);
     useEffect(() => {
         ref.current?.showModal();
+        // The page behind doesn't scroll while a modal is open; the panel body is the one place that does.
+        const body = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = body;
+        };
     }, []);
     const tryClose = () => {
         if (!onCancel || onCancel()) ref.current?.close();
@@ -18,18 +24,40 @@ function useModal(onClose: () => void, onCancel?: () => boolean) {
     const props = {
         ref,
         onClose,
-        onCancel: (e: React.SyntheticEvent) => {
-            e.preventDefault();
-            tryClose();
+        // Escape is handled here rather than by the dialog's cancel event, which browsers stop letting us veto after
+        // the first time: a second Escape would otherwise close it with the edits.
+        onKeyDown: (e: React.KeyboardEvent) => {
+            if (e.key === "Escape" && !e.defaultPrevented) {
+                e.preventDefault();
+                tryClose();
+            }
         },
-        onMouseDown: (e: React.MouseEvent) => e.target === ref.current && tryClose(),
+        onCancel: (e: React.SyntheticEvent) => e.preventDefault(),
+        // Only a click on the backdrop closes it: outside the dialog's box, not on its own padding.
+        onMouseDown: (e: React.MouseEvent) => {
+            const box = ref.current?.getBoundingClientRect();
+            if (e.target === ref.current && box && (e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom)) tryClose();
+        },
     };
     return { props, close: tryClose };
 }
 
 /** A small centered dialog for a confirmation. */
-export function Dialog({ title, onClose, children, footer }: { title: ReactNode; onClose: () => void; children: ReactNode; footer: ReactNode }) {
-    const { props } = useModal(onClose);
+export function Dialog({
+    title,
+    onClose,
+    onCancel,
+    children,
+    footer,
+}: {
+    title: ReactNode;
+    onClose: () => void;
+    /** Return false to keep it open, e.g. while the action runs. */
+    onCancel?: () => boolean;
+    children: ReactNode;
+    footer: ReactNode;
+}) {
+    const { props } = useModal(onClose, onCancel);
     return (
         <dialog {...props} className="dialog" aria-labelledby="dialog-title">
             <h2 id="dialog-title" className="dialog-title">
@@ -55,13 +83,13 @@ export function SidePanel({
     onClose: () => void;
     onCancel?: () => boolean;
     children: ReactNode;
-    footer: ReactNode;
+    /** Gets the close that asks first (the same as Escape and the close button), for a Cancel button. */
+    footer: ReactNode | ((close: () => void) => ReactNode);
 }) {
     const { props, close } = useModal(onClose, onCancel);
     const [width, resize] = usePanelWidth();
     return (
         <dialog {...props} className="side-panel" aria-labelledby="panel-title" style={{ width }}>
-            <ResizeHandle width={width} onResize={resize} />
             <div className="side-panel-header">
                 <div className="side-panel-heading">
                     <h2 id="panel-title" className="dialog-title">
@@ -72,7 +100,9 @@ export function SidePanel({
                 <IconButton icon="x" label="Close" onClick={close} />
             </div>
             <div className="side-panel-body">{children}</div>
-            <div className="side-panel-footer">{footer}</div>
+            <div className="side-panel-footer">{typeof footer === "function" ? footer(close) : footer}</div>
+            {/* After the content, so focus starts in the form rather than on the handle. */}
+            <ResizeHandle width={width} onResize={resize} />
         </dialog>
     );
 }

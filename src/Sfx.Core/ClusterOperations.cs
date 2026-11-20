@@ -100,9 +100,12 @@ public sealed class ClusterOperations(IServiceFabricClient client)
     /// <param name="parameters">Every parameter the application should have afterwards; ones left out go back to their defaults.</param>
     /// <param name="failureAction">For monitored upgrades: what to do when a health check fails.</param>
     /// <param name="policy">Timeouts and health limits; null, or null fields, leave the cluster's defaults.</param>
+    /// <param name="applicationManifest">
+    /// The target version's manifest, whose health policy fills in what <paramref name="policy"/> leaves out.
+    /// </param>
     public Task UpgradeApplicationAsync(
         string applicationId, string applicationName, string targetVersion, IReadOnlyDictionary<string, string> parameters,
-        UpgradeMode mode, FailureAction? failureAction, UpgradePolicy? policy, CancellationToken cancellationToken) =>
+        UpgradeMode mode, FailureAction? failureAction, UpgradePolicy? policy, string? applicationManifest, CancellationToken cancellationToken) =>
         client.Applications.StartApplicationUpgradeAsync(
             applicationId,
             new ApplicationUpgradeDescription(
@@ -114,21 +117,31 @@ public sealed class ClusterOperations(IServiceFabricClient client)
                 upgradeReplicaSetCheckTimeoutInSeconds: policy?.ReplicaSetCheckTimeout is { } check ? (long)check.TotalSeconds : null,
                 forceRestart: policy?.ForceRestart,
                 monitoringPolicy: mode == UpgradeMode.Monitored ? MonitoringPolicy(failureAction, policy) : null,
-                applicationHealthPolicy: policy is { HasHealthPolicy: true } ? HealthPolicy(policy) : null),
+                applicationHealthPolicy: policy is { HasHealthPolicy: true } ? HealthPolicy(policy, applicationManifest) : null),
             cancellationToken: cancellationToken);
 
-    // The SDK's defaults for these are false and 0, not "unset", so every field is passed explicitly.
-    private static ApplicationHealthPolicy HealthPolicy(UpgradePolicy policy) =>
-        new(
-            considerWarningAsError: policy.ConsiderWarningAsError,
-            maxPercentUnhealthyDeployedApplications: policy.MaxPercentUnhealthyDeployedApplications,
-            defaultServiceTypeHealthPolicy: policy.HasServiceTypeHealthPolicy
-                ? new ServiceTypeHealthPolicy(
-                    maxPercentUnhealthyPartitionsPerService: policy.MaxPercentUnhealthyPartitionsPerService,
-                    maxPercentUnhealthyReplicasPerPartition: policy.MaxPercentUnhealthyReplicasPerPartition,
-                    maxPercentUnhealthyServices: policy.MaxPercentUnhealthyServices)
-                : null,
-            serviceTypeHealthPolicyMap: null);
+    /// <summary>
+    /// The health policy to send when some of it is set. A policy sent replaces the manifest's whole, and what it leaves
+    /// out counts as false or 0%, so every field the user didn't set is filled in from the manifest (or Service Fabric's
+    /// defaults without one), including the manifest's per-service-type policies.
+    /// </summary>
+    internal static ApplicationHealthPolicy HealthPolicy(UpgradePolicy policy, string? applicationManifest)
+    {
+        var defaults = applicationManifest is null ? new HealthPolicyDefaults(false, 0, 0, 0, 0, false) : UpgradeDefaults.HealthPolicy(applicationManifest);
+        var perServiceType = applicationManifest is null
+            ? new Dictionary<string, ServiceTypeHealthPolicy>()
+            : UpgradeDefaults.ServiceTypeHealthPolicies(applicationManifest);
+        return new(
+            considerWarningAsError: policy.ConsiderWarningAsError ?? defaults.ConsiderWarningAsError,
+            maxPercentUnhealthyDeployedApplications: policy.MaxPercentUnhealthyDeployedApplications ?? defaults.MaxPercentUnhealthyDeployedApplications,
+            defaultServiceTypeHealthPolicy: new ServiceTypeHealthPolicy(
+                maxPercentUnhealthyPartitionsPerService: policy.MaxPercentUnhealthyPartitionsPerService ?? defaults.MaxPercentUnhealthyPartitionsPerService,
+                maxPercentUnhealthyReplicasPerPartition: policy.MaxPercentUnhealthyReplicasPerPartition ?? defaults.MaxPercentUnhealthyReplicasPerPartition,
+                maxPercentUnhealthyServices: policy.MaxPercentUnhealthyServices ?? defaults.MaxPercentUnhealthyServices),
+            serviceTypeHealthPolicyMap: perServiceType.Count == 0
+                ? null
+                : perServiceType.Select(kv => new ServiceTypeHealthPolicyMapItem(kv.Key, kv.Value)).ToList());
+    }
 
     private static string? Milliseconds(TimeSpan? duration) =>
         duration is { } d ? ((long)d.TotalMilliseconds).ToString(CultureInfo.InvariantCulture) : null;
@@ -151,14 +164,16 @@ public sealed class ClusterOperations(IServiceFabricClient client)
     /// <param name="configVersion">The cluster configuration version to move to, or null to keep today's.</param>
     /// <param name="failureAction">For monitored upgrades: what to do when a health check fails.</param>
     /// <param name="policy">Timeouts and health limits; null, or null fields, leave the cluster's defaults.</param>
+    /// <param name="clusterManifest">The cluster manifest, whose health policy fills in what <paramref name="policy"/> leaves out.</param>
     public Task UpgradeClusterAsync(
         string? codeVersion, string? configVersion, UpgradeMode mode, FailureAction? failureAction, UpgradePolicy? policy,
-        CancellationToken cancellationToken) =>
+        string? clusterManifest, CancellationToken cancellationToken) =>
         client.Cluster.StartClusterUpgradeAsync(
-            ClusterUpgradeDescription(codeVersion, configVersion, mode, failureAction, policy), cancellationToken: cancellationToken);
+            ClusterUpgradeDescription(codeVersion, configVersion, mode, failureAction, policy, clusterManifest), cancellationToken: cancellationToken);
 
     internal static StartClusterUpgradeDescription ClusterUpgradeDescription(
-        string? codeVersion, string? configVersion, UpgradeMode mode, FailureAction? failureAction, UpgradePolicy? policy)
+        string? codeVersion, string? configVersion, UpgradeMode mode, FailureAction? failureAction, UpgradePolicy? policy,
+        string? clusterManifest = null)
     {
         if (string.IsNullOrEmpty(codeVersion) && string.IsNullOrEmpty(configVersion))
         {
@@ -173,12 +188,25 @@ public sealed class ClusterOperations(IServiceFabricClient client)
             upgradeReplicaSetCheckTimeoutInSeconds: policy?.ReplicaSetCheckTimeout is { } check ? (long)check.TotalSeconds : null,
             forceRestart: policy?.ForceRestart,
             monitoringPolicy: mode == UpgradeMode.Monitored ? MonitoringPolicy(failureAction, policy) : null,
-            clusterHealthPolicy: policy is { HasClusterHealthPolicy: true }
-                ? new ClusterHealthPolicy(
-                    considerWarningAsError: policy.ConsiderWarningAsError,
-                    maxPercentUnhealthyNodes: policy.MaxPercentUnhealthyNodes,
-                    maxPercentUnhealthyApplications: policy.MaxPercentUnhealthyApplications)
-                : null);
+            clusterHealthPolicy: policy is { HasClusterHealthPolicy: true } ? ClusterHealthPolicy(policy, clusterManifest) : null);
+    }
+
+    /// <summary>
+    /// Like <see cref="HealthPolicy"/>: a cluster health policy sent replaces the manifest's, so what the user didn't set
+    /// comes from the manifest's HealthManager/ClusterHealthPolicy, per-application-type limits included.
+    /// </summary>
+    internal static ClusterHealthPolicy ClusterHealthPolicy(UpgradePolicy policy, string? clusterManifest)
+    {
+        var defaults = clusterManifest is null
+            ? new ClusterHealthPolicyDefaults(false, 0, 0, new Dictionary<string, int>())
+            : UpgradeDefaults.ClusterHealthPolicy(clusterManifest);
+        return new ClusterHealthPolicy(
+            considerWarningAsError: policy.ConsiderWarningAsError ?? defaults.ConsiderWarningAsError,
+            maxPercentUnhealthyNodes: policy.MaxPercentUnhealthyNodes ?? defaults.MaxPercentUnhealthyNodes,
+            maxPercentUnhealthyApplications: policy.MaxPercentUnhealthyApplications ?? defaults.MaxPercentUnhealthyApplications,
+            applicationTypeHealthPolicyMap: defaults.ApplicationTypes.Count == 0
+                ? null
+                : defaults.ApplicationTypes.Select(kv => new ApplicationTypeHealthPolicyMapItem(kv.Key, kv.Value)).ToList());
     }
 
     private static MonitoringPolicyDescription MonitoringPolicy(FailureAction? failureAction, UpgradePolicy? policy) =>

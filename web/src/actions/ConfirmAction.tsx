@@ -37,12 +37,15 @@ export function ConfirmAction({ action, onClose }: { action: Action; onClose: ()
         <Dialog
             title={`${action.title} ${lowerFirst(subject(action.target))}`}
             onClose={onClose}
+            onCancel={() => !running}
             footer={
                 <>
                     <Button type="submit" form="confirm-form" variant={destructive ? "danger-filled" : "primary"} disabled={!confirmed || running}>
                         {running ? "Working…" : action.title}
                     </Button>
-                    <Button onClick={onClose}>Cancel</Button>
+                    <Button onClick={onClose} disabled={running}>
+                        Cancel
+                    </Button>
                 </>
             }
         >

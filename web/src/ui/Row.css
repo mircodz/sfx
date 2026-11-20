@@ -111,21 +111,33 @@ button.row-summary {
     border-bottom-right-radius: 0;
 }
 
+/*
+ * One hairline per seam: the previous row's bottom border. A hovered or open row draws its own top edge over it,
+ * so its outline is whole.
+ */
 .row + .row {
-    border-top-color: transparent;
+    border-top-width: 0;
     border-top-left-radius: 0;
     border-top-right-radius: 0;
-    box-shadow: inset 0 0.5px 0 var(--border);
 }
 
 .row + .row:hover,
 .row + .row.open {
-    border-top-color: var(--border-strong);
+    position: relative;
+    box-shadow: 0 -0.5px 0 var(--border-strong);
 }
 
 .row-summary {
     min-height: 40px;
     padding: 8px var(--space-4);
+}
+
+/* A row of several lines: its pill, value and chevron go with the name on the first line, not the middle. */
+.row-summary:has(.row-sub, .row-reason) > .pill,
+.row-summary:has(.row-sub, .row-reason) > .row-value,
+.row-summary:has(.row-sub, .row-reason) > .row-chevron {
+    align-self: flex-start;
+    margin-top: 1px;
 }
 
 /*
@@ -139,7 +151,8 @@ button.row-summary {
 @container (min-width: 820px) {
     .row-main {
         display: grid;
-        grid-template-columns: minmax(200px, 24%) minmax(0, 1fr) minmax(0, 1.3fr);
+        /* Sized by the row, not by what's left beside its pill or value, so every row's columns start at the same x. */
+        grid-template-columns: minmax(200px, 24cqi) minmax(0, 30cqi) minmax(0, 1fr);
         align-items: baseline;
         column-gap: var(--space-5);
     }
@@ -157,7 +170,21 @@ button.row-summary {
         grid-column: 2;
         grid-row: 1;
     }
+
+    /* No reason: the facts may use its column rather than truncate beside an empty one. */
+    .row-main:not(:has(.row-reason)) .row-sub {
+        grid-column: 2 / -1;
+    }
+
+    /* One line again: back to the middle. */
+    .row-summary:has(.row-sub, .row-reason) > .pill,
+    .row-summary:has(.row-sub, .row-reason) > .row-value,
+    .row-summary:has(.row-sub, .row-reason) > .row-chevron {
+        align-self: center;
+        margin-top: 0;
+    }
 }
+
 
 /* A fixed pill width, so the columns before it line up whatever each row's status says. */
 .row-summary > .pill {

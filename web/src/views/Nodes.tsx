@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../lib/api";
-import { count, plural } from "../lib/format";
+import { count, natural, plural } from "../lib/format";
 import { healthFilters, matches } from "../lib/health";
 import type { HealthFilter } from "../lib/health";
 import { useResource } from "../lib/resource";
@@ -40,9 +40,10 @@ export function Nodes() {
         <Load resource={nodes}>
             {(all) => {
                 const q = search.toLowerCase();
-                const shown = all.filter((n) => matches(filter, n.health) && (!q || `${n.name} ${n.nodeType} ${n.address}`.toLowerCase().includes(q)));
+                const shown = [...all].sort((a, b) => natural(a.name, b.name)).filter((n) => matches(filter, n.health) && (!q || `${n.name} ${n.nodeType} ${n.address}`.toLowerCase().includes(q)));
                 const types = [...new Set(shown.map((n) => n.nodeType))].sort();
-                const picked = all.find((n) => n.name === selected);
+                // A selection the filter hides would leave details for a node that isn't on the map.
+                const picked = shown.find((n) => n.name === selected);
                 return (
                     <>
                         <h2 className="sr-only">

@@ -2,12 +2,13 @@ import { useState } from "react";
 import { api } from "../lib/api";
 import { plural } from "../lib/format";
 import { useResource } from "../lib/resource";
-import { isRunning, upgradeProgress, upgradeWord } from "../lib/upgrades";
+import { direction, isRunning, upgradeProgress, upgradeWord } from "../lib/upgrades";
 import { Load } from "../ui/Load";
 import { PageHeader } from "../ui/PageHeader";
 import { DisclosureRow } from "../ui/Row";
 import { Empty, Section } from "../ui/Section";
 import { UpgradeCard } from "./UpgradeCard";
+import { Limited } from "../ui/ShowMore";
 
 export function Upgrades() {
     const upgrades = useResource("upgrades", api.upgrades);
@@ -30,9 +31,10 @@ export function Upgrades() {
                             onRefresh={upgrades.reload}
                             updated={upgrades.at}
                         />
-                        <Section label="Cluster and applications" aside="Running first">
+                        <Section label="Cluster and applications">
                             {all.length === 0 && <Empty>Nothing on this cluster has been upgraded yet.</Empty>}
-                            {all.map((u) => {
+                            <Limited items={all}>
+                                {(u) => {
                                 const p = upgradeProgress(u);
                                 return (
                                     <DisclosureRow
@@ -40,14 +42,16 @@ export function Upgrades() {
                                         id={u.name}
                                         icon={u.kind === "cluster" ? "topology-star-3" : "apps"}
                                         name={u.name}
-                                        sub={`${u.from ? `${u.from} to ` : ""}${u.target} · ${upgradeWord(u)} · ${p.done} of ${p.total} domains`}
+                                        sub={`${direction(u).from ? `${direction(u).from} to ` : ""}${direction(u).to} · ${p.done} of ${p.total} domains`}
+                                        status={upgradeWord(u)}
                                         open={current === u.name}
                                         onToggle={() => setOpen(current === u.name ? null : u.name)}
                                     >
                                         <UpgradeCard upgrade={u} />
                                     </DisclosureRow>
                                 );
-                            })}
+                                }}
+                            </Limited>
                         </Section>
                     </>
                 );

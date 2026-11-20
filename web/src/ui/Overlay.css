@@ -1,7 +1,8 @@
 .dialog,
 .side-panel {
     border: 0.5px solid var(--border-strong);
-    background: var(--surface-1);
+    /* Lifted off the page in dark, where the page and a same-colored dialog run together. */
+    background: light-dark(var(--surface-1), var(--surface-2));
     color: var(--text-primary);
 }
 
@@ -12,7 +13,7 @@
 
 .dialog {
     width: min(440px, calc(100vw - 32px));
-    padding: 20px;
+    padding: var(--space-4);
     border-radius: var(--radius-lg);
 }
 

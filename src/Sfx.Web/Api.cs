@@ -54,38 +54,32 @@ internal static class Api
         api.MapGet("/nodes/{name}", async (UiSession s, string name, CancellationToken ct) =>
         {
             var nodes = s.Queries.GetNodesAsync(ct);
+            var node = (await nodes).FirstOrDefault(n => n.Name == name)
+                ?? throw new ActionException($"There's no node {name} on this cluster.", StatusCodes.Status404NotFound);
             var health = s.Inspector.GetNodeHealthAsync(name, ct);
             var load = s.Inspector.GetNodeLoadAsync(name, ct);
-            var node = (await nodes).FirstOrDefault(n => n.Name == name)
-                ?? throw new ActionException($"No node named '{name}'.", StatusCodes.Status404NotFound);
-
-            var replicas = new List<DeployedReplicaDto>();
-            if (node.Status == nameof(NodeStatus.Up))
-            {
-                var apps = await s.Deployed.GetApplicationsAsync(name, ct);
-                var perApp = await ForEachLimited(apps, async a => (await s.Deployed.GetReplicasAsync(name, a.Id, null, ct))
-                    .Select(r => new DeployedReplicaDto(a.Name, a.Id, r.ServiceName, r.PartitionId.ToString(), r.Id, r.Role, r.Status, r.CodePackage)));
-                replicas.AddRange(perApp.SelectMany(r => r).OrderBy(r => r.Application).ThenBy(r => r.Service));
-            }
+            var capacities = s.GetDeclaredCapacitiesAsync(ct);
+            var replicas = DeployedReplicasAsync(s, node, ct);
 
             // "__NamingServiceReplicaCount__" and the like are the cluster's own bookkeeping, not load anyone set.
+            var declared = await capacities;
             var metrics = ((await load).NodeLoadMetricInformation ?? [])
                 .Where(m => m.Name is { } n && !n.StartsWith("__", StringComparison.Ordinal))
-                .Select(m => new MetricDto(m.Name ?? "", m.CurrentNodeLoad ?? Number(m.NodeLoad), Capacity(m.NodeCapacity)))
+                .Select(m => new MetricDto(m.Name ?? "", m.CurrentNodeLoad ?? Number(m.NodeLoad), Capacity(m.NodeCapacity, declared.Declares(node.NodeType, m.Name!))))
                 .OrderBy(m => m.Capacity is null)
                 .ThenBy(m => m.Name)
                 .ToList();
-            return new NodeDetailDto(Node(s, node), Dto.Health(await health), metrics, replicas);
+            return new NodeDetailDto(Node(s, node), Dto.Health(await health), metrics, await replicas);
         });
 
         api.MapGet("/applications", async (UiSession s, CancellationToken ct) => (await s.Queries.GetApplicationsAsync(ct)).Select(Dto.Application).ToList());
 
         api.MapGet("/applications/{appId}", async (UiSession s, string appId, CancellationToken ct) =>
         {
-            var services = s.Queries.GetServicesAsync(appId, ct);
-            var health = s.Inspector.GetApplicationHealthAsync(appId, ct);
             if (appId == ClusterQueries.SystemApplicationId)
             {
+                var services = s.Queries.GetServicesAsync(appId, ct);
+                var health = s.Inspector.GetApplicationHealthAsync(appId, ct);
                 var system = (await s.Queries.GetApplicationsAsync(ct)).First(a => a.Id == appId);
                 return new ApplicationDetailDto(
                     Dto.Application(system) with { Health = Dto.Health((await health).State) },
@@ -93,7 +87,10 @@ internal static class Api
                     UpgradeDefaultsDto.For("<ApplicationManifest />"));
             }
 
+            // Asked first, so an unknown id is a 404 that says so rather than whichever query fails first.
             var info = await s.Inspector.GetApplicationAsync(appId, ct);
+            var appServices = s.Queries.GetServicesAsync(appId, ct);
+            var appHealth = s.Inspector.GetApplicationHealthAsync(appId, ct);
             var versions = s.Inspector.GetApplicationTypeVersionsAsync(info.TypeName, ct);
             var upgrade = s.Inspector.GetApplicationUpgradeAsync(appId, ct);
             var manifest = s.Inspector.GetApplicationManifestAsync(info.TypeName, info.TypeVersion, ct);
@@ -118,13 +115,13 @@ internal static class Api
             };
             return new ApplicationDetailDto(
                 Dto.Application(row),
-                Dto.Health(await health),
+                Dto.Health(await appHealth),
                 parameters,
                 types.OrderByDescending(t => t.Version, VersionComparer.Instance)
                     .Select(t => new VersionDto(t.Version, t.DefaultParameterList ?? new Dictionary<string, string>()))
                     .ToList(),
                 upgradeRow.StartedUtc is null ? null : Dto.Upgrade(upgradeRow, UpgradeActions(s, upgradeRow)),
-                (await services).Select(Dto.Service).ToList(),
+                (await appServices).Select(Dto.Service).ToList(),
                 WebActions.For(s, "application", target),
                 new DefaultServicesDto(await defaultServicesUpgrade, DefaultServices.ParameterUses(await manifest)),
                 UpgradeDefaultsDto.For(await manifest));
@@ -139,12 +136,12 @@ internal static class Api
 
         api.MapGet("/applications/{appId}/services/{serviceId}", async (UiSession s, string appId, string serviceId, CancellationToken ct) =>
         {
-            var info = s.Inspector.GetServiceAsync(appId, serviceId, ct);
+            // Asked first, so an unknown id is a 404 that says so rather than whichever query fails first.
+            var service = Service(await s.Inspector.GetServiceAsync(appId, serviceId, ct));
             var description = s.Inspector.GetServiceDescriptionAsync(serviceId, ct);
             var health = s.Inspector.GetServiceHealthAsync(serviceId, ct);
             var partitions = s.Queries.GetPartitionsAsync(serviceId, ct);
 
-            var service = Service(await info);
             var d = await description;
             var (count, min) = d switch
             {
@@ -176,15 +173,13 @@ internal static class Api
             async (UiSession s, string appId, string serviceId, string partitionId, CancellationToken ct) =>
             {
                 var id = new PartitionId(Guid.TryParse(partitionId, out var guid) ? guid : throw new ActionException("Not a partition id."));
-                var service = s.Inspector.GetServiceAsync(appId, serviceId, ct);
-                var partitions = s.Queries.GetPartitionsAsync(serviceId, ct);
+                var svc = Service(await s.Inspector.GetServiceAsync(appId, serviceId, ct));
+                var partition = (await s.Queries.GetPartitionsAsync(serviceId, ct)).FirstOrDefault(p => p.Id.ToString() == id.ToString())
+                    ?? throw new ActionException($"There's no partition {partitionId} in {svc.Name}.", StatusCodes.Status404NotFound);
                 var health = s.Inspector.GetPartitionHealthAsync(id, ct);
                 var load = s.Inspector.GetPartitionLoadAsync(id, ct);
                 var replicas = s.Queries.GetReplicasAsync(id, ct);
 
-                var svc = Service(await service);
-                var partition = (await partitions).FirstOrDefault(p => p.Id.ToString() == id.ToString())
-                    ?? throw new ActionException($"No partition {partitionId} in {svc.Name}.", StatusCodes.Status404NotFound);
                 var l = await load;
                 var metrics = (l.PrimaryLoadMetricReports ?? []).Select(m => new MetricDto($"{m.Name} (primary)", Number(m.CurrentValue ?? m.Value), null))
                     .Concat((l.SecondaryLoadMetricReports ?? []).Select(m => new MetricDto($"{m.Name} (secondary)", Number(m.CurrentValue ?? m.Value), null)))
@@ -205,8 +200,11 @@ internal static class Api
 
         api.MapGet("/replicas", (UiSession s, CancellationToken ct) => s.GetClusterReplicasAsync(ct));
 
+        api.MapGet("/applications/{appId}/services/{serviceId}/replicas", (UiSession s, string appId, string serviceId, CancellationToken ct) =>
+            s.GetServiceReplicasAsync(appId, serviceId, ct));
+
         api.MapGet("/upgrades", async (UiSession s, CancellationToken ct) =>
-            (await s.Upgrades.GetUpgradesAsync(ct))
+            (await s.GetUpgradesAsync(ct))
                 .OrderBy(u => u.Urgency)
                 .ThenByDescending(u => u.StartedUtc)
                 .Select(u => Dto.Upgrade(u, UpgradeActions(s, u)))
@@ -219,7 +217,7 @@ internal static class Api
             {
                 var events = await s.Events.GetEventsAsync(TimeSpan.FromHours(Math.Clamp(hours ?? 1, 1, 24 * 7)), ct);
                 return new EventsDto(events
-                    .Where(e => entity is null || e.Entity == entity || e.Entity.StartsWith(entity + "/", StringComparison.Ordinal))
+                    .Where(e => entity is null || EventQueries.IsAbout(e, entity))
                     .Take(500)
                     .Select(e => new EventDto(e.TimeUtc, e.Kind, e.EntityKind, e.Category, e.Entity, e.Details))
                     .ToList(), null);
@@ -255,6 +253,7 @@ internal static class Api
         ApiPackages.Map(api);
         ApiRepairs.Map(api);
         ApiLoad.Map(api);
+        ApiOverview.Map(api);
     }
 
     public sealed record PowerRequest(bool On);
@@ -262,6 +261,42 @@ internal static class Api
     private static SessionDto SessionInfo(UiSession s, SystemServices services) =>
         new(s.Context.Name, s.Cluster.Endpoint.ToString(), s.ReadOnly, s.Power, s.Version, services.EventStore, s.Context.Folder, s.Label, s.Color,
             services.RepairManager, services.FaultAnalysis);
+
+    /// <summary>
+    /// The replicas on a node, system services' included (as application "fabric:/System", which the node's application
+    /// list leaves out). A node that isn't up may not answer; it then shows none rather than failing the page.
+    /// </summary>
+    private static async Task<IReadOnlyList<DeployedReplicaDto>> DeployedReplicasAsync(UiSession s, NodeRow node, CancellationToken ct)
+    {
+        if (!ClusterQueries.MayHostReplicas(node.Status))
+        {
+            return [];
+        }
+        try
+        {
+            var system = new DeployedApplicationRow(
+                ClusterQueries.SystemApplicationId, ClusterQueries.SystemApplicationName, "System", "", HealthState.Unknown);
+            var apps = (await s.Deployed.GetApplicationsAsync(node.Name, ct)).Where(a => a.Id != system.Id).Prepend(system);
+            var perApp = await ForEachLimited(apps, async a =>
+            {
+                try
+                {
+                    return (await s.Deployed.GetReplicasAsync(node.Name, a.Id, null, ct))
+                        .Select(r => new DeployedReplicaDto(a.Name, a.Id, r.ServiceName, r.PartitionId.ToString(), r.Id, r.Role, r.Status, r.CodePackage));
+                }
+                // Older clusters may not list system replicas by application; the rest of the node still shows.
+                catch (Exception) when (a.Id == system.Id && !ct.IsCancellationRequested)
+                {
+                    return [];
+                }
+            });
+            return perApp.SelectMany(r => r).OrderBy(r => r.Application).ThenBy(r => r.Service).ToList();
+        }
+        catch (Exception) when (node.Status != nameof(NodeStatus.Up) && !ct.IsCancellationRequested)
+        {
+            return [];
+        }
+    }
 
     private static NodeDto Node(UiSession s, NodeRow n) => new(
         n.Name, n.Address, n.NodeType, n.Status, Dto.Health(n.Health), n.UpgradeDomain, n.FaultDomain, n.IsSeed, n.CodeVersion,
@@ -271,7 +306,7 @@ internal static class Api
     private static ServiceDto Service(ServiceInfo s) => new(
         s.Id, s.Name.ToString(), s.TypeName ?? "", s.ServiceKind.ToString() ?? "", s.ServiceStatus?.ToString() ?? "", Dto.Health(s.HealthState));
 
-    private static IReadOnlyList<ActionDto> UpgradeActions(UiSession s, UpgradeRow u) =>
+    internal static IReadOnlyList<ActionDto> UpgradeActions(UiSession s, UpgradeRow u) =>
         WebActions.For(s, "upgrade", new Dictionary<string, string>
         {
             ["kind"] = u.Kind, ["applicationId"] = u.ApplicationId ?? "", ["name"] = u.Name, ["state"] = u.Report.State,
@@ -344,8 +379,17 @@ internal static class Api
     internal static double Number(string? value) =>
         double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var n) ? n : 0;
 
-    /// <summary>Unset capacities come back as 0 or as a huge number; both mean "no limit".</summary>
-    internal static double? Capacity(string? value) => Number(value) is > 0 and < 1e12 and var n ? n : null;
+    /// <summary>
+    /// A capacity, or null for no limit. Unset capacities come back as 0, -1 or a huge number; 0 is only a real limit
+    /// (nothing with that load may be placed) when the cluster manifest <paramref name="declared"/> it.
+    /// </summary>
+    internal static double? Capacity(string? value, bool declared = false) => Number(value) switch
+    {
+        _ when string.IsNullOrWhiteSpace(value) => null,
+        >= 1e12 or < 0 => null,
+        0 when !declared => null,
+        var n => n,
+    };
 
     private static async Task<IReadOnlyList<TOut>> ForEachLimited<TIn, TOut>(IEnumerable<TIn> items, Func<TIn, Task<TOut>> run)
     {

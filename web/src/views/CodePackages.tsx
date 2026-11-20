@@ -27,8 +27,9 @@ export function CodePackages({ node }: { node: string }) {
                                     .filter((p) => p.application === app)
                                     .flatMap((p) =>
                                         p.codePackages.map((c) => {
-                                            const id = `${p.servicePackage}:${p.activationId}:${c.name}`;
-                                            const failing = c.activationFailures > 0 || (c.lastExitCode !== "" && c.lastExitCode !== "0");
+                                            const id = `${p.application}:${p.servicePackage}:${p.activationId}:${c.name}`;
+                                            // Past failures stay in the counters forever; only one that isn't running now is a problem now.
+                                            const failing = !["Active", "Upgrading", "Activating"].includes(c.status) || (c.status === "Activating" && c.activationFailures > 0);
                                             return (
                                                 <DisclosureRow
                                                     key={id}
@@ -36,7 +37,7 @@ export function CodePackages({ node }: { node: string }) {
                                                     icon="terminal-2"
                                                     name={`${p.servicePackage} · ${c.name}`}
                                                     sub={`${c.status} · ${c.hostType} · version ${c.version}${c.processId ? ` · process ${c.processId}` : ""}`}
-                                                    reason={failing ? `Exited with ${c.lastExitCode || "an error"}; ${plural(c.activationFailures, "failed start")}.` : undefined}
+                                                    reason={failing ? `${c.status}${c.lastExitCode && c.lastExitCode !== "0" ? `, last exit code ${c.lastExitCode}` : ""}; ${plural(c.activationFailures, "failed start")} so far.` : undefined}
                                                     status={failing ? "Warning" : undefined}
                                                     open={open === id}
                                                     onToggle={() => setOpen((o) => (o === id ? null : id))}

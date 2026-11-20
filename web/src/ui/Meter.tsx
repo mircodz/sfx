@@ -1,15 +1,18 @@
-import { number } from "../lib/format";
+import { metricName, number } from "../lib/format";
 import type { Metric } from "../lib/types";
 import { Fields } from "./Fields";
 import { Empty } from "./Section";
 import "./Meter.css";
 
-/** A 0-100 bar; past `warnAbove` it turns amber. */
-export function ProgressBar({ pct, label, warnAbove }: { pct: number; label: string; warnAbove?: number }) {
+/**
+ * A 0-100 bar; past `warnAbove` it turns amber. `relative` is a share of the largest, not of a capacity: grey, so it
+ * doesn't read as how full something is.
+ */
+export function ProgressBar({ pct, label, warnAbove, relative }: { pct: number; label: string; warnAbove?: number; relative?: boolean }) {
     const warn = warnAbove !== undefined && pct > warnAbove;
     return (
         <div className="track" role="progressbar" aria-label={label} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-            <div className={`fill ${warn ? "warning" : ""}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+            <div className={`fill ${warn ? "warning" : relative ? "relative" : ""}`} style={{ width: `${Math.min(pct, 100)}%` }} />
         </div>
     );
 }
@@ -26,7 +29,7 @@ export function Meters({ metrics }: { metrics: Metric[] }) {
                 return (
                     <div key={m.name}>
                         <div className="meter-head">
-                            <span>{m.name}</span>
+                            <span>{metricName(m.name)}</span>
                             <span>
                                 {number(m.value)} of {number(m.capacity!)} · {pct}%
                             </span>
@@ -35,7 +38,7 @@ export function Meters({ metrics }: { metrics: Metric[] }) {
                     </div>
                 );
             })}
-            {plain.length > 0 && <Fields fields={plain.map((m) => ({ name: m.name, value: number(m.value) }))} />}
+            {plain.length > 0 && <Fields fields={plain.map((m) => ({ name: metricName(m.name), value: number(m.value) }))} />}
         </div>
     );
 }

@@ -1,11 +1,14 @@
 import type { DomainState, Upgrade } from "./types";
 
-export type UpgradeWord = "In progress" | "Paused" | "Complete" | "Rolled back" | "Failed";
+export type UpgradeWord = "In progress" | "Paused" | "Complete" | "Rolling back" | "Rolled back" | "Failed";
 
 export function upgradeWord(u: Upgrade): UpgradeWord {
     switch (u.state) {
         case "RollingForwardPending":
+        case "RollingBackPending":
             return "Paused";
+        case "RollingBackInProgress":
+            return "Rolling back";
         case "RollingForwardCompleted":
             return "Complete";
         case "RollingBackCompleted":
@@ -17,12 +20,20 @@ export function upgradeWord(u: Upgrade): UpgradeWord {
     }
 }
 
+/** Still under way: moving forward or back, or waiting to be resumed. A failed upgrade has stopped; it isn't running. */
 export function isRunning(u: Upgrade) {
-    return ["In progress", "Paused", "Failed"].includes(upgradeWord(u));
+    return ["In progress", "Paused", "Rolling back"].includes(upgradeWord(u));
+}
+
+export const isRollingBack = (u: Upgrade) => u.state.startsWith("RollingBack");
+
+/** Where it's going: during a rollback the target is the version it came from. */
+export function direction(u: Upgrade) {
+    return isRollingBack(u) ? { from: u.target, to: u.from } : { from: u.from, to: u.target };
 }
 
 export function domainState(u: Upgrade, domain: { name: string; state: string }): DomainState {
-    if (domain.state === "Completed") return "Done";
+    if (domain.state === "Completed") return isRollingBack(u) ? "Rolled back" : "Done";
     if (domain.state === "InProgress" || domain.name === u.currentDomain) {
         if (u.state === "Failed") return "Failed";
         return ["WaitDuration", "StableDuration", "Retry"].includes(u.healthCheckPhase) ? "Verifying" : "Upgrading";

@@ -70,6 +70,10 @@ public static class WebServer
             {
                 await Error(context, StatusCodes.Status400BadRequest, ex.Message);
             }
+            catch (NotFoundException ex)
+            {
+                await Error(context, StatusCodes.Status404NotFound, ex.Message);
+            }
             catch (ServiceFabricException ex) when (ex.ErrorCode.ToString() is var code && (code.Contains("NOT_FOUND") || code.Contains("DOES_NOT_EXIST")))
             {
                 await Error(context, StatusCodes.Status404NotFound, ex.Message);
@@ -91,7 +95,16 @@ public static class WebServer
         // A plain MapFallback skips paths that look like files, which is every asset.
         app.MapFallback("{**path}", ServeAsset);
 
-        await app.StartAsync(cancellationToken);
+        try
+        {
+            await app.StartAsync(cancellationToken);
+        }
+        catch (IOException ex) when (ex.InnerException is Microsoft.AspNetCore.Connections.AddressInUseException)
+        {
+            Console.Error.WriteLine(
+                $"sfx: port {options.Port} is already in use, probably by another sfx ui. Pick another with --port, or leave it out to use any free one.");
+            return 1;
+        }
         var port = new Uri(app.Urls.First()).Port;
         var url = $"http://127.0.0.1:{port}/?token={token}";
         var session = host.Current;

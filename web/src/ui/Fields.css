@@ -9,10 +9,16 @@
     .fields {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    /* One field is one line across, not half a hairline. */
+    .fields:has(> .field:only-child) {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .field {
     display: flex;
+    align-items: baseline;
     gap: var(--space-3);
     min-width: 0;
     padding: var(--space-2) 0;

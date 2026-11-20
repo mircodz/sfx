@@ -79,13 +79,18 @@ export function Events() {
         <>
             <h2 className="sr-only">The cluster's events, newest first.</h2>
             <PageHeader title="Events" summary={windowLabels[hours]} onRefresh={events.reload} />
-            <Toolbar>
-                <SearchBox value={search} onChange={setSearch} placeholder="Filter by event, entity or detail" />
-                <Chips label="Time window" options={windows} labels={windowLabels} value={hours} onChange={setHours} />
-            </Toolbar>
-            <Toolbar>
-                <Chips label="Entity kind" options={kinds} labels={kindLabels} value={kind} onChange={setKind} />
-            </Toolbar>
+            {/* Nothing to filter without an event store. */}
+            {!events.data?.unavailable && (
+                <>
+                    <Toolbar>
+                        <SearchBox value={search} onChange={setSearch} placeholder="Filter by event, entity or detail" />
+                        <Chips label="Time window" options={windows} labels={windowLabels} value={hours} onChange={setHours} />
+                    </Toolbar>
+                    <Toolbar>
+                        <Chips label="Entity kind" options={kinds} labels={kindLabels} value={kind} onChange={setKind} />
+                    </Toolbar>
+                </>
+            )}
             <Load resource={events} shape="rows">
                 {(d) => {
                     if (d.unavailable) return <Empty>{d.unavailable}</Empty>;

@@ -53,16 +53,27 @@ public sealed class EventQueries(ClusterQueries queries)
     private static async Task<IEnumerable<FabricEvent>> Events<T>(Task<IEnumerable<T>> events) where T : FabricEvent =>
         (await events ?? []).Cast<FabricEvent>();
 
-    private static EventRow ToRow(FabricEvent e)
+    /// <summary>
+    /// Whether an event is about <paramref name="entity"/> (a node name, an application or service name, or a partition id)
+    /// or something under it: "fabric:/orders" covers "fabric:/orders/Counter", a partition covers its replicas.
+    /// </summary>
+    public static bool IsAbout(EventRow e, string entity) =>
+        e.Entity == entity
+        || e.Entity.StartsWith(entity + "/", StringComparison.Ordinal)
+        || (e.EntityKind == "replica" && e.Entity.StartsWith(entity + ReplicaSeparator, StringComparison.Ordinal));
+
+    private const string ReplicaSeparator = " / ";
+
+    internal static EventRow ToRow(FabricEvent e)
     {
         var kind = e.GetType().Name is var name && name.EndsWith("Event", StringComparison.Ordinal) ? name[..^5] : e.GetType().Name;
         var (entity, entityKind) = e switch
         {
             NodeEvent n => (n.NodeName?.ToString() ?? "", "node"),
-            ApplicationEvent a => ("fabric:/" + a.ApplicationId, "application"),
-            ServiceEvent s => ("fabric:/" + s.ServiceId?.Replace('~', '/'), "service"),
+            ApplicationEvent a => (ClusterInspector.NameOf(a.ApplicationId ?? ""), "application"),
+            ServiceEvent s => (ClusterInspector.NameOf(s.ServiceId ?? ""), "service"),
             PartitionEvent p => (p.PartitionId?.ToString() ?? "", "partition"),
-            ReplicaEvent r => ($"{r.PartitionId} / {r.ReplicaId}", "replica"),
+            ReplicaEvent r => ($"{r.PartitionId}{ReplicaSeparator}{r.ReplicaId}", "replica"),
             _ => ("cluster", "cluster"),
         };
         var details = string.Join("  ", Inspect.Fields(e)
