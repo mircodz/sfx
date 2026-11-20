@@ -116,20 +116,31 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host)
             .Column("STARTS", Constraint.Length(7), c => Plain(c.Activations.ToString()), c => c.Activations, Justify.Right)
             .Column("FAILED", Constraint.Length(7), c => c.ActivationFailures > 0 ? Colored(c.ActivationFailures.ToString(), Theme.Current.Error) : Muted("0"), c => c.ActivationFailures, Justify.Right);
 
-    /// <summary>The saved contexts; opening one calls <paramref name="use"/> instead of navigating.</summary>
+    /// <summary>
+    /// The saved contexts, grouped by folder, with the mode and label their folders give them; opening one calls
+    /// <paramref name="use"/> instead of navigating.
+    /// </summary>
     public static IResourceView Contexts(ContextStore store, string current, Action<ClusterContext> use) =>
-        new ResourceView<ClusterContext>("contexts", "contexts", _ => Task.FromResult(store.Contexts), c => c.Name)
+        new ResourceView<ResolvedContext>("contexts", "contexts", _ => Task.FromResult<IReadOnlyList<ResolvedContext>>(store.Contexts.Select(store.Resolve).ToList()), c => c.Context.Name)
             {
                 OnOpen = context =>
                 {
-                    use(context);
+                    use(context.Context);
                     return null;
                 },
             }
-            .Column("NAME", Constraint.Fill(1), c => c.Name == current ? Colored(c.Name + " *", Theme.Current.Accent) : Plain(c.Name), c => c.Name)
-            .Column("AUTH", Constraint.Length(14), c => Plain(c.Auth.Count > 0 ? string.Join(",", c.Auth) : "none"))
-            .Column("MODE", Constraint.Length(9), c => Plain(ContextCommand.Mode(c)))
-            .Column("ENDPOINT", Constraint.Fill(2), c => Plain(c.Endpoint), c => c.Endpoint);
+            .Column("NAME", Constraint.Fill(1), c => c.Context.Name == current ? Colored(c.Context.Name + " *", Theme.Current.Accent) : Plain(c.Context.Name), c => c.Context.Name)
+            .Column("FOLDER", Constraint.Fill(1), Folder, c => new FolderOrder(c.Context.Folder, c.Context.Name))
+            .Column("AUTH", Constraint.Length(14), c => Plain(c.Context.Auth.Count > 0 ? string.Join(",", c.Context.Auth) : "none"))
+            .Column("MODE", Constraint.Length(9), c => Plain(ContextCommand.Mode(c.Context)))
+            .Column("ENDPOINT", Constraint.Fill(2), c => Plain(c.Context.Endpoint), c => c.Context.Endpoint)
+            .Sorting("FOLDER");
+
+    /// <summary>"prod/europe PROD": the path, so filtering matches it, then the label in the folder's color.</summary>
+    private static StyledText Folder(ResolvedContext context) =>
+        context.Context.Folder is not { } path ? Muted("-")
+        : context.Label is { } label ? StyledText.Of(path + " ").Append(label).Bold().Fg(FolderColor(context.Color))
+        : StyledText.Of(path);
 
     private static StyledText Role(string role) => role == "Primary" ? Colored(role, Theme.Current.Accent) : Plain(role);
 }

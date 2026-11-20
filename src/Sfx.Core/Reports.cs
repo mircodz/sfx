@@ -120,7 +120,8 @@ public static class ClusterSettings
 /// <summary>One line of the action log.</summary>
 public sealed record ActionLogEntry(DateTimeOffset Time, string User, string Context, string Endpoint, string Action, string Outcome)
 {
-    public bool Succeeded => Outcome == "ok";
+    /// <summary>"ok" when an action ran; "done" when the browser saw the cluster finish what it asked for.</summary>
+    public bool Succeeded => Outcome is "ok" or "done";
 }
 
 /// <summary>Appends one line per action taken to a file, so there's a record of what was changed, where and when.</summary>

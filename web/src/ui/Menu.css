@@ -1,0 +1,42 @@
+.menu-anchor {
+    position: relative;
+}
+
+.menu {
+    position: absolute;
+    top: calc(100% + var(--space-1));
+    right: 0;
+    z-index: 20;
+    min-width: 220px;
+    padding: var(--space-1);
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    background: var(--surface-2);
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 36px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    font-size: 13px;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+    background: var(--fill-ghost-selected);
+    box-shadow: none;
+}
+
+.menu-divider {
+    height: 0.5px;
+    margin: var(--space-1) 0;
+    background: var(--border);
+}

@@ -60,7 +60,7 @@ internal sealed class Shell : IActionHost
         _views = new Views(session.Queries, this);
         _connector = connector;
         _store = store;
-        _log = new ActionLog(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(store.Path))!, "actions.log"));
+        _log = new ActionLog(SfxHost.ActionLogPath(store));
         _activity = new ActivityTracker(_log);
         _global = GlobalActions();
 
@@ -558,8 +558,10 @@ internal sealed class Shell : IActionHost
         Refresh();
     }
 
-    private void Connect(ClusterContext context)
+    /// <summary>Connects to a saved context, with its folders' rules applied so a read-only folder stays read-only.</summary>
+    private void Connect(ClusterContext saved)
     {
+        var context = _store.Resolve(saved).Context;
         _connecting?.Cancel();
         var connecting = _connecting = new CancellationTokenSource();
         _notice = $"connecting to {context.Name}…";
@@ -728,6 +730,10 @@ internal sealed class Shell : IActionHost
     private void UpdateStatus()
     {
         var context = StyledText.Of($" {_session.Context.Name} ").Bold().Fg(Theme.Current.Accent);
+        if (_store.Resolve(_session.Context) is { Label: { } label } folder)
+        {
+            context.Append(label + " ").Bold().Fg(Styles.FolderColor(folder.Color));
+        }
         if (_session.Context.ReadOnly)
         {
             context.Append("read-only ").Fg(Theme.Current.Info);

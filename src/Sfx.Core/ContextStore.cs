@@ -7,7 +7,8 @@ namespace Sfx.Core;
 
 /// <summary>
 /// Saved cluster contexts in a TOML file: <c>$SFX_CONFIG</c>, or <c>~/.sfx/config.toml</c>.
-/// Besides <c>endpoint</c>, <c>auth</c>, <c>readonly</c> and <c>power</c>, a context's keys are the options of its auth methods.
+/// Besides <c>endpoint</c>, <c>auth</c>, <c>readonly</c>, <c>power</c> and <c>folder</c>, a context's keys are the options of its auth methods.
+/// <c>[folders.&lt;path&gt;]</c> tables set a <c>label</c>, <c>color</c> and <c>readonly</c> for the contexts in a folder and its subfolders.
 /// </summary>
 public sealed class ContextStore
 {
@@ -17,6 +18,10 @@ public sealed class ContextStore
     private const string AuthKey = "auth";
     private const string ReadOnlyKey = "readonly";
     private const string PowerKey = "power";
+    private const string FolderKey = "folder";
+    private const string FoldersKey = "folders";
+    private const string LabelKey = "label";
+    private const string ColorKey = "color";
 
     private readonly TomlTable _root;
 
@@ -66,6 +71,49 @@ public sealed class ContextStore
     public ClusterContext? Find(string name) =>
         Contexts.FirstOrDefault(context => context.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>
+    /// The <c>[folders.&lt;path&gt;]</c> tables, by path. A path may be quoted (<c>[folders."prod/europe"]</c>) or nested
+    /// (<c>[folders.prod.europe]</c>). Unknown keys and colors are ignored.
+    /// </summary>
+    public IReadOnlyList<FolderSettings> Folders =>
+        (_root.TryGetValue(FoldersKey, out var value) && value is TomlTable table ? ReadFolders(table, "") : [])
+            .GroupBy(folder => folder.Path, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new FolderSettings(
+                group.Key,
+                group.Select(f => f.Label).FirstOrDefault(label => label is not null),
+                group.Select(f => f.Color).FirstOrDefault(color => color is not null),
+                group.Any(f => f.ReadOnly)))
+            .OrderBy(folder => folder.Path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>
+    /// Applies the rules of the context's folders: label and color come from the nearest folder that sets them, and a
+    /// read-only folder makes the context read-only (and not power), whatever the context says.
+    /// </summary>
+    public ResolvedContext Resolve(ClusterContext context)
+    {
+        if (FolderPath.Normalize(context.Folder) is not { } path)
+        {
+            return new ResolvedContext(context with { Folder = null }, null, null);
+        }
+
+        var folders = Folders.ToDictionary(folder => folder.Path, StringComparer.OrdinalIgnoreCase);
+        string? label = null;
+        string? color = null;
+        var readOnly = context.ReadOnly;
+        foreach (var ancestor in FolderPath.Ancestors(path))
+        {
+            if (folders.TryGetValue(ancestor, out var folder))
+            {
+                label = folder.Label ?? label;
+                color = folder.Color ?? color;
+                readOnly |= folder.ReadOnly;
+            }
+        }
+
+        return new ResolvedContext(context with { Folder = path, ReadOnly = readOnly, Power = !readOnly && context.Power }, label, color);
+    }
+
     /// <summary>Adds the context, or replaces the one with the same name.</summary>
     public void Set(ClusterContext context)
     {
@@ -81,6 +129,10 @@ public sealed class ContextStore
         if (context.Power)
         {
             table[PowerKey] = true;
+        }
+        if (FolderPath.Normalize(context.Folder) is { } folder)
+        {
+            table[FolderKey] = folder;
         }
 
         foreach (var key in context.Options.Keys)
@@ -147,7 +199,7 @@ public sealed class ContextStore
         var options = new AuthOptions();
         foreach (var (key, option) in table)
         {
-            if (key is not (EndpointKey or AuthKey or ReadOnlyKey or PowerKey))
+            if (key is not (EndpointKey or AuthKey or ReadOnlyKey or PowerKey or FolderKey))
             {
                 foreach (var text in Strings(option))
                 {
@@ -162,7 +214,31 @@ public sealed class ContextStore
             Strings(table.TryGetValue(AuthKey, out var auth) ? auth : null),
             options,
             table.TryGetValue(ReadOnlyKey, out var readOnly) && readOnly is true,
-            table.TryGetValue(PowerKey, out var power) && power is true);
+            table.TryGetValue(PowerKey, out var power) && power is true,
+            FolderPath.Normalize(table.TryGetValue(FolderKey, out var folder) ? folder as string : null));
+    }
+
+    private static IEnumerable<FolderSettings> ReadFolders(TomlTable table, string parent)
+    {
+        foreach (var (key, value) in table)
+        {
+            if (value is not TomlTable folder || FolderPath.Normalize($"{parent}/{key}") is not { } path)
+            {
+                continue;
+            }
+
+            var label = folder.TryGetValue(LabelKey, out var text) && text is string l && l.Trim() is { Length: > 0 } trimmed ? trimmed : null;
+            var color = folder.TryGetValue(ColorKey, out var name) && name is string c
+                ? FolderPath.Colors.FirstOrDefault(allowed => allowed.Equals(c.Trim(), StringComparison.OrdinalIgnoreCase))
+                : null;
+            var readOnly = folder.TryGetValue(ReadOnlyKey, out var flag) && flag is true;
+            yield return new FolderSettings(path, label, color, readOnly);
+
+            foreach (var child in ReadFolders(folder, path))
+            {
+                yield return child;
+            }
+        }
     }
 
     private static List<string> Strings(object? value) => value switch

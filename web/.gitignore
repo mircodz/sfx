@@ -1,0 +1,3 @@
+node_modules/
+# Screenshots depend on the machine's fonts and Chrome; each machine makes its own baselines.
+tests/gallery/

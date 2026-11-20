@@ -1,0 +1,22 @@
+.notice {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: var(--space-4) 0 0;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius);
+    font-size: 13px;
+}
+
+.notice-text {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.notice-dismiss.icon-button {
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+    color: inherit;
+}

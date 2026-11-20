@@ -1,0 +1,50 @@
+.evaluations {
+    padding: var(--space-1) 0 var(--space-3);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.evaluation {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-1) 0;
+}
+
+/* A fixed column, so every description starts at the same place whatever its pill says. */
+.evaluation-status {
+    flex: 0 0 64px;
+    display: flex;
+}
+
+.evaluation-indent {
+    flex: none;
+    align-self: stretch;
+    width: 12px;
+    margin: calc(-1 * var(--space-1)) 0 calc(-1 * var(--space-1)) var(--space-1);
+    border-left: 0.5px solid var(--border-strong);
+}
+
+.evaluation-text {
+    min-width: 0;
+    padding-top: 1px;
+    overflow-wrap: anywhere;
+}
+
+.errors-and-warnings {
+    margin-top: var(--space-4);
+}
+
+.text-button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.text-button:hover {
+    color: var(--text-primary);
+}

@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Sfx.Core\Sfx.Core.csproj" />
+    <ProjectReference Include="..\Sfx.Web\Sfx.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>

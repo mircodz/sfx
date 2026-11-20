@@ -33,6 +33,14 @@ public sealed class ClusterInspector(IServiceFabricClient client)
         return (await client.ApplicationTypes.GetApplicationManifestAsync(typeName, typeVersion, cancellationToken: cancellationToken)).Manifest;
     }
 
+    /// <summary>The provisioned versions of an application type, with each one's default parameters.</summary>
+    public async Task<IReadOnlyList<ApplicationTypeInfo>> GetApplicationTypeVersionsAsync(string typeName, CancellationToken cancellationToken)
+    {
+        RequireUserApplication(typeName);
+        return await ClusterQueries.PageAsync(token => client.ApplicationTypes.GetApplicationTypeInfoListByNameAsync(
+            typeName, continuationToken: token, cancellationToken: cancellationToken));
+    }
+
     public Task<ApplicationUpgradeProgressInfo> GetApplicationUpgradeAsync(string applicationId, CancellationToken cancellationToken) =>
         client.Applications.GetApplicationUpgradeAsync(applicationId, cancellationToken: cancellationToken);
 
@@ -97,6 +105,20 @@ public sealed class ClusterInspector(IServiceFabricClient client)
 
     public Task<ClusterUpgradeProgressObject> GetClusterUpgradeAsync(CancellationToken cancellationToken) =>
         client.Cluster.GetClusterUpgradeProgressAsync(cancellationToken: cancellationToken);
+
+    /// <summary>The Service Fabric versions provisioned for a cluster upgrade, in no particular order.</summary>
+    public async Task<IReadOnlyList<string>> GetProvisionedCodeVersionsAsync(CancellationToken cancellationToken) =>
+        (await client.Cluster.GetProvisionedFabricCodeVersionInfoListAsync(cancellationToken: cancellationToken))
+            .Select(v => v.CodeVersion)
+            .OfType<string>()
+            .ToList();
+
+    /// <summary>The cluster configuration versions provisioned for a cluster upgrade, in no particular order.</summary>
+    public async Task<IReadOnlyList<string>> GetProvisionedConfigVersionsAsync(CancellationToken cancellationToken) =>
+        (await client.Cluster.GetProvisionedFabricConfigVersionInfoListAsync(cancellationToken: cancellationToken))
+            .Select(v => v.ConfigVersion)
+            .OfType<string>()
+            .ToList();
 
     /// <summary>The cluster configuration JSON. Only standalone clusters have one.</summary>
     public async Task<string> GetClusterConfigurationAsync(CancellationToken cancellationToken) =>

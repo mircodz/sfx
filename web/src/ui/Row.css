@@ -1,0 +1,102 @@
+.row {
+    display: block;
+    margin-bottom: var(--space-3);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    text-decoration: none;
+}
+
+.row:hover,
+.row.open {
+    border-color: var(--border-strong);
+}
+
+.row-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 44px;
+    padding: 10px var(--space-4);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* The disclosure's button sits inside the card, so it has no card of its own; a link row is the card. */
+button.row-summary {
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+}
+
+.row-icon {
+    flex: none;
+    font-size: 18px;
+    color: var(--text-secondary);
+}
+
+.row-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.row-name,
+.row-sub,
+.row-reason {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row-name {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.row-sub,
+.row-reason,
+.row-value {
+    font-size: 12px;
+}
+
+.row-sub,
+.row-value {
+    color: var(--text-secondary);
+}
+
+.row-value {
+    flex: none;
+    white-space: nowrap;
+}
+
+.row-chevron {
+    flex: none;
+    font-size: 16px;
+    color: var(--text-secondary);
+}
+
+.row.open .row-chevron {
+    transform: rotate(180deg);
+}
+
+.row-details {
+    padding: 0 var(--space-4) var(--space-4) 38px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.row-details > * + * {
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 0.5px solid var(--border);
+}
+
+.row-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}

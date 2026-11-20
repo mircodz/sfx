@@ -1,0 +1,45 @@
+.folder-heading {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    margin: 0 0 var(--space-3);
+    padding: var(--space-2) 0;
+    border: 0;
+    border-bottom: 0.5px solid var(--border);
+    background: transparent;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.folder-icon {
+    font-size: 18px;
+    color: var(--text-secondary);
+}
+
+.folder-name {
+    font-weight: 500;
+}
+
+.folder-chevron {
+    font-size: 16px;
+    color: var(--text-secondary);
+}
+
+.folder-heading[aria-expanded="false"] .folder-chevron {
+    transform: rotate(-90deg);
+}
+
+.context-row .row-summary:disabled {
+    cursor: default;
+}
+
+.context-row.current {
+    border-color: var(--border-accent);
+}
+
+.sign-in {
+    display: grid;
+    gap: var(--space-3);
+}

@@ -1,0 +1,60 @@
+:root {
+    color-scheme: light dark;
+
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "Cascadia Code", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --radius: 8px;
+    --radius-lg: 12px;
+
+    /* Surfaces and text */
+    --surface-1: light-dark(#faf9f5, #1f1e1d);
+    --surface-2: light-dark(#ffffff, #2c2c2a);
+    --bg-neutral: light-dark(#f1efe8, #3a3a37);
+    --text-primary: light-dark(#1f1e1d, #f1efe8);
+    --text-secondary: light-dark(#5f5e5a, #b4b2a9);
+    --text-muted: #888780;
+    --border: light-dark(rgba(0, 0, 0, 0.12), rgba(255, 255, 255, 0.14));
+    --border-strong: light-dark(rgba(0, 0, 0, 0.28), rgba(255, 255, 255, 0.32));
+    --border-accent: light-dark(#185fa5, #85b7eb);
+    --fill-ghost-selected: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
+    --backdrop: rgba(0, 0, 0, 0.35);
+
+    /* Status roles: background and text pairs */
+    --bg-success: light-dark(#c0dd97, #27500a);
+    --text-success: light-dark(#27500a, #c0dd97);
+    --bg-warning: light-dark(#fac775, #633806);
+    --text-warning: light-dark(#633806, #fac775);
+    --bg-danger: light-dark(#f7c1c1, #791f1f);
+    --text-danger: light-dark(#791f1f, #f7c1c1);
+    --bg-accent: light-dark(#b5d4f4, #0c447c);
+    --text-accent: light-dark(#0c447c, #b5d4f4);
+
+    /* Progress and meters */
+    --fill-accent: light-dark(#185fa5, #378add);
+    --fill-warning: light-dark(#ba7517, #ef9f27);
+
+    --focus-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--border-accent);
+
+    /* Code: kept away from the status hues so a tag never reads as a health state. */
+    --code-tag: light-dark(#6b3fa0, #c4a7e7);
+    --code-attr: light-dark(#8a5a12, #e0b878);
+    --code-string: light-dark(#1f6f6b, #7fc8c2);
+    --code-number: light-dark(#a2387a, #e99bc8);
+    --code-muted: #8a8880;
+
+    /* Spacing rhythm */
+    --space-1: 4px;
+    --space-2: 6px;
+    --space-3: 8px;
+    --space-4: 12px;
+    --space-5: 16px;
+    --space-6: 24px;
+}
+
+:root[data-theme="light"] {
+    color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+}

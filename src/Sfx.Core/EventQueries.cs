@@ -6,8 +6,9 @@ namespace Sfx.Core;
 /// <summary>One event from the cluster's event store.</summary>
 /// <param name="Kind">The event type without its "Event" suffix, e.g. "NodeDown".</param>
 /// <param name="Entity">What it's about: a node, application, service or partition, or "cluster".</param>
+/// <param name="EntityKind">What kind of entity that is: "cluster", "node", "application", "service", "partition" or "replica".</param>
 /// <param name="Details">The event's own fields, as "Name=value" pairs.</param>
-public sealed record EventRow(DateTime TimeUtc, string Kind, string Category, string Entity, string Details, FabricEvent Event);
+public sealed record EventRow(DateTime TimeUtc, string Kind, string Category, string Entity, string EntityKind, string Details, FabricEvent Event);
 
 public sealed class EventQueries(ClusterQueries queries)
 {
@@ -55,18 +56,18 @@ public sealed class EventQueries(ClusterQueries queries)
     private static EventRow ToRow(FabricEvent e)
     {
         var kind = e.GetType().Name is var name && name.EndsWith("Event", StringComparison.Ordinal) ? name[..^5] : e.GetType().Name;
-        var entity = e switch
+        var (entity, entityKind) = e switch
         {
-            NodeEvent n => n.NodeName?.ToString() ?? "",
-            ApplicationEvent a => "fabric:/" + a.ApplicationId,
-            ServiceEvent s => "fabric:/" + s.ServiceId?.Replace('~', '/'),
-            PartitionEvent p => p.PartitionId?.ToString() ?? "",
-            ReplicaEvent r => $"{r.PartitionId} / {r.ReplicaId}",
-            _ => "cluster",
+            NodeEvent n => (n.NodeName?.ToString() ?? "", "node"),
+            ApplicationEvent a => ("fabric:/" + a.ApplicationId, "application"),
+            ServiceEvent s => ("fabric:/" + s.ServiceId?.Replace('~', '/'), "service"),
+            PartitionEvent p => (p.PartitionId?.ToString() ?? "", "partition"),
+            ReplicaEvent r => ($"{r.PartitionId} / {r.ReplicaId}", "replica"),
+            _ => ("cluster", "cluster"),
         };
         var details = string.Join("  ", Inspect.Fields(e)
             .Where(f => !CommonFields.Contains(f.Name) && f.Value.Length > 0)
             .Select(f => $"{f.Name}={f.Value}"));
-        return new EventRow(e.TimeStamp ?? DateTime.MinValue, kind, e.Category ?? "", entity, details, e);
+        return new EventRow(e.TimeStamp ?? DateTime.MinValue, kind, e.Category ?? "", entity, entityKind, details, e);
     }
 }

@@ -29,6 +29,19 @@ internal static class Styles
         _ => Colored(status, Theme.Current.Warning),
     };
 
+    /// <summary>A folder's color (success, warning, danger, accent or neutral) in the theme's status colors.</summary>
+    public static Color FolderColor(string? color) => color switch
+    {
+        "success" => Theme.Current.Success,
+        "warning" => Theme.Current.Warning,
+        "danger" => Theme.Current.Error,
+        "accent" => Theme.Current.Accent,
+        _ => Theme.Current.Foreground,
+    };
+
+    /// <summary>A folder's label, bold in the folder's color.</summary>
+    public static StyledText FolderLabel(string label, string? color) => StyledText.Of(label).Bold().Fg(FolderColor(color));
+
     public static string Duration(TimeSpan? value) => value switch
     {
         null => "-",

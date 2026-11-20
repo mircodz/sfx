@@ -1,0 +1,42 @@
+.node-map {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-2);
+}
+
+@media (min-width: 720px) {
+    .node-map {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+}
+
+.node-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    height: 64px;
+    padding: var(--space-1);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.node-cell[aria-pressed="true"] {
+    border: 2px solid var(--border-accent);
+}
+
+.node-cell-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.node-cell-sub {
+    font-size: 11px;
+}

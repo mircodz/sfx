@@ -1,0 +1,77 @@
+/* The few styles that belong to one view rather than to a component. */
+
+.view {
+    padding: var(--space-6) 0 48px;
+}
+
+.upgrade-card > * + * {
+    margin-top: var(--space-4);
+    padding-top: var(--space-4);
+    border-top: 0.5px solid var(--border);
+}
+
+.upgrade-card .errors-and-warnings {
+    margin-top: var(--space-4);
+}
+
+.upgrade-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    min-height: 32px;
+}
+
+/* On an application's page the card stands alone, so it gets the card surface a row would give it. */
+.section > .upgrade-card {
+    padding: var(--space-4);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+}
+
+.upgrade-summary {
+    display: grid;
+    gap: var(--space-1);
+    padding: 10px 0;
+    border-top: 0.5px solid var(--border);
+    text-decoration: none;
+}
+
+.upgrade-summary .track {
+    margin-top: var(--space-2);
+}
+
+.upgrade-summary-head {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+
+.map-detail {
+    margin-top: var(--space-2);
+    padding: var(--space-3) 0;
+    border-top: 0.5px solid var(--border);
+    font-size: 13px;
+}
+
+.more {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+}
+
+.load-grid {
+    display: grid;
+    gap: var(--space-2);
+}
+
+.load-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 200px) minmax(0, 1fr) minmax(90px, auto);
+    align-items: center;
+    gap: var(--space-4);
+    font-size: 13px;
+}

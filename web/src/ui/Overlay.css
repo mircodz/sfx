@@ -1,0 +1,134 @@
+.dialog,
+.side-panel {
+    border: 0.5px solid var(--border-strong);
+    background: var(--surface-1);
+    color: var(--text-primary);
+}
+
+.dialog::backdrop,
+.side-panel::backdrop {
+    background: var(--backdrop);
+}
+
+.dialog {
+    width: min(440px, calc(100vw - 32px));
+    padding: 20px;
+    border-radius: var(--radius-lg);
+}
+
+.dialog-title {
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.dialog-body {
+    font-size: 13px;
+}
+
+.dialog-footer {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: 20px;
+}
+
+.side-panel {
+    position: fixed;
+    flex-direction: column;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0 0 0 auto;
+    padding: 0;
+    border-width: 0 0 0 0.5px;
+}
+
+.side-panel[open] {
+    display: flex;
+    animation: slide-in 120ms ease-out;
+}
+
+@keyframes slide-in {
+    from {
+        transform: translateX(24px);
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .side-panel[open] {
+        animation: none;
+    }
+}
+
+.side-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-5);
+    border-bottom: 0.5px solid var(--border);
+}
+
+.side-panel-heading {
+    min-width: 0;
+}
+
+.side-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-1) var(--space-5) var(--space-5);
+}
+
+.side-panel-footer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-5);
+    border-top: 0.5px solid var(--border);
+}
+
+/* A wide grab area on the edge; the visible line only shows on hover, drag or focus. */
+.side-panel-resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -4px;
+    z-index: 1;
+    width: 9px;
+    cursor: col-resize;
+    touch-action: none;
+}
+
+.side-panel-resize::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 3px;
+    border-radius: 2px;
+    background: transparent;
+}
+
+.side-panel-resize:hover::after,
+.side-panel-resize:active::after,
+.side-panel-resize:focus-visible::after {
+    background: var(--border-accent);
+}
+
+.side-panel-resize:focus-visible {
+    box-shadow: none;
+}
+
+/* On a phone the panel is the screen: full width, nothing to resize. */
+@media (max-width: 600px) {
+    .side-panel {
+        width: 100vw !important;
+    }
+
+    .side-panel-resize {
+        display: none;
+    }
+}

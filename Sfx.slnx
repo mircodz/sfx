@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Sfx.Core/Sfx.Core.csproj" />
     <Project Path="src/Sfx.Tui/Sfx.Tui.csproj" />
+    <Project Path="src/Sfx.Web/Sfx.Web.csproj" />
     <Project Path="src/Sfx/Sfx.csproj" />
   </Folder>
   <Folder Name="/tests/">
