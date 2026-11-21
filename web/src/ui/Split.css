@@ -1,0 +1,28 @@
+/* By the page's own width, so a collapsed sidebar or a narrow window decides alike. */
+.split-wrap {
+    container-type: inline-size;
+}
+
+@container (min-width: 960px) {
+    .split {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        column-gap: var(--space-6);
+        align-items: start;
+    }
+
+    .split-main {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .split-aside {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    /* Facts in the narrow column: one per line, not two squeezed side by side. */
+    .split-aside .fields {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

@@ -35,11 +35,13 @@ internal sealed class Shell : IActionHost
     private readonly Slot _footer;
     private readonly ActionLog _log;
     private readonly ActivityTracker _activity;
+    private readonly ViewCatalog _viewCatalog;
 
     private Widget _promptRow;
     private Widget _statusRow;
     private ClusterSession _session;
     private Views _views;
+    private ViewFilter _view;
     private PromptMode _mode;
     private Action<string>? _askSubmit;
     private bool _power;
@@ -51,13 +53,21 @@ internal sealed class Shell : IActionHost
     private string? _error;
     private string? _notice;
 
-    public Shell(App app, ITerminal terminal, ClusterSession session, ClusterConnector connector, ContextStore store, TimeSpan refreshInterval)
+    /// <param name="views">The views in the config; none when null.</param>
+    /// <param name="view">The view to start with.</param>
+    /// <param name="notice">Shown in the status line once the UI is up, e.g. that the context's view isn't defined.</param>
+    public Shell(
+        App app, ITerminal terminal, ClusterSession session, ClusterConnector connector, ContextStore store, TimeSpan refreshInterval,
+        ViewCatalog? views = null, ViewFilter? view = null, string? notice = null)
     {
         _app = app;
         _terminal = terminal;
         _session = session;
         _power = session.Context.Power;
-        _views = new Views(session.Queries, this);
+        _viewCatalog = views ?? ViewCatalog.Empty;
+        _view = view ?? ViewFilter.None;
+        _notice = notice;
+        _views = new Views(session.Queries, this, () => _view);
         _connector = connector;
         _store = store;
         _log = new ActionLog(SfxHost.ActionLogPath(store));
@@ -139,6 +149,7 @@ internal sealed class Shell : IActionHost
         new("Events of the last hour; :events 6h for longer", ViewsGroup, ShowEvents, Commands: ["events", "ev"]),
         new("Repair tasks: reboots, patching and other infrastructure work", ViewsGroup, _ => ShowRoot(_views.Repairs()), Commands: ["repairs", "repair", "rt"]),
         new("Contexts; :ctx <name> switches", ViewsGroup, SwitchContext, [KeyChord.Of('c')], ["ctx", "context", "contexts"]),
+        new("Show only a view's applications: :view <name>; :view alone shows them all", General, SwitchView, Commands: ["view"]),
         new("Unlock or lock power actions (recover, delete, remove node state…)", General, _ => TogglePower(), Commands: ["power"]),
 
         new("Open row (or click it twice)", Movement, _ => Forward(Key.Enter), [KeyChord.Named(Key.Enter), KeyChord.Of('l')]),
@@ -267,7 +278,10 @@ internal sealed class Shell : IActionHost
             .DistinctBy(action => action.Title)
             .Select(action => new Command(action.Title, () => action.Run(null), action.Hint))
             .Concat(_store.Contexts.Select(context =>
-                new Command($"Switch to context {context.Name}", () => Connect(context), context.Endpoint)));
+                new Command($"Switch to context {context.Name}", () => Connect(context), context.Endpoint)))
+            .Concat(_viewCatalog.Views.Where(view => view != _view).Select(view =>
+                new Command($"Use view {view.Name}", () => SwitchView(view.Name), Patterns(view.Definition!))))
+            .Concat(_view.IsNone ? [] : [new Command("Show every application (no view)", () => SwitchView(null), ":view")]);
 
         var palette = new CommandPalette(commands);
         var overlay = new Overlay(palette)
@@ -338,6 +352,27 @@ internal sealed class Shell : IActionHost
             UpdateStatus();
         }
     }
+
+    /// <summary><c>:view payments</c> shows only that view's applications and what belongs to them; <c>:view</c> shows everything.</summary>
+    private void SwitchView(string? name)
+    {
+        if (name is not null && _viewCatalog.Find(name) is null)
+        {
+            _notice = _viewCatalog.Views.Count == 0
+                ? $"no views in {_viewCatalog.ConfigPath}; add a [views.<name>] table with apps or exclude patterns"
+                : $"no view named '{name}'; views: {string.Join(", ", _viewCatalog.Views.Select(view => view.Name))}";
+            UpdateStatus();
+            return;
+        }
+
+        _view = name is null ? ViewFilter.None : _viewCatalog.Find(name)!;
+        _notice = _view.IsNone ? "showing every application" : $"view {_view.Name}: {Patterns(_view.Definition!)}";
+        Refresh();
+    }
+
+    /// <summary>"fabric:/payments/*, not fabric:/payments/legacy", for the status line and palette.</summary>
+    private static string Patterns(ViewDefinition view) =>
+        string.Join(", ", view.Apps.Concat(view.Exclude.Select(pattern => "not " + pattern)));
 
     private void TogglePower()
     {
@@ -581,10 +616,12 @@ internal sealed class Shell : IActionHost
                     _connecting = null;
                     _session = session;
                     _power = session.Context.Power;
-                    _views = new Views(session.Queries, this);
+                    _views = new Views(session.Queries, this, () => _view);
+                    // Each context opens with its own view.
+                    _view = _viewCatalog.DefaultFor(context, out var warning);
                     _store.Active = context.Name;
                     _store.Save();
-                    _notice = null;
+                    _notice = warning;
                     ShowRoot(_views.Nodes());
                 });
             }
@@ -733,6 +770,10 @@ internal sealed class Shell : IActionHost
         if (_store.Resolve(_session.Context) is { Label: { } label } folder)
         {
             context.Append(label + " ").Bold().Fg(Styles.FolderColor(folder.Color));
+        }
+        if (!_view.IsNone)
+        {
+            context.Append($"view {_view.Name} ").Fg(Theme.Current.Info);
         }
         if (_session.Context.ReadOnly)
         {

@@ -8,9 +8,20 @@ namespace Sfx.Web;
 /// <param name="EventStore">Whether the cluster runs the event store; without it there are no events to show.</param>
 /// <param name="RepairManager">Whether it runs the repair manager; without it there are no repair tasks.</param>
 /// <param name="FaultAnalysis">Whether it runs the Fault Analysis Service, which stopping nodes and restarting partitions need.</param>
+/// <param name="Views">The views in the config, by name; any of them can be passed as <c>?view=</c>.</param>
+/// <param name="DefaultView">The view to start with: <c>--view</c>, else the current context's; null for none.</param>
 public sealed record SessionDto(
     string Context, string Endpoint, bool ReadOnly, bool Power, string Version, bool EventStore, string? Folder, string? Label, string? Color,
-    bool RepairManager, bool FaultAnalysis);
+    bool RepairManager, bool FaultAnalysis, IReadOnlyList<ViewDto> Views, string? DefaultView);
+
+/// <summary>A view: the applications it shows (<paramref name="Apps"/>; all when empty) minus those it excludes.</summary>
+public sealed record ViewDto(string Name, IReadOnlyList<string> Apps, IReadOnlyList<string> Exclude);
+
+/// <summary>How the view in <c>?view=</c> splits the cluster's applications; health and counts elsewhere stay cluster-wide.</summary>
+/// <param name="Applications">Applications in the view.</param>
+/// <param name="HiddenApplications">Applications the view leaves out.</param>
+/// <param name="HiddenUnhealthy">Of those left out, how many are in warning or error.</param>
+public sealed record ViewSummaryDto(string Name, int Applications, int HiddenApplications, int HiddenUnhealthy);
 
 /// <summary>The optional system services a cluster may run; what isn't there isn't offered.</summary>
 public sealed record SystemServices(bool EventStore, bool RepairManager, bool FaultAnalysis);
@@ -39,7 +50,10 @@ public sealed record LoadSummaryDto(
 
 /// <summary>The cluster at a glance, cheap to ask even of a large cluster.</summary>
 /// <param name="Health">The cluster's evaluations and unhealthy events.</param>
-/// <param name="RunningUpgrades">The cluster's upgrade when it's running, pending or failed, and the applications' that are running.</param>
+/// <param name="RunningUpgrades">
+/// The cluster's upgrade when it's running, pending or failed, and the applications' that are running (those in the view).
+/// </param>
+/// <param name="View">The view in <c>?view=</c> and what it hides; null without one.</param>
 public sealed record OverviewDto(
     string Name,
     string Endpoint,
@@ -47,7 +61,8 @@ public sealed record OverviewDto(
     HealthDto Health,
     IReadOnlyList<HealthCountDto> Counts,
     IReadOnlyList<LoadSummaryDto> Load,
-    IReadOnlyList<UpgradeDto> RunningUpgrades);
+    IReadOnlyList<UpgradeDto> RunningUpgrades,
+    ViewSummaryDto? View);
 
 public sealed record NodeDto(
     string Name, string Address, string NodeType, string Status, string Health, string UpgradeDomain, string FaultDomain,
@@ -58,7 +73,9 @@ public sealed record MetricDto(string Name, double Value, double? Capacity);
 public sealed record DeployedReplicaDto(
     string Application, string ApplicationId, string Service, string PartitionId, string Id, string Role, string Status, string CodePackage);
 
-public sealed record NodeDetailDto(NodeDto Node, HealthDto Health, IReadOnlyList<MetricDto> Load, IReadOnlyList<DeployedReplicaDto> Replicas);
+/// <param name="HiddenReplicas">How many replicas on the node the view in <c>?view=</c> leaves out; 0 without one.</param>
+public sealed record NodeDetailDto(
+    NodeDto Node, HealthDto Health, IReadOnlyList<MetricDto> Load, IReadOnlyList<DeployedReplicaDto> Replicas, int HiddenReplicas);
 
 public sealed record ApplicationDto(string Id, string Name, string TypeName, string TypeVersion, string Status, string Health, string? Reason = null);
 

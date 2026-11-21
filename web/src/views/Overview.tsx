@@ -22,6 +22,7 @@ import { Empty } from "../ui/Section";
 import { HealthTab, Tabs, useTab } from "../ui/Tabs";
 import { TimelineRow } from "../ui/Timeline";
 import { DomainStrip } from "../ui/DomainStrip";
+import { ViewNote } from "../ui/ViewNote";
 
 const tabs = ["overview", "health", "manifest"] as const;
 
@@ -93,6 +94,7 @@ export function Overview() {
                             updated={cluster.at}
                             actions={<ActionGroup actions={c.actions} label="Cluster actions" />}
                         />
+                        <ViewNote />
                         <Tabs
                             value={tab}
                             onChange={setTab}

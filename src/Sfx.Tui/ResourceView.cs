@@ -1,6 +1,7 @@
 using Cellar.Layout;
 using Cellar.Text;
 using Cellar.Widgets;
+using Sfx.Core;
 
 namespace Sfx.Tui;
 
@@ -40,6 +41,9 @@ public sealed class ResourceView<T> : IResourceView
     private Func<T, IResourceView>? _describe;
     private IReadOnlyList<T> _all = [];
     private string _filter = "";
+    private Func<ViewFilter>? _view;
+    private Func<T, string?>? _application;
+    private int _hidden;
 
     public ResourceView(string kind, string crumb, Func<CancellationToken, Task<IReadOnlyList<T>>> load, Func<T, string> key)
     {
@@ -133,6 +137,17 @@ public sealed class ResourceView<T> : IResourceView
         return this;
     }
 
+    /// <summary>
+    /// Leaves out rows of applications the current view doesn't include, and says in the title how many. Rows whose
+    /// <paramref name="application"/> is null (the cluster, a node) always show.
+    /// </summary>
+    public ResourceView<T> InView(Func<ViewFilter> view, Func<T, string?> application)
+    {
+        _view = view;
+        _application = application;
+        return this;
+    }
+
     /// <summary>Lets <c>d</c> describe the selected row; Enter does too when the row has nothing to drill into.</summary>
     public ResourceView<T> Describing(Func<T, IResourceView> describe)
     {
@@ -150,9 +165,17 @@ public sealed class ResourceView<T> : IResourceView
     public async Task<Action> LoadAsync(CancellationToken cancellationToken)
     {
         var rows = await _load(cancellationToken);
+        var hidden = 0;
+        if (_view?.Invoke() is { IsNone: false } view && _application is { } application)
+        {
+            var shown = rows.Where(row => application(row) is not { } app || view.Includes(app)).ToList();
+            hidden = rows.Count - shown.Count;
+            rows = shown;
+        }
         return () =>
         {
             _all = rows;
+            _hidden = hidden;
             ShowRows();
         };
     }
@@ -175,7 +198,7 @@ public sealed class ResourceView<T> : IResourceView
     }
 
     private void UpdateTitle() =>
-        _panel.Title = $" {_kind} [{Table.Rows.Count}]{(_filter.Length > 0 ? $" /{_filter}" : "")} ";
+        _panel.Title = $" {_kind} [{Table.Rows.Count}]{(_hidden > 0 ? $" · {_hidden} hidden by the view" : "")}{(_filter.Length > 0 ? $" /{_filter}" : "")} ";
 
     private bool Matches(T row) =>
         Table.Columns.Any(column => column.Render(row).PlainText.Contains(_filter, StringComparison.OrdinalIgnoreCase));

@@ -17,6 +17,9 @@ public sealed record UpgradeRow(string Name, string Kind, string? ApplicationId,
     private bool TryParse(CultureInfo culture, out DateTime utc) =>
         DateTime.TryParse(Report.Started, culture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out utc);
 
+    /// <summary>Whether it shows in the view: the cluster's upgrade always does, an application's through its application.</summary>
+    public bool InView(ViewFilter view) => ApplicationId is null || view.Includes(Name);
+
     public int DomainsDone => Report.Domains.Count(d => d.State == nameof(UpgradeDomainState.Completed));
 
     /// <summary>Running first, then waiting for someone, then failed or rolled back, then done.</summary>

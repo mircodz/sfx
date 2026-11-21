@@ -1,6 +1,6 @@
 import { ActionGroup } from "../actions/ActionGroup";
 import { api } from "../lib/api";
-import { duration, plural } from "../lib/format";
+import { duration, plural, shortName } from "../lib/format";
 import { useResource } from "../lib/resource";
 import { useEventsAvailable } from "../lib/session";
 import { href, idOf, useQueryParam } from "../lib/router";
@@ -18,6 +18,7 @@ import { SearchBox } from "../ui/Toolbar";
 import { EntityEvents } from "./Events";
 import { CodePackages } from "./CodePackages";
 import { nodeFacts } from "./Nodes";
+import { Split } from "../ui/Split";
 
 /** Up, but also disabling or disabled nodes, still run what's on them; only down ones (or unknown) don't. */
 export const hosting = (status: string) => !["Down", "Invalid", "Unknown"].includes(status);
@@ -63,8 +64,9 @@ export function NodeDetail({ name }: { name: string }) {
                             ]}
                         >
                             {tab === "overview" && (
-                                <>
-                                    <ErrorsAndWarnings evaluations={d.health.evaluations} />
+                                <Split
+                                    aside={
+                                        <>
                                     <Section label="Facts">
                                         <Fields
                                             fields={[
@@ -82,10 +84,19 @@ export function NodeDetail({ name }: { name: string }) {
                                     <Section label="Load">
                                         <Meters metrics={d.load} />
                                     </Section>
+                                        </>
+                                    }
+                                >
+                                    <ErrorsAndWarnings evaluations={d.health.evaluations} />
                                     <Section label="Replicas on this node" aside={<Link href={href.replicas({ node: n.name })}>{plural(d.replicas.length, "replica")}</Link>}>
                                         {!hosting(n.status) && <Empty>The node is {n.status.toLowerCase()}, so nothing runs on it.</Empty>}
                                         {d.replicas.length > 0 && <SearchBox value={search} onChange={setSearch} placeholder="Filter by service, role or application" />}
                                         {hosting(n.status) && replicas.length === 0 && <Empty>No replicas match.</Empty>}
+                                        {!!d.hiddenReplicas && (
+                                            <Empty>
+                                                {plural(d.hiddenReplicas, "replica")} of applications outside the view {d.hiddenReplicas === 1 ? "isn't" : "aren't"} shown.
+                                            </Empty>
+                                        )}
                                         {apps.map((appId) => {
                                             const group = replicas.filter((r) => r.applicationId === appId);
                                             return (
@@ -96,7 +107,7 @@ export function NodeDetail({ name }: { name: string }) {
                                                             key={`${r.partitionId}:${r.id}`}
                                                             href={href.partition(appId, idOf(r.service), r.partitionId)}
                                                             icon={r.role === "Primary" ? "crown" : r.role === "Instance" ? "box" : "copy"}
-                                                            name={r.service}
+                                                            name={shortName(r.service, group[0].application)}
                                                             sub={`${r.role} · ${r.status} · partition ${r.partitionId.slice(0, 8)}…`}
                                                         />
                                                     ))}
@@ -104,7 +115,7 @@ export function NodeDetail({ name }: { name: string }) {
                                             );
                                         })}
                                     </Section>
-                                </>
+                                </Split>
                             )}
                             {tab === "packages" && <CodePackages node={n.name} />}
                             {tab === "health" && <HealthPanel health={d.health} />}

@@ -21,13 +21,17 @@ import type {
     LoadMetric,
     Overview,
 } from "./types";
+import { withView } from "./view";
 
-// sfx ui opens the page as /?token=…; keep the token for this tab and take it out of the address bar.
+// sfx ui opens the page as /?token=…; keep the token for this tab and take it out of the address bar (only it).
 const tokenKey = "sfx-token";
-const fromUrl = new URLSearchParams(location.search).get("token");
+const params = new URLSearchParams(location.search);
+const fromUrl = params.get("token");
 if (fromUrl) {
     sessionStorage.setItem(tokenKey, fromUrl);
-    history.replaceState(null, "", location.pathname + location.hash);
+    params.delete("token");
+    const rest = params.toString();
+    history.replaceState(null, "", `${location.pathname}${rest ? `?${rest}` : ""}${location.hash}`);
 }
 
 export class ApiError extends Error {
@@ -42,7 +46,7 @@ export class ApiError extends Error {
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
     let response: Response;
     try {
-        response = await fetch(`/api${path}`, {
+        response = await fetch(`/api${withView(method, path)}`, {
             method,
             headers: {
                 "X-Sfx-Token": sessionStorage.getItem(tokenKey) ?? "",

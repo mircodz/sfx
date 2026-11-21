@@ -2,14 +2,15 @@ using Sfx.Core;
 
 namespace Sfx.Tui;
 
-/// <summary><c>sfx context list|add|use|move|show|remove</c>: manages the saved contexts.</summary>
+/// <summary><c>sfx context list|add|use|move|set-view|show|remove</c>: manages the saved contexts.</summary>
 internal static class ContextCommand
 {
     public const string Usage = """
         sfx context list
-        sfx context add <name> <endpoint> [--auth <methods>] [auth options] [--readonly | --power] [--folder <path>] [--use]
+        sfx context add <name> <endpoint> [--auth <methods>] [auth options] [--readonly | --power] [--folder <path>] [--view <view>] [--use]
         sfx context use <name>
         sfx context move <name> <folder>    file it under a folder like prod/europe; "" or / for the top level
+        sfx context set-view <name> <view>  open it with a view (see 'sfx view list'); --none instead of a view for none
         sfx context show [<name>]
         sfx context remove <name>
         """;
@@ -25,7 +26,8 @@ internal static class ContextCommand
 
             case ["add", var name, var endpoint]:
                 var folder = FolderPath.Normalize(options.Folder);
-                var context = new ClusterContext(name, endpoint, options.AuthMethods, options.AuthOptions, options.ReadOnly, options.Power, folder);
+                var view = options.View is null ? null : RequireView(store, options.View);
+                var context = new ClusterContext(name, endpoint, options.AuthMethods, options.AuthOptions, options.ReadOnly, options.Power, folder, view);
                 connector.Resolve(context);
                 store.Set(context);
                 if (options.Use || store.Active is null)
@@ -53,6 +55,25 @@ internal static class ContextCommand
                     : $"Moved context '{moved.Name}' to folder '{moved.Folder}'.");
                 return 0;
 
+            case ["set-view", var name, var viewName] when !options.NoView:
+                var viewed = Require(store, name) with { View = RequireView(store, viewName) };
+                store.Set(viewed);
+                store.Save();
+                output.WriteLine($"Context '{viewed.Name}' opens with view '{viewed.View}'.");
+                return 0;
+
+            case ["set-view", var name] when options.NoView:
+                var cleared = Require(store, name) with { View = null };
+                store.Set(cleared);
+                store.Save();
+                output.WriteLine($"Context '{cleared.Name}' opens without a view.");
+                return 0;
+
+            case ["set-view", ..]:
+                throw new UsageException(options.NoView
+                    ? "Pass a view or --none, not both: 'sfx context set-view <name> <view>' or 'sfx context set-view <name> --none'."
+                    : "Name the context and the view: 'sfx context set-view <name> <view>', or --none instead of a view for none.");
+
             case ["show"]:
                 Show(store, Require(store, store.Active ?? throw new UsageException("No active context.")), output);
                 return 0;
@@ -78,6 +99,30 @@ internal static class ContextCommand
     private static ClusterContext Require(ContextStore store, string name) =>
         store.Find(name) ?? throw new UsageException($"No context named '{name}'. See 'sfx context list'.");
 
+    /// <summary>The view's name as defined, or a usage error that lists the views there are.</summary>
+    private static string RequireView(ContextStore store, string name)
+    {
+        var catalog = ViewCatalog.From(store);
+        return catalog.Find(name)?.Name ?? throw new UsageException(catalog.Unknown(name));
+    }
+
+    /// <summary>The names of the views the config defines; null when they can't be read, so nothing is marked.</summary>
+    internal static HashSet<string>? DefinedViews(ContextStore store)
+    {
+        try
+        {
+            return store.Views.Select(view => view.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+        catch (ViewConfigurationException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The context's view, marked when it isn't defined (the context then opens without one).</summary>
+    private static string ViewText(string? view, HashSet<string>? defined) =>
+        view is null ? "-" : defined is null || defined.Contains(view) ? view : $"{view} (not defined)";
+
     /// <summary>Top-level contexts, then each folder under a heading, subfolders indented two spaces per level.</summary>
     private static void List(ContextStore store, TextWriter output)
     {
@@ -100,7 +145,11 @@ internal static class ContextCommand
 
         var width = Math.Max(4, contexts.Max(c => Indent(c.Context.Folder).Length + c.Context.Name.Length));
         var endpointWidth = contexts.Any(c => c.Label is not null) ? contexts.Max(c => c.Context.Endpoint.Length) : 0;
-        output.WriteLine($"  {"NAME".PadRight(width)}  {"AUTH",-12}  {"MODE",-8}  ENDPOINT");
+        // The view column only shows once a context has a view.
+        var defined = DefinedViews(store);
+        var viewWidth = contexts.Any(c => c.Context.View is not null) ? contexts.Max(c => ViewText(c.Context.View, defined).Length) : 0;
+        string ViewColumn(string text) => viewWidth == 0 ? "" : text.PadRight(Math.Max(viewWidth, 4)) + "  ";
+        output.WriteLine($"  {"NAME".PadRight(width)}  {"AUTH",-12}  {"MODE",-8}  {ViewColumn("VIEW")}ENDPOINT");
 
         void Write(ResolvedContext resolved)
         {
@@ -109,7 +158,7 @@ internal static class ContextCommand
             var name = (Indent(context.Folder) + context.Name).PadRight(width);
             var auth = context.Auth.Count > 0 ? string.Join(",", context.Auth) : "none";
             var label = resolved.Label is null ? "" : $"  [{resolved.Label}]";
-            output.WriteLine($"{marker} {name}  {auth,-12}  {Mode(context),-8}  {context.Endpoint.PadRight(endpointWidth)}{label}".TrimEnd());
+            output.WriteLine($"{marker} {name}  {auth,-12}  {Mode(context),-8}  {ViewColumn(ViewText(context.View, defined))}{context.Endpoint.PadRight(endpointWidth)}{label}".TrimEnd());
         }
 
         foreach (var context in byFolder.GetValueOrDefault("") ?? [])
@@ -146,6 +195,10 @@ internal static class ContextCommand
         if (resolved.Label is not null)
         {
             output.WriteLine($"{"label",-18}{resolved.Label}");
+        }
+        if (context.View is not null)
+        {
+            output.WriteLine($"{"view",-18}{ViewText(context.View, DefinedViews(store))}");
         }
         foreach (var key in context.Options.Keys)
         {

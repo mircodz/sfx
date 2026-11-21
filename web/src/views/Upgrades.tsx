@@ -9,6 +9,7 @@ import { DisclosureRow } from "../ui/Row";
 import { Empty, Section } from "../ui/Section";
 import { UpgradeCard } from "./UpgradeCard";
 import { Limited } from "../ui/ShowMore";
+import { ViewNote } from "../ui/ViewNote";
 
 export function Upgrades() {
     const upgrades = useResource("upgrades", api.upgrades);
@@ -31,6 +32,7 @@ export function Upgrades() {
                             onRefresh={upgrades.reload}
                             updated={upgrades.at}
                         />
+                        <ViewNote />
                         <Section label="Cluster and applications">
                             {all.length === 0 && <Empty>Nothing on this cluster has been upgraded yet.</Empty>}
                             <Limited items={all}>

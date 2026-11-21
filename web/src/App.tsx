@@ -22,6 +22,7 @@ import { SessionContext } from "./lib/session";
 import { OperationsContext, useOperationsPoll } from "./lib/operations";
 import "./views/views.css";
 import { Gallery } from "./gallery/Gallery";
+import { syncViews } from "./lib/view";
 
 /** #/nodes/:name, #/apps/:app/services/:service/partitions/:partition and the top-level pages. */
 function Page({ path }: { path: string[] }) {
@@ -68,7 +69,9 @@ export function App() {
     });
 
     useEffect(() => {
-        if (session.data) document.title = `${session.data.context} · sfx`;
+        if (!session.data) return;
+        document.title = `${session.data.context} · sfx`;
+        syncViews((session.data.views ?? []).map((v) => v.name), session.data.defaultView ?? null);
     }, [session.data]);
 
     // A switch changes the session: load it again whenever everything refreshes.

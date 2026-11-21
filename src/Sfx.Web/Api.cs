@@ -51,8 +51,10 @@ internal static class Api
 
         api.MapGet("/nodes", async (UiSession s, CancellationToken ct) => (await s.Queries.GetNodesAsync(ct)).Select(n => Node(s, n)).ToList());
 
-        api.MapGet("/nodes/{name}", async (UiSession s, string name, CancellationToken ct) =>
+        // ?view= on the lists below leaves out what belongs to applications outside the view.
+        api.MapGet("/nodes/{name}", async (UiSession s, string name, string? view, CancellationToken ct) =>
         {
+            var filter = s.View(view);
             var nodes = s.Queries.GetNodesAsync(ct);
             var node = (await nodes).FirstOrDefault(n => n.Name == name)
                 ?? throw new ActionException($"There's no node {name} on this cluster.", StatusCodes.Status404NotFound);
@@ -69,10 +71,16 @@ internal static class Api
                 .OrderBy(m => m.Capacity is null)
                 .ThenBy(m => m.Name)
                 .ToList();
-            return new NodeDetailDto(Node(s, node), Dto.Health(await health), metrics, await replicas);
+            var all = await replicas;
+            var shown = filter.IsNone ? all : all.Where(r => filter.Includes(r.Application)).ToList();
+            return new NodeDetailDto(Node(s, node), Dto.Health(await health), metrics, shown, all.Count - shown.Count);
         });
 
-        api.MapGet("/applications", async (UiSession s, CancellationToken ct) => (await s.Queries.GetApplicationsAsync(ct)).Select(Dto.Application).ToList());
+        api.MapGet("/applications", async (UiSession s, string? view, CancellationToken ct) =>
+        {
+            var filter = s.View(view);
+            return (await s.Queries.GetApplicationsAsync(ct)).Where(a => filter.Includes(a.Name)).Select(Dto.Application).ToList();
+        });
 
         api.MapGet("/applications/{appId}", async (UiSession s, string appId, CancellationToken ct) =>
         {
@@ -198,26 +206,44 @@ internal static class Api
                     Dto.Partition(partition), svc, Dto.Health(await health), metrics, replicaDtos, WebActions.For(s, "partition", target));
             });
 
-        api.MapGet("/replicas", (UiSession s, CancellationToken ct) => s.GetClusterReplicasAsync(ct));
+        // The walk is cached for the whole cluster and filtered per request.
+        api.MapGet("/replicas", async (UiSession s, string? view, CancellationToken ct) =>
+        {
+            var filter = s.View(view);
+            var replicas = await s.GetClusterReplicasAsync(ct);
+            return filter.IsNone ? replicas : replicas.Where(r => filter.Includes(r.Application)).ToList();
+        });
 
         api.MapGet("/applications/{appId}/services/{serviceId}/replicas", (UiSession s, string appId, string serviceId, CancellationToken ct) =>
             s.GetServiceReplicasAsync(appId, serviceId, ct));
 
-        api.MapGet("/upgrades", async (UiSession s, CancellationToken ct) =>
-            (await s.GetUpgradesAsync(ct))
+        api.MapGet("/upgrades", async (UiSession s, string? view, CancellationToken ct) =>
+        {
+            var filter = s.View(view);
+            return (await s.GetUpgradesAsync(ct))
+                .Where(u => u.InView(filter))
                 .OrderBy(u => u.Urgency)
                 .ThenByDescending(u => u.StartedUtc)
                 .Select(u => Dto.Upgrade(u, UpgradeActions(s, u)))
-                .ToList());
+                .ToList();
+        });
 
         // ?entity= narrows to one node, application ("fabric:/orders"), service or partition id, and what's under it.
-        api.MapGet("/events", async (UiSession s, int? hours, string? entity, CancellationToken ct) =>
+        // ?view= leaves out events about applications outside the view, and their services, partitions and replicas.
+        api.MapGet("/events", async (UiSession s, int? hours, string? entity, string? view, CancellationToken ct) =>
         {
+            var filter = s.View(view);
             try
             {
-                var events = await s.Events.GetEventsAsync(TimeSpan.FromHours(Math.Clamp(hours ?? 1, 1, 24 * 7)), ct);
-                return new EventsDto(events
+                IReadOnlyList<EventRow> events = (await s.Events.GetEventsAsync(TimeSpan.FromHours(Math.Clamp(hours ?? 1, 1, 24 * 7)), ct))
                     .Where(e => entity is null || EventQueries.IsAbout(e, entity))
+                    .ToList();
+                if (!filter.IsNone)
+                {
+                    events = await s.Events.WithApplicationsAsync(events, ct);
+                }
+                return new EventsDto(events
+                    .Where(e => EventQueries.InView(e, filter))
                     .Take(500)
                     .Select(e => new EventDto(e.TimeUtc, e.Kind, e.EntityKind, e.Category, e.Entity, e.Details))
                     .ToList(), null);
@@ -260,7 +286,9 @@ internal static class Api
 
     private static SessionDto SessionInfo(UiSession s, SystemServices services) =>
         new(s.Context.Name, s.Cluster.Endpoint.ToString(), s.ReadOnly, s.Power, s.Version, services.EventStore, s.Context.Folder, s.Label, s.Color,
-            services.RepairManager, services.FaultAnalysis);
+            services.RepairManager, services.FaultAnalysis,
+            s.Views.Definitions.Select(v => new ViewDto(v.Name, v.Apps, v.Exclude)).ToList(),
+            s.DefaultView);
 
     /// <summary>
     /// The replicas on a node, system services' included (as application "fabric:/System", which the node's application

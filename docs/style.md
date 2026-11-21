@@ -223,6 +223,10 @@ Sidebar
 232px wide, full height, sticky; hairline right border, --surface-1.
 Top to bottom: "sfx" in Cascadia Code's cursive italic (the one flourish); the context block (folder path in 11px secondary, the context name in 500 with its folder label pill; links to the Contexts page, also "c"); the pages, each an 18px Tabler icon and a 13px label, 34px tall, the current one with the ghost background and 500; at the bottom, after a hairline, the power toggle (amber pair while on, or a Read-only row), the theme button, and the version in muted 11px.
 A running-operations count sits on Activity as a small accent badge.
+Under the context block, only when ~/.sfx/config.toml defines views: the view picker, a sidebar row ("All applications" with ti-filter-off, or "View: payments" in --text-accent with ti-filter) over an invisible native select, so keyboard, touch and screen readers get the platform's own list. The choice is per tab, in the address bar as ?view=; a context switch goes back to that context's default view.
+
+View note
+While a view is on, every list page (Overview, Applications, Replicas, Upgrades, Events) shows one line under its header, in a hairline --border-accent box: "Through view payments: 3 of 17 applications." plus, in --text-warning, "2 unhealthy applications outside it." and a "Show all" button. Cluster health and counts stay cluster-wide; a view is a lens, so what it hides is never silent. A node's page says how many of its replicas the view leaves out.
 Under 1100px the sidebar collapses to 60px of icons with tooltips; under 640px it becomes a scrolling strip across the top.
 
 Page
@@ -257,7 +261,7 @@ Inside a list: 12px secondary label (node type, application) with the group's co
 
 Metric card: as 6. Metric cards. A card that links somewhere is an <a> and gets --border-strong on hover. The note line may use a status text color when it reports something unhealthy ("2 down").
 
-Row: as 6. List rows, but dense: consecutive rows join into one card with hairlines between them, 40px tall, and once a row is 820px wide (a container query, so it works in dashboard cards too) its name, facts and reason sit in aligned columns on one line; pills have a fixed 72px width so the columns line up. Two variants that look the same:
+Row: as 6. List rows, but dense: consecutive rows join into one card with hairlines between them, 40px tall, and once a row is 720px wide (a container query, so it works in dashboard cards too) its name, facts and reason sit in aligned columns on one line; pills have a fixed 72px width so the columns line up. Two variants that look the same:
     Disclosure row: a <button> with aria-expanded and ti-chevron-down; reveals details beneath.
     Link row: an <a> to another page with ti-chevron-right.
 Anatomy, left to right: icon (18px, secondary), name (14px, 500) over facts (12px, secondary, " · "), optional reason line (12px, in the status text color) when the entity is unhealthy, then a right-aligned value (12px, secondary, e.g. "3 of 3"), the status pill, the chevron. Pills and chevrons are vertically centered on the first line, never stretched.
@@ -345,7 +349,7 @@ In the review step: one row per change. Name (mono, 12px), then old value (secon
 13.6 Page templates
 
 List page: page header (no breadcrumb), metric cards when they help, list toolbar, grouped rows.
-Detail page: page header with breadcrumb, actions and refresh; tabs. The Overview tab shows errors and warnings (collapsed), key facts (fields), load (meters), then children as link rows.
+Detail page: page header with breadcrumb, actions and refresh; tabs. The Overview tab shows errors and warnings (collapsed), key facts (fields), load (meters), then children as link rows. Once the page is 960px wide (a container query), it splits: errors and warnings and the children on the left, facts and load in a 320px column on the right, one field per line. Narrower, the facts come first, in one column.
 Overview (the cluster's page): a dashboard. Metric cards across (nodes, applications, services, partitions, replicas, upgrades running), then a 12-column grid of cards: Health (a stacked health bar per entity kind, then errors and warnings, collapsed) and Unhealthy (link rows with reasons); Nodes (a compact map by upgrade domain, with the cluster's node types, domains and seed nodes in a line under it) and Upgrades (running ones with their domain strips); Load (meters for metrics with a capacity), Recent changes (one line per change) and Events (only when the cluster has an event store). Every card's aside links to the page with the rest. The cluster manifest and cluster actions are on the cluster's tabs and menu, like any other entity.
 
 Card: a dashboard tile on --surface-2 with a hairline border and 12px radius; title (13px, 500) and aside (12px, secondary, often a link) on one line, then the content. Spans 3 to 12 of the dashboard's 12 columns on wide screens; half width under 1100px; full width on a phone.

@@ -16,6 +16,7 @@ import { Section } from "../ui/Section";
 import { CountTab, HealthTab, Tabs, useTab } from "../ui/Tabs";
 import { EntityEvents } from "./Events";
 import { replicaSet } from "./ServiceDetail";
+import { Split } from "../ui/Split";
 
 const tabs = ["overview", "health", "events", "details"] as const;
 
@@ -66,7 +67,26 @@ export function PartitionDetail({ appId, serviceId, partitionId }: { appId: stri
                             ]}
                         >
                             {tab === "overview" && (
-                                <>
+                                <Split
+                                    aside={
+                                        <>
+                                            <Section label="Facts">
+                                                <Fields
+                                                    fields={[
+                                                        { name: "Id", value: p.id },
+                                                        { name: "Key", value: partitionKey(p) },
+                                                        { name: "Status", value: p.status },
+                                                        { name: s.kind === "Stateful" ? "Replicas" : "Instances", value: replicaSet(s.kind, p.replicaSet) },
+                                                        { name: "Service", value: s.name, href: href.service(appId, serviceId) },
+                                                    ]}
+                                                />
+                                            </Section>
+                                            <Section label="Load">
+                                                <Meters metrics={d.load} />
+                                            </Section>
+                                        </>
+                                    }
+                                >
                                     <ErrorsAndWarnings evaluations={d.health.evaluations} />
                                     <Section label={s.kind === "Stateful" ? "Replicas" : "Instances"} aside={plural(d.replicas.length, noun)}>
                                         {d.replicas.map((r) => (
@@ -101,10 +121,7 @@ export function PartitionDetail({ appId, serviceId, partitionId }: { appId: stri
                                             </DisclosureRow>
                                         ))}
                                     </Section>
-                                    <Section label="Load">
-                                        <Meters metrics={d.load} />
-                                    </Section>
-                                </>
+                                </Split>
                             )}
                             {tab === "health" && <HealthPanel health={d.health} />}
                             {tab === "events" && <EntityEvents entity={p.id} />}

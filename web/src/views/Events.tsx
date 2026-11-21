@@ -10,6 +10,7 @@ import { PageHeader } from "../ui/PageHeader";
 import { Empty, Section } from "../ui/Section";
 import { DayHeading, TimelineRow } from "../ui/Timeline";
 import { SearchBox, Toolbar } from "../ui/Toolbar";
+import { ViewNote } from "../ui/ViewNote";
 
 const windows = ["1", "6", "24", "168"] as const;
 type Window = (typeof windows)[number];
@@ -79,6 +80,7 @@ export function Events() {
         <>
             <h2 className="sr-only">The cluster's events, newest first.</h2>
             <PageHeader title="Events" summary={windowLabels[hours]} onRefresh={events.reload} />
+            <ViewNote />
             {/* Nothing to filter without an event store. */}
             {!events.data?.unavailable && (
                 <>

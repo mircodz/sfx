@@ -20,6 +20,17 @@ export interface Session {
     folder?: string;
     label?: string;
     color?: FolderColor;
+    /** The views in ~/.sfx/config.toml, by name. */
+    views: View[];
+    /** The view to start with: sfx ui --view, else the context's own, else none. */
+    defaultView: string | null;
+}
+
+/** A named filter on applications by glob on their fabric:/ names; a lens, not access control. */
+export interface View {
+    name: string;
+    apps: string[];
+    exclude: string[];
 }
 
 export type FolderColor = "success" | "warning" | "danger" | "accent" | "neutral";
@@ -38,6 +49,8 @@ export interface ClusterContext {
     /** From the nearest folder that sets one, e.g. "PROD". */
     label?: string;
     color?: FolderColor;
+    /** The view this context starts with. */
+    view?: string | null;
 }
 
 export interface Folder {
@@ -176,6 +189,8 @@ export interface NodeDetail {
     health: HealthReport;
     load: Metric[];
     replicas: DeployedReplica[];
+    /** Replicas of applications outside the view, left out of `replicas`. */
+    hiddenReplicas?: number;
 }
 
 export interface Application {
@@ -427,4 +442,6 @@ export interface Overview {
     counts: HealthCount[];
     load: Omit<LoadMetric, "nodes">[];
     runningUpgrades: Upgrade[];
+    /** With a view: how much it hides. Counts and health above stay cluster-wide. */
+    view?: { name: string; applications: number; hiddenApplications: number; hiddenUnhealthy: number } | null;
 }

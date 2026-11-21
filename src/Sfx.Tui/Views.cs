@@ -8,10 +8,14 @@ namespace Sfx.Tui;
 
 /// <summary>
 /// The pages of sfx. Every table follows the same rules: Enter (or a second click) drills into a row, <c>d</c>
-/// describes it, and the row's actions are those of its entity, also offered on its describe page.
+/// describes it, and the row's actions are those of its entity, also offered on its describe page. Lists of
+/// applications, and of what belongs to them across the cluster, show only what the current view includes.
 /// </summary>
-public sealed partial class Views(ClusterQueries queries, IActionHost host)
+/// <param name="view">The view in use, asked on every load so switching it takes effect on the next refresh.</param>
+public sealed partial class Views(ClusterQueries queries, IActionHost host, Func<ViewFilter>? view = null)
 {
+    private ViewFilter View() => view?.Invoke() ?? ViewFilter.None;
+
     private readonly ClusterInspector _inspect = new(queries.Client);
     private readonly ClusterOperations _ops = new(queries.Client);
     private readonly DeployedQueries _deployed = new(queries.Client);
@@ -33,6 +37,7 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host)
 
     public IResourceView Applications() =>
         new ResourceView<ApplicationRow>("applications", "apps", queries.GetApplicationsAsync, a => a.Id) { OnOpen = Services }
+            .InView(View, a => a.Name)
             .Describing(DescribeApplication)
             .Acting(ApplicationActions())
             .Column("NAME", Constraint.Fill(2), a => Plain(a.Name), a => a.Name)
@@ -83,6 +88,7 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host)
             {
                 OnOpen = app => ServicePackages(node.Name, app),
             }
+            .InView(View, a => a.Name)
             .Column("NAME", Constraint.Fill(2), a => Plain(a.Name), a => a.Name)
             .Column("TYPE", Constraint.Fill(1), a => Plain(a.TypeName), a => a.TypeName)
             .Column("STATUS", Constraint.Length(10), a => Status(a.Status), a => a.Status)

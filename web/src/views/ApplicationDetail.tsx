@@ -1,6 +1,6 @@
 import { ActionGroup } from "../actions/ActionGroup";
 import { api } from "../lib/api";
-import { plural, shortName } from "../lib/format";
+import { count, plural, shortName } from "../lib/format";
 import { useResource } from "../lib/resource";
 import { useEventsAvailable } from "../lib/session";
 import { href } from "../lib/router";
@@ -13,9 +13,11 @@ import { LinkRow } from "../ui/Row";
 import { Empty, Section } from "../ui/Section";
 import { CountTab, HealthTab, Tabs, useTab } from "../ui/Tabs";
 import { EntityEvents } from "./Events";
-import { isRunning } from "../lib/upgrades";
+import { direction, isRunning, upgradeWord } from "../lib/upgrades";
 import { Parameters } from "./Parameters";
 import { UpgradeCard } from "./UpgradeCard";
+import { Split } from "../ui/Split";
+import { Fields } from "../ui/Fields";
 
 const tabs = ["overview", "health", "events", "manifest", "details"] as const;
 
@@ -55,7 +57,27 @@ export function ApplicationDetail({ appId }: { appId: string }) {
                             ]}
                         >
                             {tab === "overview" && (
-                                <>
+                                <Split
+                                    aside={
+                                        <Section label="Facts">
+                                            <Fields
+                                                fields={[
+                                                    { name: "Type", value: a.typeName },
+                                                    { name: "Version", value: a.typeVersion || null },
+                                                    { name: "Status", value: a.status },
+                                                    { name: "Services", value: String(d.services.length) },
+                                                    ...(system
+                                                        ? []
+                                                        : [
+                                                              { name: "Parameters", value: `${count(d.parameters, (x) => x.overridden)} set of ${d.parameters.length}` },
+                                                              { name: "Provisioned", value: d.versions.length ? d.versions.map((v) => v.version).join(", ") : null },
+                                                              { name: "Last upgrade", value: d.upgrade ? `${upgradeWord(d.upgrade)}, ${direction(d.upgrade).from ? `${direction(d.upgrade).from} to ` : ""}${direction(d.upgrade).to}` : null },
+                                                          ]),
+                                                ]}
+                                            />
+                                        </Section>
+                                    }
+                                >
                                     <ErrorsAndWarnings evaluations={d.health.evaluations} />
                                     {d.upgrade && (isRunning(d.upgrade) || d.upgrade.state === "Failed") && (
                                         <Section label="Upgrade">
@@ -77,7 +99,7 @@ export function ApplicationDetail({ appId }: { appId: string }) {
                                         ))}
                                     </Section>
                                     {!system && <Parameters parameters={d.parameters} />}
-                                </>
+                                </Split>
                             )}
                             {tab === "health" && <HealthPanel health={d.health} />}
                             {tab === "events" && <EntityEvents entity={a.name} />}

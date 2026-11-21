@@ -16,6 +16,7 @@ import { CountTab, HealthTab, Tabs, useTab } from "../ui/Tabs";
 import { EntityEvents } from "./Events";
 import { Limited } from "../ui/ShowMore";
 import { Placement } from "./Placement";
+import { Split } from "../ui/Split";
 
 const tabs = ["overview", "placement", "health", "events", "manifest", "details"] as const;
 
@@ -63,7 +64,13 @@ export function ServiceDetail({ appId, serviceId }: { appId: string; serviceId: 
                             ]}
                         >
                             {tab === "overview" && (
-                                <>
+                                <Split
+                                    aside={
+                                        <Section label="Description">
+                                            <Fields fields={d.description.map((f) => ({ ...f, value: seconds(f.value) }))} />
+                                        </Section>
+                                    }
+                                >
                                     <ErrorsAndWarnings evaluations={d.health.evaluations} />
                                     <Section label="Partitions" aside={<Link href={href.replicas({ service: s.name })}>Replicas</Link>}>
                                         <Limited items={byKey(d.partitions)}>
@@ -72,18 +79,15 @@ export function ServiceDetail({ appId, serviceId }: { appId: string; serviceId: 
                                                 key={p.id}
                                                 href={href.partition(appId, serviceId, p.id)}
                                                 icon="layout-grid"
-                                                name={<span className="mono">{p.id}</span>}
-                                                sub={`${partitionKey(p)} · ${p.status} · ${replicaSet(s.kind, p.replicaSet)}`}
+                                                name={partitionKey(p) === p.scheme ? <span className="mono">{p.id}</span> : partitionKey(p)}
+                                                sub={`${partitionKey(p) === p.scheme ? "" : `${p.id.slice(0, 8)}… · `}${p.status} · ${replicaSet(s.kind, p.replicaSet)}`}
                                                 reason={p.reason}
                                                 status={p.health}
                                             />
                                             )}
                                         </Limited>
                                     </Section>
-                                    <Section label="Description">
-                                        <Fields fields={d.description.map((f) => ({ ...f, value: seconds(f.value) }))} />
-                                    </Section>
-                                </>
+                                </Split>
                             )}
                             {tab === "placement" && <Placement appId={appId} serviceId={serviceId} />}
                             {tab === "health" && <HealthPanel health={d.health} />}

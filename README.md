@@ -36,6 +36,7 @@ downloaded with a browser is quarantined; clear it with `xattr -d com.apple.quar
 sfx [-c <context>]                           open a saved context (default: the active one)
 sfx <endpoint> [--auth <methods>] [options]  open a cluster directly
 sfx context <command>                        manage saved contexts
+sfx view list                                list views and their patterns
 sfx ui [<endpoint> | -c <context>]           open the cluster in the browser instead
 ```
 
@@ -75,6 +76,19 @@ and `readonly = true` makes every context in it and its subfolders read-only:
 label = "PROD"
 color = "danger"
 readonly = true
+```
+
+Views show only some applications, on any cluster. `apps` includes and `exclude` removes, by glob on the name: `*`
+matches within a segment, `**` across. Pick one with `--view <name>` or `:view <name>` (`:view` alone shows every
+application); `sfx context set-view prod-weu payments` makes it a context's default, and `--none` clears it. It filters
+applications, upgrades, events and a node's replicas, but never hides cluster health. `sfx view list` prints them.
+
+```toml
+[views.payments]
+apps = ["fabric:/payments", "fabric:/payments/*", "fabric:/shared-*"]
+
+[views.no-system]
+exclude = ["fabric:/System"]
 ```
 
 A `--readonly` context hides every action that changes the cluster. The riskiest actions (recover from quorum loss,

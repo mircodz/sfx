@@ -5,7 +5,8 @@ import { useOperations } from "./lib/operations";
 import { RefreshContext } from "./lib/resource";
 import { applyTheme, storedTheme, themes } from "./lib/theme";
 import type { Theme } from "./lib/theme";
-import type { Session } from "./lib/types";
+import type { Session, View } from "./lib/types";
+import { chooseView, useView } from "./lib/view";
 import { ContextLabel } from "./ui/ContextLabel";
 import { Icon } from "./ui/Icon";
 import "./Sidebar.css";
@@ -32,6 +33,7 @@ export function Sidebar({ session, current, onSessionChange }: { session?: Sessi
                 sfx
             </a>
             {session && <ContextBlock session={session} active={current === "contexts"} />}
+            {session && session.views?.length > 0 && <ViewPicker views={session.views} />}
             <nav className="sidebar-nav" aria-label="Pages">
                 {pages
                     .filter((p) => p.path !== "events" || session?.eventStore !== false)
@@ -71,6 +73,31 @@ function ContextBlock({ session, active }: { session: Session; active: boolean }
             </span>
             <Icon name="selector" className="sidebar-context-chevron sidebar-label" />
         </a>
+    );
+}
+
+/**
+ * Which view this tab looks through, under the context it applies to. A native select, so keyboard, screen readers
+ * and touch all work; it lies invisibly over the row, so the row looks like the rest of the sidebar.
+ */
+function ViewPicker({ views }: { views: View[] }) {
+    const view = useView();
+    const patterns = (v: View) => [...v.apps, ...v.exclude.map((x) => `not ${x}`)].join(", ");
+    const chosen = views.find((v) => v.name === view);
+    return (
+        <label className={`sidebar-link sidebar-view ${view ? "active" : ""}`} title={chosen ? `View ${chosen.name}: ${patterns(chosen)}` : "All applications; choose a view to narrow them"}>
+            <Icon name={view ? "filter" : "filter-off"} className="sidebar-icon" />
+            <span className="sidebar-label sidebar-view-text">{view ? `View: ${view}` : "All applications"}</span>
+            <Icon name="selector" className="sidebar-context-chevron sidebar-label" />
+            <select className="sidebar-view-select" aria-label="View" value={view ?? ""} onChange={(e) => chooseView(e.target.value || null)}>
+                <option value="">All applications</option>
+                {views.map((v) => (
+                    <option key={v.name} value={v.name}>
+                        {v.name}: {patterns(v)}
+                    </option>
+                ))}
+            </select>
+        </label>
     );
 }
 

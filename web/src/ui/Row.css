@@ -148,7 +148,7 @@ button.row-summary {
     container-type: inline-size;
 }
 
-@container (min-width: 820px) {
+@container (min-width: 720px) {
     .row-main {
         display: grid;
         /* Sized by the row, not by what's left beside its pill or value, so every row's columns start at the same x. */

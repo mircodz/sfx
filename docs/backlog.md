@@ -4,7 +4,8 @@ What's asked for and not done yet, so nothing gets lost. Done items are removed 
 
 ## Next
 
-- **Views**: named filters over what a cluster shows. Design below.
+- **View picker in the browser**: the server side of views is built (below); the picker next to the context picker
+  is in progress.
 - **Applications with many parameters** (hundreds or more): search, set ones first, and "show more", in the editor
   and on the application page. The review step already lists only what changed.
 - **Confirmation dialog spacing**: one rhythm between title, effect, fields and buttons.
@@ -57,8 +58,9 @@ the terminal UI onto it:
 
 ## Design: folders and views
 
-Folders are built (config, CLI, terminal, browser); views are next. Both live in `~/.sfx/config.toml`, so the terminal and the browser read the same thing, and both are optional: a
-config without them works as it does today.
+Folders are built (config, CLI, terminal, browser). Views are built in the config, CLI, terminal and web API; the
+browser's view picker is in progress. Both live in `~/.sfx/config.toml`, so the terminal and the browser read the same
+thing, and both are optional: a config without them works as it does today.
 
 ### Folders
 
@@ -107,27 +109,34 @@ view = "payments"
 ```
 
 - **What a view is.** A named filter on applications, by glob on the `fabric:/` name: `*` matches within a path
-  segment, `**` across. `apps` includes and `exclude` removes; with only `exclude`, everything else is in. Views
-  sit beside contexts, so one view works on every cluster.
+  segment, `**` across. `apps` includes and `exclude` removes; with only `exclude`, everything else is in. Matching
+  ignores case, every pattern starts with `fabric:/`, and a view needs `apps`, `exclude` or both. Views sit beside
+  contexts, so one view works on every cluster. `fabric:/System` is filtered like any other application.
 - **What it filters.**
   - Applications.
   - Services, partitions and replicas, through their application.
-  - Upgrades and events, through their entity.
+  - Upgrades and events, through their entity. The cluster upgrade and cluster and node events always show.
   - The nodes list stays whole, since nodes are shared. A node's page shows only in-view replicas, saying how many
     are hidden.
 - **What it never hides.**
   - Cluster health and errors and warnings: a hidden unhealthy app still shows, as "2 unhealthy outside this view".
   - Actions on what you can see.
-  - It's a lens, not access control; read-only and power stay per context.
+  - It's a lens, not access control; read-only and power stay per context. A direct link to an application outside
+    the view still opens it, and what's under an opened application isn't filtered.
 - **Choosing one.**
-  - A context's `view` is its default.
+  - A context's `view` is its default; `sfx context set-view <name> <view>` (or `--none`) sets it. A context naming a
+    view that isn't defined opens without one, with a warning. `sfx view list` prints the views.
   - In the browser, a view picker sits next to the context picker. The choice is per tab, kept in the URL (`?view=`),
     so a link to a slice keeps its view.
-  - In the terminal, `:view payments` and `:view` (none).
-  - On the command line, `sfx -c prod-weu --view payments`.
+  - In the terminal, `:view payments` and `:view` (none), also in the palette. The status line shows the view, and
+    switching context goes back to that context's default.
+  - On the command line, `sfx -c prod-weu --view payments`; for `sfx ui` it's the browser's starting view.
 - **Where it's applied.**
   - On the server: every list endpoint takes `view` and filters before returning, so the browser never gets
-    everything and throws most away.
+    everything and throws most away. `/api/applications`, `/api/replicas`, `/api/upgrades`, `/api/events`,
+    `/api/nodes/{name}` (with `hiddenReplicas`), `/api/nodes/{name}/packages` and `/api/overview` (with
+    `view: { name, applications, hiddenApplications, hiddenUnhealthy }`) take it. An unknown name is a 400.
+    `/api/session` returns `views` and `defaultView`; `/api/contexts` returns each context's `view`.
   - Core gains `ViewFilter` (glob matching, `Includes(applicationName)`), used by both the web API and the terminal's
     views.
   - The replicas cache stays cluster-wide and is filtered per request.
