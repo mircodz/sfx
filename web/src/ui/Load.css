@@ -1,0 +1,68 @@
+/* Placeholders in the shape of what's coming, so the page doesn't jump when it arrives. */
+.skeleton {
+    background: var(--bg-neutral);
+    border-radius: var(--radius);
+}
+
+.skeleton-crumbs {
+    width: 160px;
+    height: 10px;
+    margin: var(--space-1) 0 var(--space-2);
+}
+
+.skeleton-title {
+    width: 220px;
+    height: 22px;
+    margin: 0 0 var(--space-2);
+}
+
+.skeleton-line {
+    height: 12px;
+    margin: var(--space-3) 0;
+}
+
+.skeleton-line.short {
+    width: 320px;
+    max-width: 60%;
+}
+
+.skeleton-tabs {
+    height: 36px;
+    margin: var(--space-4) 0 var(--space-5);
+    border-bottom: 0.5px solid var(--border);
+}
+
+/* Joined 40px rows, like the lists they stand in for. */
+.skeleton-list {
+    display: grid;
+    gap: 1px;
+    overflow: hidden;
+    border-radius: var(--radius);
+}
+
+.skeleton-row {
+    height: 40px;
+    border-radius: 0;
+}
+
+.skeleton-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--space-3);
+}
+
+.skeleton-metric {
+    height: 84px;
+}
+
+.skeleton-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: var(--space-5);
+    margin-top: var(--space-5);
+}
+
+.skeleton-card {
+    height: 240px;
+    border-radius: var(--radius-lg);
+}

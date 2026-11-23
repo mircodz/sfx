@@ -29,11 +29,90 @@ internal static class Styles
         _ => Colored(status, Theme.Current.Warning),
     };
 
+    /// <summary>A folder's color (success, warning, danger, accent or neutral) in the theme's status colors.</summary>
+    public static Color FolderColor(string? color) => color switch
+    {
+        "success" => Theme.Current.Success,
+        "warning" => Theme.Current.Warning,
+        "danger" => Theme.Current.Error,
+        "accent" => Theme.Current.Accent,
+        _ => Theme.Current.Foreground,
+    };
+
+    /// <summary>A folder's label, bold in the folder's color.</summary>
+    public static StyledText FolderLabel(string label, string? color) => StyledText.Of(label).Bold().Fg(FolderColor(color));
+
+    /// <summary>"512 B", "3.4 KB", "1.2 GB": bytes in 1024s, one decimal below 10.</summary>
+    public static string Bytes(long? bytes)
+    {
+        if (bytes is not { } value)
+        {
+            return "";
+        }
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double size = value;
+        var unit = 0;
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+        return unit == 0 ? $"{value} B"
+            : size < 10 ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{size:0.0} {units[unit]}")
+            : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{size:0} {units[unit]}");
+    }
+
     public static string Duration(TimeSpan? value) => value switch
     {
         null => "-",
         { TotalDays: >= 1 } t => $"{(int)t.TotalDays}d{t.Hours}h",
         { TotalHours: >= 1 } t => $"{(int)t.TotalHours}h{t.Minutes}m",
         { } t => $"{(int)t.TotalMinutes}m",
+    };
+
+    /// <summary>How long ago: "45s", "4m", "2h5m", "3d1h".</summary>
+    public static string Age(DateTime? utc, DateTime? now = null)
+    {
+        if (utc is not { } at)
+        {
+            return "-";
+        }
+
+        var age = (now ?? DateTime.UtcNow) - at;
+        return age < TimeSpan.Zero ? "0s" : age.TotalMinutes < 1 ? $"{(int)age.TotalSeconds}s" : Duration(age);
+    }
+
+    /// <summary>"■■□□□ 2/5", in <paramref name="color"/>; "-" when there's nothing to count.</summary>
+    public static StyledText Progress(int done, int total, Color color)
+    {
+        if (total <= 0)
+        {
+            return Muted("-");
+        }
+
+        var filled = Math.Clamp(done, 0, total);
+        return StyledText.Of(new string('■', filled)).Fg(color)
+            .Append(new string('□', total - filled)).Fg(Theme.Current.Muted)
+            .Append($" {done}/{total}").Fg(Theme.Current.Foreground);
+    }
+
+    /// <summary>An upgrade state in words, colored by whether it needs attention.</summary>
+    public static StyledText UpgradeState(string state) => state switch
+    {
+        "RollingForwardInProgress" => Colored("rolling forward", Theme.Current.Warning),
+        "RollingBackInProgress" => Colored("rolling back", Theme.Current.Error),
+        "RollingForwardPending" => Colored("waiting to resume", Theme.Current.Warning),
+        "RollingForwardCompleted" => Colored("done", Theme.Current.Success),
+        "RollingBackCompleted" => Colored("rolled back", Theme.Current.Error),
+        "Failed" => Colored("failed", Theme.Current.Error),
+        "" => Muted("-"),
+        _ => Plain(state),
+    };
+
+    public static Color UpgradeColor(string state) => state switch
+    {
+        "RollingForwardCompleted" => Theme.Current.Success,
+        "RollingForwardInProgress" or "RollingForwardPending" => Theme.Current.Warning,
+        _ => Theme.Current.Error,
     };
 }

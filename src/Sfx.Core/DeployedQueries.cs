@@ -87,7 +87,12 @@ public sealed class DeployedQueries(IServiceFabricClient client)
         return (replicas ?? []).Select(r => new DeployedReplicaRow(
             r.ServiceName?.ToString() ?? "",
             r.PartitionId,
-            r is DeployedStatefulServiceReplicaInfo stateful ? stateful.ReplicaId?.ToString() ?? "" : "",
+            r switch
+            {
+                DeployedStatefulServiceReplicaInfo stateful => stateful.ReplicaId?.ToString() ?? "",
+                DeployedStatelessServiceInstanceInfo stateless => stateless.InstanceId?.ToString() ?? "",
+                _ => "",
+            },
             r is DeployedStatefulServiceReplicaInfo s ? s.ReplicaRole?.ToString() ?? "" : "Instance",
             r.ReplicaStatus?.ToString() ?? "",
             r.CodePackageName ?? "",

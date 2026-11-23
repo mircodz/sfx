@@ -1,0 +1,38 @@
+.document {
+    margin-top: var(--space-4);
+}
+
+.document-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    font-size: 12px;
+}
+
+.document-code {
+    margin: 0;
+    padding: var(--space-4);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.document-code.wrap {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.tok-tag,
+.tok-key { color: var(--code-tag); }
+.tok-attr { color: var(--code-attr); }
+.tok-string { color: var(--code-string); }
+.tok-number,
+.tok-literal { color: var(--code-number); }
+.tok-comment { color: var(--code-muted); font-style: italic; }
+.tok-punct { color: var(--code-muted); }

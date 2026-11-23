@@ -9,8 +9,8 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>sfx</ToolCommandName>
     <PackageId>sfx</PackageId>
-    <Description>A k9s-style terminal UI for Azure Service Fabric clusters: browse nodes, applications, services, partitions and replicas, inspect health and manifests, and run cluster operations.</Description>
-    <PackageTags>service-fabric;servicefabric;tui;terminal;cli;k9s;azure</PackageTags>
+    <Description>Azure Service Fabric Explorer for the terminal and the browser: browse nodes, applications, services, partitions and replicas, read health, manifests, upgrades and events, and run cluster operations, with confirmations and an action log.</Description>
+    <PackageTags>azure;service-fabric;servicefabric;service-fabric-explorer;sfx;cluster;explorer;tui;terminal;cli;web-ui</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
   </PropertyGroup>

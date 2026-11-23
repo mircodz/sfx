@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.AspNetCore.Builder" />
+    <Using Include="Microsoft.AspNetCore.Hosting" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+    <Using Include="Microsoft.AspNetCore.Routing" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sfx.Core\Sfx.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sfx.Tests" />
+  </ItemGroup>
+
+  <!--
+    The browser UI lives in web/ (React, built with bun) and is embedded here, so `sfx ui` serves it from the binary.
+    It's built when there's no build yet, and always for Release; pass -p:SkipWebBuild=true to embed whatever is there.
+  -->
+  <PropertyGroup>
+    <WebRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..', 'web'))</WebRoot>
+    <WebDist>$([MSBuild]::NormalizeDirectory('$(WebRoot)', 'dist'))</WebDist>
+  </PropertyGroup>
+
+  <Target Name="BuildWeb" BeforeTargets="PrepareForBuild"
+          Condition="'$(SkipWebBuild)' != 'true' And (!Exists('$(WebDist)index.html') Or '$(Configuration)' == 'Release')">
+    <Exec Command="bun install --frozen-lockfile" WorkingDirectory="$(WebRoot)" />
+    <Exec Command="bun run build" WorkingDirectory="$(WebRoot)" />
+  </Target>
+
+  <Target Name="EmbedWeb" AfterTargets="BuildWeb" BeforeTargets="PrepareResourceNames">
+    <ItemGroup>
+      <_WebAsset Include="$(WebDist)**\*" />
+      <EmbeddedResource Include="@(_WebAsset)" LogicalName="wwwroot/%(_WebAsset.RecursiveDir)%(_WebAsset.Filename)%(_WebAsset.Extension)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

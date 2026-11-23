@@ -1,0 +1,193 @@
+.row {
+    display: block;
+    margin-bottom: var(--space-3);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    text-decoration: none;
+}
+
+.row:hover,
+.row.open {
+    border-color: var(--border-strong);
+}
+
+.row-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 44px;
+    padding: 10px var(--space-4);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* The disclosure's button sits inside the card, so it has no card of its own; a link row is the card. */
+button.row-summary {
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+}
+
+.row-icon {
+    flex: none;
+    font-size: 18px;
+    color: var(--text-secondary);
+}
+
+.row-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.row-name,
+.row-sub,
+.row-reason {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row-name {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.row-sub,
+.row-reason,
+.row-value {
+    font-size: 12px;
+}
+
+.row-sub,
+.row-value {
+    color: var(--text-secondary);
+}
+
+.row-value {
+    flex: none;
+    white-space: nowrap;
+}
+
+.row-chevron {
+    flex: none;
+    font-size: 16px;
+    color: var(--text-secondary);
+}
+
+.row.open .row-chevron {
+    transform: rotate(180deg);
+}
+
+.row-details {
+    padding: 0 var(--space-4) var(--space-4) 38px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.row-details > * + * {
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 0.5px solid var(--border);
+}
+
+.row-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+/*
+ * Consecutive rows read as one list: they join into a single card with hairlines between them, instead of a
+ * stack of separate cards.
+ */
+.row:has(+ .row) {
+    margin-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+/*
+ * One hairline per seam: the previous row's bottom border. A hovered or open row draws its own top edge over it,
+ * so its outline is whole.
+ */
+.row + .row {
+    border-top-width: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+.row + .row:hover,
+.row + .row.open {
+    position: relative;
+    box-shadow: 0 -0.5px 0 var(--border-strong);
+}
+
+.row-summary {
+    min-height: 40px;
+    padding: 8px var(--space-4);
+}
+
+/* A row of several lines: its pill, value and chevron go with the name on the first line, not the middle. */
+.row-summary:has(.row-sub, .row-reason) > .pill,
+.row-summary:has(.row-sub, .row-reason) > .row-value,
+.row-summary:has(.row-sub, .row-reason) > .row-chevron {
+    align-self: flex-start;
+    margin-top: 1px;
+}
+
+/*
+ * A wide row (by its own width, so it works in a dashboard card too): one line, in columns that line up down the
+ * list: name, facts, why it's unhealthy.
+ */
+.row {
+    container-type: inline-size;
+}
+
+@container (min-width: 720px) {
+    .row-main {
+        display: grid;
+        /* Sized by the row, not by what's left beside its pill or value, so every row's columns start at the same x. */
+        grid-template-columns: minmax(200px, 24cqi) minmax(0, 30cqi) minmax(0, 1fr);
+        align-items: baseline;
+        column-gap: var(--space-5);
+    }
+
+    .row-name {
+        font-size: 13px;
+    }
+
+    .row-reason {
+        grid-column: 3;
+        grid-row: 1;
+    }
+
+    .row-sub {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    /* No reason: the facts may use its column rather than truncate beside an empty one. */
+    .row-main:not(:has(.row-reason)) .row-sub {
+        grid-column: 2 / -1;
+    }
+
+    /* One line again: back to the middle. */
+    .row-summary:has(.row-sub, .row-reason) > .pill,
+    .row-summary:has(.row-sub, .row-reason) > .row-value,
+    .row-summary:has(.row-sub, .row-reason) > .row-chevron {
+        align-self: center;
+        margin-top: 0;
+    }
+}
+
+
+/* A fixed pill width, so the columns before it line up whatever each row's status says. */
+.row-summary > .pill {
+    min-width: 72px;
+    text-align: center;
+}

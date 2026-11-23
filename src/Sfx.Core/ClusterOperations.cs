@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.ServiceFabric.Client;
 using Microsoft.ServiceFabric.Common;
 
@@ -93,6 +94,163 @@ public sealed class ClusterOperations(IServiceFabricClient client)
     public Task DeleteApplicationAsync(string applicationId, bool force, CancellationToken cancellationToken) =>
         client.Applications.DeleteApplicationAsync(applicationId, force, cancellationToken: cancellationToken);
 
+    /// <summary>
+    /// Upgrades an application to <paramref name="targetVersion"/> (which may be its current version, to change only parameters).
+    /// </summary>
+    /// <param name="parameters">Every parameter the application should have afterwards; ones left out go back to their defaults.</param>
+    /// <param name="failureAction">For monitored upgrades: what to do when a health check fails.</param>
+    /// <param name="policy">Timeouts and health limits; null, or null fields, leave the cluster's defaults.</param>
+    /// <param name="applicationManifest">
+    /// The target version's manifest, whose health policy fills in what <paramref name="policy"/> leaves out.
+    /// </param>
+    public Task UpgradeApplicationAsync(
+        string applicationId, string applicationName, string targetVersion, IReadOnlyDictionary<string, string> parameters,
+        UpgradeMode mode, FailureAction? failureAction, UpgradePolicy? policy, string? applicationManifest, CancellationToken cancellationToken) =>
+        client.Applications.StartApplicationUpgradeAsync(
+            applicationId,
+            new ApplicationUpgradeDescription(
+                name: applicationName,
+                targetApplicationTypeVersion: targetVersion,
+                upgradeKind: UpgradeKind.Rolling,
+                parameters: parameters,
+                rollingUpgradeMode: mode,
+                upgradeReplicaSetCheckTimeoutInSeconds: policy?.ReplicaSetCheckTimeout is { } check ? (long)check.TotalSeconds : null,
+                forceRestart: policy?.ForceRestart,
+                monitoringPolicy: mode == UpgradeMode.Monitored ? MonitoringPolicy(failureAction, policy) : null,
+                applicationHealthPolicy: policy is { HasHealthPolicy: true } ? HealthPolicy(policy, applicationManifest) : null),
+            cancellationToken: cancellationToken);
+
+    /// <summary>
+    /// The health policy to send when some of it is set. A policy sent replaces the manifest's whole, and what it leaves
+    /// out counts as false or 0%, so every field the user didn't set is filled in from the manifest (or Service Fabric's
+    /// defaults without one), including the manifest's per-service-type policies.
+    /// </summary>
+    internal static ApplicationHealthPolicy HealthPolicy(UpgradePolicy policy, string? applicationManifest)
+    {
+        var defaults = applicationManifest is null ? new HealthPolicyDefaults(false, 0, 0, 0, 0, false) : UpgradeDefaults.HealthPolicy(applicationManifest);
+        var perServiceType = applicationManifest is null
+            ? new Dictionary<string, ServiceTypeHealthPolicy>()
+            : UpgradeDefaults.ServiceTypeHealthPolicies(applicationManifest);
+        return new(
+            considerWarningAsError: policy.ConsiderWarningAsError ?? defaults.ConsiderWarningAsError,
+            maxPercentUnhealthyDeployedApplications: policy.MaxPercentUnhealthyDeployedApplications ?? defaults.MaxPercentUnhealthyDeployedApplications,
+            defaultServiceTypeHealthPolicy: new ServiceTypeHealthPolicy(
+                maxPercentUnhealthyPartitionsPerService: policy.MaxPercentUnhealthyPartitionsPerService ?? defaults.MaxPercentUnhealthyPartitionsPerService,
+                maxPercentUnhealthyReplicasPerPartition: policy.MaxPercentUnhealthyReplicasPerPartition ?? defaults.MaxPercentUnhealthyReplicasPerPartition,
+                maxPercentUnhealthyServices: policy.MaxPercentUnhealthyServices ?? defaults.MaxPercentUnhealthyServices),
+            serviceTypeHealthPolicyMap: perServiceType.Count == 0
+                ? null
+                : perServiceType.Select(kv => new ServiceTypeHealthPolicyMapItem(kv.Key, kv.Value)).ToList());
+    }
+
+    private static string? Milliseconds(TimeSpan? duration) =>
+        duration is { } d ? ((long)d.TotalMilliseconds).ToString(CultureInfo.InvariantCulture) : null;
+
+    /// <summary>Moves a manual upgrade on into <paramref name="upgradeDomain"/>.</summary>
+    public Task ResumeApplicationUpgradeAsync(string applicationId, string upgradeDomain, CancellationToken cancellationToken) =>
+        client.Applications.ResumeApplicationUpgradeAsync(applicationId, new ResumeApplicationUpgradeDescription(upgradeDomain), cancellationToken: cancellationToken);
+
+    public Task RollbackApplicationUpgradeAsync(string applicationId, CancellationToken cancellationToken) =>
+        client.Applications.RollbackApplicationUpgradeAsync(applicationId, cancellationToken: cancellationToken);
+
+    public Task ResumeClusterUpgradeAsync(string upgradeDomain, CancellationToken cancellationToken) =>
+        client.Cluster.ResumeClusterUpgradeAsync(new ResumeClusterUpgradeDescription(upgradeDomain), cancellationToken: cancellationToken);
+
+    public Task RollbackClusterUpgradeAsync(CancellationToken cancellationToken) =>
+        client.Cluster.RollbackClusterUpgradeAsync(cancellationToken: cancellationToken);
+
+    /// <summary>Switches an application's running upgrade to another plan, e.g. from manual to automatic.</summary>
+    public Task ChangeApplicationUpgradePlanAsync(string applicationId, UpgradePlan plan, CancellationToken cancellationToken) =>
+        client.Applications.UpdateApplicationUpgradeAsync(
+            applicationId,
+            new ApplicationUpgradeUpdateDescription(
+                new ApplicationName(ClusterInspector.NameOf(applicationId)), UpgradeKind.Rolling, updateDescription: plan.UpdateDescription()),
+            cancellationToken: cancellationToken);
+
+    /// <summary>Switches the cluster's running upgrade to another plan.</summary>
+    public Task ChangeClusterUpgradePlanAsync(UpgradePlan plan, CancellationToken cancellationToken) =>
+        client.Cluster.UpdateClusterUpgradeAsync(
+            new UpdateClusterUpgradeDescription(UpgradeType.Rolling, plan.UpdateDescription()), cancellationToken: cancellationToken);
+
+    /// <summary>Upgrades the cluster's code, configuration or both to versions already provisioned.</summary>
+    /// <param name="codeVersion">The Service Fabric version to move to, or null to keep today's.</param>
+    /// <param name="configVersion">The cluster configuration version to move to, or null to keep today's.</param>
+    /// <param name="failureAction">For monitored upgrades: what to do when a health check fails.</param>
+    /// <param name="policy">Timeouts and health limits; null, or null fields, leave the cluster's defaults.</param>
+    /// <param name="clusterManifest">The cluster manifest, whose health policy fills in what <paramref name="policy"/> leaves out.</param>
+    public Task UpgradeClusterAsync(
+        string? codeVersion, string? configVersion, UpgradeMode mode, FailureAction? failureAction, UpgradePolicy? policy,
+        string? clusterManifest, CancellationToken cancellationToken) =>
+        client.Cluster.StartClusterUpgradeAsync(
+            ClusterUpgradeDescription(codeVersion, configVersion, mode, failureAction, policy, clusterManifest), cancellationToken: cancellationToken);
+
+    internal static StartClusterUpgradeDescription ClusterUpgradeDescription(
+        string? codeVersion, string? configVersion, UpgradeMode mode, FailureAction? failureAction, UpgradePolicy? policy,
+        string? clusterManifest = null)
+    {
+        if (string.IsNullOrEmpty(codeVersion) && string.IsNullOrEmpty(configVersion))
+        {
+            throw new ArgumentException("A cluster upgrade needs a code version, a config version or both.");
+        }
+
+        return new StartClusterUpgradeDescription(
+            codeVersion: string.IsNullOrEmpty(codeVersion) ? null : codeVersion,
+            configVersion: string.IsNullOrEmpty(configVersion) ? null : configVersion,
+            upgradeKind: UpgradeKind.Rolling,
+            rollingUpgradeMode: mode,
+            upgradeReplicaSetCheckTimeoutInSeconds: policy?.ReplicaSetCheckTimeout is { } check ? (long)check.TotalSeconds : null,
+            forceRestart: policy?.ForceRestart,
+            monitoringPolicy: mode == UpgradeMode.Monitored ? MonitoringPolicy(failureAction, policy) : null,
+            clusterHealthPolicy: policy is { HasClusterHealthPolicy: true } ? ClusterHealthPolicy(policy, clusterManifest) : null);
+    }
+
+    /// <summary>
+    /// Like <see cref="HealthPolicy"/>: a cluster health policy sent replaces the manifest's, so what the user didn't set
+    /// comes from the manifest's HealthManager/ClusterHealthPolicy, per-application-type limits included.
+    /// </summary>
+    internal static ClusterHealthPolicy ClusterHealthPolicy(UpgradePolicy policy, string? clusterManifest)
+    {
+        var defaults = clusterManifest is null
+            ? new ClusterHealthPolicyDefaults(false, 0, 0, new Dictionary<string, int>())
+            : UpgradeDefaults.ClusterHealthPolicy(clusterManifest);
+        return new ClusterHealthPolicy(
+            considerWarningAsError: policy.ConsiderWarningAsError ?? defaults.ConsiderWarningAsError,
+            maxPercentUnhealthyNodes: policy.MaxPercentUnhealthyNodes ?? defaults.MaxPercentUnhealthyNodes,
+            maxPercentUnhealthyApplications: policy.MaxPercentUnhealthyApplications ?? defaults.MaxPercentUnhealthyApplications,
+            applicationTypeHealthPolicyMap: defaults.ApplicationTypes.Count == 0
+                ? null
+                : defaults.ApplicationTypes.Select(kv => new ApplicationTypeHealthPolicyMapItem(kv.Key, kv.Value)).ToList());
+    }
+
+    private static MonitoringPolicyDescription MonitoringPolicy(FailureAction? failureAction, UpgradePolicy? policy) =>
+        new(
+            failureAction: failureAction ?? FailureAction.Rollback,
+            healthCheckWaitDurationInMilliseconds: Milliseconds(policy?.HealthCheckWait),
+            healthCheckStableDurationInMilliseconds: Milliseconds(policy?.HealthCheckStable),
+            healthCheckRetryTimeoutInMilliseconds: Milliseconds(policy?.HealthCheckRetry),
+            upgradeTimeoutInMilliseconds: Milliseconds(policy?.UpgradeTimeout),
+            upgradeDomainTimeoutInMilliseconds: Milliseconds(policy?.UpgradeDomainTimeout));
+
+    /// <summary>Sets how many instances a stateless service runs (-1: one on every node).</summary>
+    public Task ScaleStatelessServiceAsync(string serviceId, int instanceCount, CancellationToken cancellationToken) =>
+        client.Services.UpdateServiceAsync(
+            serviceId,
+            new StatelessServiceUpdateDescription(flags: ((int)ServiceUpdateFlags.Count).ToString(CultureInfo.InvariantCulture), instanceCount: instanceCount),
+            cancellationToken: cancellationToken);
+
+    /// <summary>Sets a stateful service's target replica set size and, optionally, its minimum.</summary>
+    public Task ScaleStatefulServiceAsync(string serviceId, int targetReplicaSetSize, int? minReplicaSetSize, CancellationToken cancellationToken)
+    {
+        var flags = ServiceUpdateFlags.Count | (minReplicaSetSize is null ? 0 : ServiceUpdateFlags.MinReplicaSetSize);
+        return client.Services.UpdateServiceAsync(
+            serviceId,
+            new StatefulServiceUpdateDescription(
+                flags: ((int)flags).ToString(CultureInfo.InvariantCulture),
+                targetReplicaSetSize: targetReplicaSetSize,
+                minReplicaSetSize: minReplicaSetSize),
+            cancellationToken: cancellationToken);
+    }
+
     public Task RecoverAllPartitionsAsync(CancellationToken cancellationToken) =>
         client.Partitions.RecoverAllPartitionsAsync(cancellationToken: cancellationToken);
 
@@ -102,10 +260,17 @@ public sealed class ClusterOperations(IServiceFabricClient client)
     // Deployed code packages
 
     public Task RestartCodePackageAsync(string node, string applicationId, DeployedCodePackageRow codePackage, CancellationToken cancellationToken) =>
+        RestartCodePackageAsync(
+            node, applicationId, codePackage.ServiceManifestName, codePackage.Name, codePackage.InstanceId, codePackage.ActivationId, cancellationToken);
+
+    /// <param name="instanceId">The running instance; if the code package restarted since, the cluster refuses rather than restart it again.</param>
+    /// <param name="activationId">The service package's activation; empty for shared activation.</param>
+    public Task RestartCodePackageAsync(
+        string node, string applicationId, string serviceManifestName, string codePackageName, string instanceId, string activationId,
+        CancellationToken cancellationToken) =>
         client.CodePackages.RestartDeployedCodePackageAsync(
             new NodeName(node),
             applicationId,
-            new RestartDeployedCodePackageDescription(
-                codePackage.ServiceManifestName, codePackage.Name, codePackage.InstanceId, codePackage.ActivationId),
+            new RestartDeployedCodePackageDescription(serviceManifestName, codePackageName, instanceId, activationId),
             cancellationToken: cancellationToken);
 }

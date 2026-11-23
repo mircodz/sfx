@@ -78,6 +78,34 @@ public sealed class ContextStoreTests : IDisposable
         Assert.Equal(["aad"], secure.Auth);
         Assert.Equal(["AA", "BB"], secure.Options.GetAll("server-thumbprint"));
     }
+
+    [Fact]
+    public void Changing_a_context_keeps_its_place_and_the_blank_lines_between_tables()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+        File.WriteAllText(_path, """
+            [contexts.a]
+            endpoint = "a:19080"
+
+            [contexts.b]
+            endpoint = "b:19080"
+
+            [contexts.c]
+            endpoint = "c:19080"
+
+            [folders.prod]
+            label = "PROD"
+            """);
+        var store = ContextStore.Load(_path);
+        store.Set(store.Contexts.Single(c => c.Name == "b") with { Endpoint = "b2:19080" });
+        store.Save();
+
+        var text = File.ReadAllText(_path);
+        Assert.True(text.IndexOf("[contexts.a]") < text.IndexOf("[contexts.b]") && text.IndexOf("[contexts.b]") < text.IndexOf("[contexts.c]"), text);
+        Assert.Contains("endpoint = \"b2:19080\"\n\n[contexts.c]", text.ReplaceLineEndings("\n"));
+        Assert.DoesNotContain("\n\n\n", text.ReplaceLineEndings("\n"));
+        Assert.DoesNotContain("[contexts]", text);
+    }
 }
 
 public class ClusterConnectorTests
@@ -112,4 +140,5 @@ public class ClusterConnectorTests
 
         Assert.Same(custom, connector.Resolve(new ClusterContext("x", "host", ["none"], new AuthOptions()))[0]);
     }
+
 }

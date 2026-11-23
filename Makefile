@@ -1,4 +1,4 @@
-.PHONY: help build build-release test clean pack install uninstall reinstall publish run setup all
+.PHONY: help build build-release test clean pack install uninstall reinstall publish run ui web web-dev setup all
 
 VERSION   := $(shell cat version)
 NUPKG_DIR := ./nupkgs
@@ -27,9 +27,19 @@ test: ## Run tests (set SFX_TEST_CLUSTER=<endpoint> to include the cluster tests
 run: ## Run sfx from source; pass arguments with ARGS="..."
 	dotnet run --project $(CLI_PROJ) -- $(ARGS)
 
+ui: ## Run sfx ui from source on port 7080, rebuilding the web UI first; pass arguments with ARGS="..."
+	cd web && bun install && bun run build
+	dotnet run --project $(CLI_PROJ) -- ui --port 7080 $(ARGS)
+
+web: ## Build the web UI (web/dist), which the next dotnet build embeds
+	cd web && bun install && bun run build
+
+web-dev: ## Serve the web UI with hot reload, against a running `make ui`
+	cd web && bun install && bun run dev
+
 clean: ## Clean build artifacts
 	dotnet clean $(SOLUTION) || true
-	rm -rf $(NUPKG_DIR) $(DIST_DIR)
+	rm -rf $(NUPKG_DIR) $(DIST_DIR) web/dist
 	rm -rf */*/bin */*/obj
 
 pack: ## Pack sfx as a dotnet tool package
@@ -59,5 +69,6 @@ reinstall: uninstall install ## Reinstall the tool (clean install)
 
 setup: ## Restore packages
 	dotnet restore $(SOLUTION)
+	cd web && bun install
 
 all: clean build test ## Clean, build, and test

@@ -1,0 +1,15 @@
+.specimen {
+    padding: var(--space-6) 0;
+    border-top: 0.5px solid var(--border);
+}
+
+.specimen-name {
+    margin-bottom: var(--space-4);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.specimen-gap {
+    height: var(--space-5);
+}

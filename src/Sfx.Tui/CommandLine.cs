@@ -3,6 +3,7 @@ using Sfx.Core.Auth;
 namespace Sfx.Tui;
 
 /// <param name="Arguments">Positional arguments: an endpoint, or a subcommand and its arguments.</param>
+/// <param name="Folder">The folder <c>sfx context add</c> files the context in.</param>
 public sealed record CommandLineOptions(
     IReadOnlyList<string> Arguments,
     string? Context,
@@ -13,7 +14,10 @@ public sealed record CommandLineOptions(
     bool ShowHelp,
     bool ReadOnly = false,
     bool Power = false,
-    bool ShowVersion = false);
+    bool ShowVersion = false,
+    int Port = 0,
+    bool NoBrowser = false,
+    string? Folder = null);
 
 public sealed class UsageException(string message) : Exception(message);
 
@@ -21,7 +25,8 @@ public static class CommandLine
 {
     /// <summary>
     /// Host options (<c>--auth</c>, <c>-c/--context</c>, <c>--refresh</c>, <c>--use</c>, <c>--readonly</c>, <c>--power</c>,
-    /// <c>--help</c>, <c>--version</c>) are read here; every other <c>--key value</c> is collected for the auth providers.
+    /// <c>--help</c>, <c>--version</c>, <c>--port</c> and <c>--no-browser</c> for <c>sfx ui</c>, and <c>--folder</c> for
+    /// <c>sfx context add</c>) are read here; every other <c>--key value</c> is collected for the auth providers.
     /// <paramref name="flags"/> names options that take no value.
     /// </summary>
     public static CommandLineOptions Parse(IReadOnlyList<string> args, IReadOnlySet<string> flags)
@@ -36,6 +41,9 @@ public static class CommandLine
         var version = false;
         var readOnly = false;
         var power = false;
+        var port = 0;
+        var noBrowser = false;
+        string? folder = null;
 
         for (var i = 0; i < args.Count; i++)
         {
@@ -56,6 +64,9 @@ public static class CommandLine
                     continue;
                 case "--power":
                     power = true;
+                    continue;
+                case "--no-browser":
+                    noBrowser = true;
                     continue;
                 case "-c":
                     context = i + 1 < args.Count ? args[++i] : throw new UsageException("-c needs a context name.");
@@ -98,10 +109,18 @@ public static class CommandLine
                 case "context":
                     context = value;
                     break;
+                case "folder":
+                    folder = value;
+                    break;
                 case "refresh":
-                    refresh = int.TryParse(value, out var seconds) && seconds >= 0
-                        ? TimeSpan.FromSeconds(seconds)
-                        : throw new UsageException($"--refresh expects a number of seconds, got '{value}'.");
+                    refresh = RefreshInterval.TryParse(value, out var interval)
+                        ? interval
+                        : throw new UsageException($"--refresh expects an interval like 5s, 1m or off, got '{value}'.");
+                    break;
+                case "port":
+                    port = int.TryParse(value, out var p) && p is >= 0 and <= 65535
+                        ? p
+                        : throw new UsageException($"--port expects a port number, got '{value}'.");
                     break;
                 default:
                     authOptions.Add(key, value);
@@ -109,6 +128,11 @@ public static class CommandLine
             }
         }
 
-        return new CommandLineOptions(arguments, context, methods, authOptions, refresh, use, help, readOnly, power, version);
+        if (folder is not null && !help && arguments is not ["context", "add", ..])
+        {
+            throw new UsageException("--folder only applies to 'sfx context add'. To file a saved context elsewhere, use 'sfx context move <name> <folder>'.");
+        }
+
+        return new CommandLineOptions(arguments, context, methods, authOptions, refresh, use, help, readOnly, power, version, port, noBrowser, folder);
     }
 }

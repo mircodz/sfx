@@ -1,0 +1,9 @@
+.pill {
+    display: inline-block;
+    flex: none;
+    font-size: 12px;
+    line-height: 16px;
+    padding: 2px 8px;
+    border-radius: var(--radius);
+    white-space: nowrap;
+}

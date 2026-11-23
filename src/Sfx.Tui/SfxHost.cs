@@ -4,6 +4,7 @@ using Cellar.Terminal;
 using Cellar.Widgets;
 using Sfx.Core;
 using Sfx.Core.Auth;
+using Sfx.Web;
 
 namespace Sfx.Tui;
 
@@ -24,6 +25,8 @@ public static class SfxHost
         CommandLineOptions options;
         ContextStore store;
         ClusterContext context;
+        bool ui;
+        AnsiTerminal? terminal = null;
         try
         {
             options = CommandLine.Parse(args, flags);
@@ -45,12 +48,37 @@ public static class SfxHost
                 return ContextCommand.Run(options.Arguments.Skip(1).ToList(), options, store, connector);
             }
 
+            ui = options.Arguments is ["ui", ..];
+            if (ui)
+            {
+                options = options with { Arguments = options.Arguments.Skip(1).ToList() };
+            }
+
+            if (NeedsPick(options, store) && !Console.IsInputRedirected && !Console.IsOutputRedirected)
+            {
+                terminal = new AnsiTerminal();
+                if (await ContextPicker.PickAsync(terminal, store) is not { } picked)
+                {
+                    terminal.Dispose();
+                    return 0;
+                }
+                store.Active = picked.Name;
+                store.Save();
+            }
+
             context = SelectContext(options, store);
             connector.Resolve(context);
         }
         catch (Exception ex) when (ex is UsageException or AuthConfigurationException)
         {
+            terminal?.Dispose();
             return UsageError(ex.Message, connector.Providers);
+        }
+
+        if (ui)
+        {
+            terminal?.Dispose();
+            terminal = null;
         }
 
         // Auth messages (e.g. device codes) go to the console until the UI is up, then to its status line.
@@ -68,29 +96,47 @@ public static class SfxHost
         }
         catch (Exception ex) when (ex is AuthConfigurationException or FormatException)
         {
+            terminal?.Dispose();
             return UsageError(ex.Message, connector.Providers);
         }
         catch (Exception ex)
         {
+            terminal?.Dispose();
             Console.Error.WriteLine($"sfx: could not connect to {context.Name}: {ex.GetBaseException().Message}");
             return 1;
         }
 
-        using var terminal = new AnsiTerminal();
-        using var app = new App(terminal);
-        var shell = new Shell(app, terminal, session, connector, store, options.RefreshInterval);
+        if (ui)
+        {
+            var log = new ActionLog(ActionLogPath(store));
+            var web = new WebOptions(options.Port, !options.NoBrowser, Environment.GetEnvironmentVariable("SFX_UI_TOKEN"));
+            return await WebServer.RunAsync(new UiHost(session, store, connector, log, Version), web, CancellationToken.None);
+        }
+
+        using var screen = terminal ?? new AnsiTerminal();
+        using var app = new App(screen);
+        var shell = new Shell(app, session, connector, store, options.RefreshInterval);
         notify = shell.NotifyAsync;
         await app.RunAsync(CancellationToken.None);
         return 0;
     }
+
+    /// <summary>Where every change made through sfx is recorded, next to the contexts file.</summary>
+    public static string ActionLogPath(ContextStore store) =>
+        Path.Combine(Path.GetDirectoryName(Path.GetFullPath(store.Path))!, "actions.log");
 
     /// <summary>The release version, without the build metadata the SDK may append (<c>+commit</c>).</summary>
     public static string Version =>
         (typeof(SfxHost).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0")
             .Split('+')[0];
 
+    /// <summary>Whether to ask which context to open: none given, none active, and some saved.</summary>
+    internal static bool NeedsPick(CommandLineOptions options, ContextStore store) =>
+        options.Arguments is [] && options.Context is null && store.Active is null && store.Contexts.Count > 0
+        && options.AuthMethods.Count == 0 && !options.AuthOptions.Keys.Any();
+
     /// <summary>An endpoint on the command line, else <c>-c</c>, else the active saved context.</summary>
-    private static ClusterContext SelectContext(CommandLineOptions options, ContextStore store)
+    internal static ClusterContext SelectContext(CommandLineOptions options, ContextStore store)
     {
         switch (options.Arguments)
         {
@@ -109,8 +155,9 @@ public static class SfxHost
 
                 var name = options.Context ?? store.Active
                     ?? throw new UsageException("No cluster given and no active context. Pass an endpoint or run 'sfx context add'.");
-                var saved = store.Find(name) ?? throw new UsageException($"No context named '{name}'. See 'sfx context list'.");
-                // --readonly tightens a saved context for one run; --power can't loosen a read-only one.
+                var found = store.Find(name) ?? throw new UsageException($"No context named '{name}'. See 'sfx context list'.");
+                var saved = store.Resolve(found).Context;
+                // A read-only folder makes the context read-only; --readonly tightens it for one run; --power can't loosen either.
                 return saved with { ReadOnly = saved.ReadOnly || options.ReadOnly, Power = !saved.ReadOnly && (saved.Power || options.Power) };
 
             default:
@@ -129,16 +176,19 @@ public static class SfxHost
     private static string Usage(IEnumerable<IClusterAuthProvider> providers)
     {
         var text = new StringBuilder();
-        text.AppendLine("usage: sfx [-c <context>]                         open a saved context (default: the active one)");
+        text.AppendLine("usage: sfx [-c <context>]                           open a saved context (default: the active one)");
         text.AppendLine("       sfx <endpoint> [--auth <methods>] [options]  open a cluster directly");
-        text.AppendLine("       sfx context <command>                       manage saved contexts");
+        text.AppendLine("       sfx context <command>                        manage saved contexts");
+        text.AppendLine("       sfx ui [<endpoint> | -c <context>]           open the cluster in the browser instead");
         text.AppendLine();
         text.AppendLine("  <endpoint>              host, host:port or URL (default port 19080)");
         text.AppendLine("  --auth <methods>        auth methods, applied in order (default: none)");
-        text.AppendLine("  --refresh <seconds>     auto-refresh interval, 0 to disable (default: 5)");
+        text.AppendLine("  --refresh <interval>    auto-refresh interval: 5s, 1m, or off (default: 5s)");
         text.AppendLine("  --readonly              hide every action that changes the cluster");
         text.AppendLine("  --power                 unlock the riskiest actions (also :power in the UI)");
         text.AppendLine("  --version               print the version");
+        text.AppendLine("  --port <n>              sfx ui: port to listen on, on 127.0.0.1 (default: any free one)");
+        text.AppendLine("  --no-browser            sfx ui: print the link instead of opening it");
         text.AppendLine();
         text.AppendLine("contexts:");
         foreach (var line in ContextCommand.Usage.Split('\n'))

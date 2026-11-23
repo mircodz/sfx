@@ -57,4 +57,22 @@ public class CommandLineTests
     {
         Assert.Throws<UsageException>(() => CommandLine.Parse(args, NoFlags));
     }
+
+    [Fact]
+    public void Reads_ui_options()
+    {
+        var options = CommandLine.Parse(["ui", "-c", "prod", "--port", "7080", "--no-browser"], NoFlags);
+
+        Assert.Equal(["ui"], options.Arguments);
+        Assert.Equal(7080, options.Port);
+        Assert.True(options.NoBrowser);
+        Assert.Empty(options.AuthOptions.Keys);
+    }
+
+    [Fact]
+    public void Rejects_a_port_that_is_not_one()
+    {
+        Assert.Throws<UsageException>(() => CommandLine.Parse(["ui", "--port", "http"], NoFlags));
+        Assert.Throws<UsageException>(() => CommandLine.Parse(["ui", "--port", "70000"], NoFlags));
+    }
 }

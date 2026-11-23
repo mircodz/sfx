@@ -22,7 +22,9 @@ public sealed record HealthEventRow(
 /// <summary>One step of the chain explaining an unhealthy state; <see cref="Depth"/> nests it under the step above.</summary>
 public sealed record HealthEvaluationRow(int Depth, string Kind, HealthState State, string Description);
 
-public sealed record HealthReport(HealthState State, IReadOnlyList<HealthEventRow> Events, IReadOnlyList<HealthEvaluationRow> Evaluations)
+/// <param name="Reason">One line on why it isn't healthy (see <see cref="HealthReasons.From"/>); null when nothing says.</param>
+public sealed record HealthReport(
+    HealthState State, IReadOnlyList<HealthEventRow> Events, IReadOnlyList<HealthEvaluationRow> Evaluations, string? Reason = null)
 {
     public static HealthReport From(EntityHealth health) => new(
         health.AggregatedHealthState ?? HealthState.Unknown,
@@ -35,7 +37,8 @@ public sealed record HealthReport(HealthState State, IReadOnlyList<HealthEventRo
                 e.LastModifiedUtcTimestamp,
                 e.IsExpired ?? false))
             .ToList(),
-        Flatten(health.UnhealthyEvaluations));
+        Flatten(health.UnhealthyEvaluations),
+        health.AggregatedHealthState is HealthState.Ok ? null : HealthReasons.From(health));
 
     /// <summary>Flattens nested unhealthy evaluations, depth first, so the cause reads top-down.</summary>
     public static IReadOnlyList<HealthEvaluationRow> Flatten(IEnumerable<HealthEvaluationWrapper>? evaluations)
@@ -79,6 +82,66 @@ public static class Inspect
 
     /// <summary>Re-indents a JSON document, such as the cluster configuration the cluster returns as one string.</summary>
     public static string PrettyJson(string json) => JsonNode.Parse(json)?.ToJsonString(Indented) ?? json;
+
+    public enum Format { None, Json, Xml }
+
+    /// <summary>
+    /// Re-indents <paramref name="text"/> when it's a JSON object or array, or an XML document or fragment, and says
+    /// which; anything else, or anything that doesn't parse, comes back unchanged with <see cref="Format.None"/>.
+    /// </summary>
+    public static (string Text, Format Format) TryPretty(string? text)
+    {
+        var trimmed = text?.Trim() ?? "";
+        if (trimmed.Length < 2)
+        {
+            return (text ?? "", Format.None);
+        }
+
+        try
+        {
+            if (trimmed[0] is '{' or '[' && JsonNode.Parse(trimmed) is { } node)
+            {
+                return (node.ToJsonString(Indented), Format.Json);
+            }
+
+            if (trimmed[0] == '<')
+            {
+                return (PrettyXml(trimmed), Format.Xml);
+            }
+        }
+        catch (Exception ex) when (ex is JsonException or System.Xml.XmlException)
+        {
+        }
+        return (text!, Format.None);
+    }
+
+    /// <summary>Indents XML two spaces per level, keeping the declaration as written, comments and attribute order.</summary>
+    private static string PrettyXml(string xml)
+    {
+        // Written to a string, the declaration would claim UTF-16; keep the original one instead.
+        var declaration = "";
+        if (xml.StartsWith("<?xml", StringComparison.Ordinal) && xml.IndexOf("?>", StringComparison.Ordinal) is var end and > 0)
+        {
+            declaration = xml[..(end + 2)] + "\n";
+            xml = xml[(end + 2)..];
+        }
+
+        using var reader = System.Xml.XmlReader.Create(new StringReader(xml),
+            new System.Xml.XmlReaderSettings { ConformanceLevel = System.Xml.ConformanceLevel.Auto, IgnoreWhitespace = true, DtdProcessing = System.Xml.DtdProcessing.Ignore });
+        var output = new StringWriter(CultureInfo.InvariantCulture);
+        using (var writer = System.Xml.XmlWriter.Create(output, new System.Xml.XmlWriterSettings
+        {
+            Indent = true,
+            IndentChars = "  ",
+            OmitXmlDeclaration = true,
+            ConformanceLevel = System.Xml.ConformanceLevel.Auto,
+            NewLineChars = "\n",
+        }))
+        {
+            writer.WriteNode(reader, defattr: false);
+        }
+        return declaration + output.ToString();
+    }
 
     /// <summary>The top-level properties of <paramref name="value"/>; nested objects are shown as compact JSON.</summary>
     public static IReadOnlyList<Field> Fields(object value, params string[] exclude) =>

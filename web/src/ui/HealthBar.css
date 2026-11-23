@@ -1,0 +1,44 @@
+.health-bar + .health-bar {
+    margin-top: var(--space-4);
+}
+
+.health-bar-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 var(--space-3);
+    margin-bottom: var(--space-1);
+    font-size: 12px;
+}
+
+/* The counts drop to the next line as one, rather than breaking mid-phrase. */
+.health-bar-head > :last-child {
+    white-space: nowrap;
+}
+
+/* The parts fill the whole bar; a 2px gap in the card's own color separates them. Only an empty bar shows a track. */
+.health-bar-track {
+    display: flex;
+    gap: 2px;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.health-bar-track:empty {
+    background: var(--bg-neutral);
+}
+
+.health-bar-part {
+    flex-basis: 0;
+    min-width: 4px;
+}
+
+/* Unknown would vanish on the neutral fill; it needs a grey that reads as a part of the bar. */
+.health-bar-part.tone-neutral {
+    background: var(--border-strong);
+}
+
+.health-bar-part.tone-success { background: var(--bar-success); }
+.health-bar-part.tone-warning { background: var(--bar-warning); }
+.health-bar-part.tone-danger { background: var(--bar-danger); }

@@ -1,0 +1,24 @@
+/* A row that opens a folder, with its actions beside the link rather than inside it. */
+.row.store-row {
+    display: flex;
+    align-items: center;
+}
+
+.store-row > .row-summary {
+    flex: 1;
+    min-width: 0;
+    color: inherit;
+}
+
+.store-file {
+    cursor: default;
+}
+
+.store-row-actions {
+    flex: none;
+    padding-right: var(--space-3);
+}
+
+.store-usage {
+    margin-top: var(--space-2);
+}

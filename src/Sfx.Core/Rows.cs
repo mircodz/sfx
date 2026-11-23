@@ -12,12 +12,28 @@ public sealed record NodeRow(
     string FaultDomain,
     bool IsSeed,
     string CodeVersion,
-    TimeSpan? Uptime);
+    TimeSpan? Uptime,
+    string Id = "");
 
 public sealed record ApplicationRow(string Id, string Name, string TypeName, string TypeVersion, string Status, HealthState Health);
 
 public sealed record ServiceRow(string Id, string Name, string TypeName, string Kind, string Status, HealthState Health);
 
-public sealed record PartitionRow(PartitionId Id, string Kind, string PartitionKind, string Status, HealthState Health, string ReplicaSet);
+/// <param name="PartitionKind">How the service is partitioned: Singleton, Int64Range or Named.</param>
+/// <param name="LowKey">For an Int64Range partition, its lowest key; as text, since keys go beyond what JSON numbers hold.</param>
+/// <param name="HighKey">For an Int64Range partition, its highest key.</param>
+/// <param name="Name">For a Named partition, its name.</param>
+public sealed record PartitionRow(
+    PartitionId Id, string Kind, string PartitionKind, string Status, HealthState Health, string ReplicaSet,
+    string? LowKey = null, string? HighKey = null, string? Name = null);
 
 public sealed record ReplicaRow(string Id, string NodeName, string Role, string Status, HealthState Health, string Address);
+
+/// <summary>One provisioned version of an application type.</summary>
+/// <param name="Status">Provisioning, Available, Unprovisioning or Failed.</param>
+/// <param name="StatusDetails">Why provisioning failed, when it did; empty otherwise.</param>
+public sealed record ApplicationTypeRow(
+    string Name, string Version, string Status, IReadOnlyDictionary<string, string> DefaultParameters, string StatusDetails = "");
+
+/// <param name="Manifest">The service manifest that declares it.</param>
+public sealed record ServiceTypeRow(string Name, bool Stateful, string Manifest, string ManifestVersion);

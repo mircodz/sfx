@@ -1,0 +1,274 @@
+/* The shell: a sidebar and the page beside it. The page is fluid up to a width where lines stay readable. */
+
+.app {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    min-height: 100vh;
+}
+
+.main {
+    min-width: 0;
+    padding: 0 32px;
+}
+
+.main-inner {
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.sidebar {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    height: 100vh;
+    padding: var(--space-4) var(--space-3);
+    border-right: 0.5px solid var(--border);
+    background: var(--surface-1);
+    overflow-y: auto;
+}
+
+.sidebar-brand {
+    padding: var(--space-1) var(--space-3) var(--space-3);
+    font-family: var(--font-mono);
+    font-style: italic;
+    font-feature-settings: "ss01";
+    font-size: 19px;
+    text-decoration: none;
+}
+
+.sidebar-context {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    text-decoration: none;
+}
+
+.sidebar-context:hover,
+.sidebar-context[aria-current="page"] {
+    border-color: var(--border-strong);
+}
+
+.sidebar-context-text {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+}
+
+.sidebar-context-folder {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.sidebar-context-name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.sidebar-context-chevron {
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.sidebar-nav {
+    display: grid;
+    gap: 2px;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 34px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.sidebar-link:hover {
+    background: var(--fill-ghost-selected);
+    color: var(--text-primary);
+}
+
+.sidebar-link[aria-current="page"] {
+    background: var(--fill-ghost-selected);
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.sidebar-static {
+    cursor: default;
+}
+
+.sidebar-static:hover {
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+.sidebar-icon {
+    flex: none;
+    font-size: 18px;
+}
+
+.sidebar-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-badge {
+    margin-left: auto;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius);
+    background: var(--bg-accent);
+    color: var(--text-accent);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 18px;
+}
+
+.sidebar-power[aria-pressed="true"] {
+    background: var(--bg-warning);
+    color: var(--text-warning);
+}
+
+.sidebar-end {
+    display: grid;
+    gap: 2px;
+    margin-top: auto;
+    padding-top: var(--space-3);
+    border-top: 0.5px solid var(--border);
+}
+
+.sidebar-version {
+    padding: var(--space-2) var(--space-3) 0;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* Narrower windows: icons only; the page keeps the width. */
+@media (max-width: 1100px) {
+    .app {
+        --sidebar-width: 60px;
+    }
+
+    .sidebar {
+        padding-inline: var(--space-2);
+    }
+
+    .sidebar-label,
+    .sidebar-context-chevron {
+        display: none;
+    }
+
+    .sidebar-brand {
+        padding-inline: 0;
+        text-align: center;
+    }
+
+    .sidebar-link,
+    .sidebar-context {
+        justify-content: center;
+        padding: 0;
+        min-height: 40px;
+    }
+
+    .sidebar-context {
+        border: 0;
+        background: transparent;
+    }
+
+    .sidebar-badge {
+        position: absolute;
+        margin: -18px 0 0 22px;
+    }
+
+    .main {
+        padding: 0 24px;
+    }
+}
+
+/* A phone: the sidebar becomes a strip across the top. */
+@media (max-width: 640px) {
+    /* The strip keeps its height; the page takes the rest, not half of it. */
+    .app {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 1fr;
+        align-content: start;
+    }
+
+    .sidebar {
+        z-index: 10;
+        flex-direction: row;
+        align-items: center;
+        height: auto;
+        padding: var(--space-2);
+        border-right: 0;
+        border-bottom: 0.5px solid var(--border);
+        overflow-x: auto;
+        /* A fade at the right edge says the strip scrolls. */
+        mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+    }
+
+    .sidebar-nav,
+    .sidebar-end {
+        display: flex;
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    .sidebar-brand {
+        padding: 0 var(--space-2);
+    }
+
+    .sidebar-context {
+        margin: 0;
+    }
+
+    .sidebar-link,
+    .sidebar-context {
+        min-width: 40px;
+    }
+
+    .main {
+        padding: 0 var(--space-4);
+    }
+}
+
+/* Find sits between the context and the pages, with its shortcut on the right. */
+.sidebar-find {
+    margin-top: var(--space-1);
+}
+
+.sidebar-kbd {
+    margin-left: auto;
+    padding: 0 4px;
+    border: 0.5px solid var(--border);
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--text-muted);
+}
