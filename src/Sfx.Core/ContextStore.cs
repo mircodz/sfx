@@ -10,7 +10,7 @@ namespace Sfx.Core;
 /// Besides <c>endpoint</c>, <c>auth</c>, <c>readonly</c>, <c>power</c> and <c>folder</c>, a context's keys are the options of its auth methods.
 /// <c>[folders.&lt;path&gt;]</c> tables set a <c>label</c>, <c>color</c> and <c>readonly</c> for the contexts in a folder and its subfolders.
 /// </summary>
-public sealed partial class ContextStore
+public sealed class ContextStore
 {
     private const string ActiveKey = "context";
     private const string ContextsKey = "contexts";
@@ -41,7 +41,7 @@ public sealed partial class ContextStore
     public static ContextStore Load(string? path = null)
     {
         path ??= DefaultPath;
-        var root = File.Exists(path) ? Toml.ToModel(File.ReadAllText(path)) : new TomlTable();
+        var root = File.Exists(path) ? TomlSerializer.Deserialize<TomlTable>(File.ReadAllText(path)) ?? new TomlTable() : new TomlTable();
         return new ContextStore(path, root);
     }
 
@@ -176,15 +176,42 @@ public sealed partial class ContextStore
     public void Save()
     {
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(Path))!);
-        File.WriteAllText(Path, Spaced(Toml.FromModel(_root)));
+        File.WriteAllText(Path, Tidy(TomlSerializer.Serialize(_root, WriteOptions)));
     }
 
-    /// <summary>A blank line before every table header, as people write it, including tables added since the load.</summary>
-    internal static string Spaced(string toml) =>
-        TableHeader().Replace(toml, "\n\n$1");
+    private static readonly TomlSerializerOptions WriteOptions = new() { BlankLineBeforeTableHeaders = true };
 
-    [System.Text.RegularExpressions.GeneratedRegex(@"(?<=[^\n])\n(\[[^\[\]\n]+\][ \t]*(?:\r?\n|$))")]
-    private static partial System.Text.RegularExpressions.Regex TableHeader();
+    /// <summary>
+    /// As people write the file: no header for a table that only holds other tables (<c>[contexts]</c> above
+    /// <c>[contexts.prod]</c>), and one blank line between tables.
+    /// </summary>
+    internal static string Tidy(string toml)
+    {
+        var lines = toml.ReplaceLineEndings("\n").Split('\n').ToList();
+        for (var i = lines.Count - 1; i >= 0; i--)
+        {
+            if (TableName(lines[i]) is not { } name)
+            {
+                continue;
+            }
+            var next = i + 1;
+            while (next < lines.Count && lines[next].Trim().Length == 0)
+            {
+                next++;
+            }
+            if (next < lines.Count && TableName(lines[next]) is { } child && child.StartsWith(name + ".", StringComparison.Ordinal))
+            {
+                lines.RemoveRange(i, next - i);
+            }
+        }
+        return string.Join('\n', lines).Trim() + "\n";
+    }
+
+    private static string? TableName(string line)
+    {
+        var trimmed = line.Trim();
+        return trimmed.StartsWith('[') && !trimmed.StartsWith("[[", StringComparison.Ordinal) && trimmed.EndsWith(']') ? trimmed[1..^1].Trim() : null;
+    }
 
     private TomlTable ContextsTable()
     {

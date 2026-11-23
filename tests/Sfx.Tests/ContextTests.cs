@@ -104,6 +104,7 @@ public sealed class ContextStoreTests : IDisposable
         Assert.True(text.IndexOf("[contexts.a]") < text.IndexOf("[contexts.b]") && text.IndexOf("[contexts.b]") < text.IndexOf("[contexts.c]"), text);
         Assert.Contains("endpoint = \"b2:19080\"\n\n[contexts.c]", text.ReplaceLineEndings("\n"));
         Assert.DoesNotContain("\n\n\n", text.ReplaceLineEndings("\n"));
+        Assert.DoesNotContain("[contexts]", text);
     }
 }
 
