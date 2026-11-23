@@ -10,7 +10,8 @@ namespace Sfx.Tui;
 
 /// <summary>
 /// What can be done to each kind of entity. The same key means the same thing everywhere:
-/// ctrl+r restart, ctrl+k remove, ctrl+d delete, m move, x deactivate, a activate, s scale. Rarer actions have only a
+/// ctrl+r restart, ctrl+k remove, ctrl+d delete, m move, x deactivate, a activate, s scale, e edit, u upgrade,
+/// ctrl+n create, p provision, o go to the node. Rarer actions have only a
 /// <c>:</c> command (and the palette). Power actions show up after <c>:power</c>. Changes the cluster takes a while to
 /// carry out are followed until they're done, in the activity strip.
 /// </summary>
@@ -23,6 +24,12 @@ public sealed partial class Views
     private static readonly KeySequence Deactivate = "x";
     private static readonly KeySequence Activate = "a";
     private static readonly KeySequence Scale = "s";
+    private static readonly KeySequence Create = "ctrl+n";
+    private static readonly KeySequence Edit = "e";
+    private static readonly KeySequence Upgrade = "u";
+    private static readonly KeySequence Provision = "p";
+    private static readonly KeySequence Upload = "u";
+    private static readonly KeySequence GoToNode = "o";
 
     private const string NotForProduction = "Uses the Fault Analysis Service; meant for testing, not production.";
 
@@ -64,6 +71,9 @@ public sealed partial class Views
                 })),
             [Move], ["move"],
             AppliesTo: r => ClusterOperations.CanMove(r.Role)),
+
+        new("Go to its node", ActionRisk.None, r => OpenNode(r.NodeName), [GoToNode], ["goto-node"],
+            AppliesTo: r => r.NodeName.Length > 0),
     ];
 
     public IReadOnlyList<EntityAction<NodeRow>> NodeActions() =>
@@ -175,6 +185,8 @@ public sealed partial class Views
             }),
             [Delete], ["delete"], Power: true,
             AppliesTo: _ => app.Id != ClusterQueries.SystemApplicationId),
+
+        .. ServiceLifecycleActions(app),
     ];
 
     public IReadOnlyList<EntityAction<ApplicationRow>> ApplicationActions() =>
@@ -189,6 +201,8 @@ public sealed partial class Views
             }),
             [Delete], ["delete"], Power: true,
             AppliesTo: a => a.Id != ClusterQueries.SystemApplicationId),
+
+        .. ApplicationLifecycleActions(),
     ];
 
     public IReadOnlyList<EntityAction<string>> ClusterActions() =>
@@ -202,6 +216,8 @@ public sealed partial class Views
             name => host.Run(Op("Recover system partitions in quorum loss", name, ActionRisk.Destructive,
                 ct => _ops.RecoverSystemPartitionsAsync(ct), "System services stuck in quorum loss are forced out; recent writes may be lost.")),
             Commands: ["recover-system"], Power: true),
+
+        .. ClusterUpgradeActions(),
     ];
 
     public IReadOnlyList<EntityAction<DeployedCodePackageRow>> CodePackageActions(string node, DeployedApplicationRow app) =>

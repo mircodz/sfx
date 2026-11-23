@@ -6,8 +6,9 @@ namespace Sfx.Web;
 
 public sealed record ActionChoice(string Value, string Label, string? Hint = null);
 
-/// <param name="Kind">How the browser asks for it: number, choice, flag, node (a node that's up, or none to let the
+/// <param name="Kind">How the browser asks for it: text, number, choice, flag, node (a node that's up, or none to let the
 /// cluster choose), version (a provisioned version of the app's type) or parameters (the app's parameters).</param>
+/// <param name="Default">The value it starts with; for text, what's typed in already (e.g. "fabric:/").</param>
 public sealed record ActionInputDto(string Name, string Label, string Kind, IReadOnlyList<ActionChoice>? Choices = null, string? Default = null);
 
 /// <param name="Risk">"confirm" asks first; "destructive" also has the user type <paramref name="ConfirmText"/>.</param>
@@ -59,20 +60,31 @@ internal enum Risk { Confirm, Destructive }
 
 /// <param name="Describe">What happens, for the confirmation and the action log, given the target and inputs.</param>
 /// <param name="ConfirmText">What to type to confirm a destructive action.</param>
+/// <param name="Run">Makes the change; null when <paramref name="Start"/> does.</param>
+/// <param name="Prepare">
+/// Checks the inputs against the cluster and describes the change, for actions that can't say what they do without
+/// asking it; used instead of <paramref name="Describe"/>. Refusing here logs nothing.
+/// </param>
+/// <param name="Start">
+/// Makes the change and returns how to follow it (null: done once requested), for actions that need to look at the
+/// cluster before they change it; used instead of <paramref name="Run"/> and <see cref="OperationWatcher"/>.
+/// </param>
 internal sealed record ActionDef(
     string Id,
     string Kind,
     string Title,
     Risk Risk,
     Func<Args, Args, string> Describe,
-    Func<UiSession, Args, Args, CancellationToken, Task> Run,
+    Func<UiSession, Args, Args, CancellationToken, Task>? Run,
     string? Warning = null,
     bool Power = false,
     Func<Args, bool>? Applies = null,
     Func<Args, string>? ConfirmText = null,
     Func<Args, IReadOnlyList<ActionInputDto>>? Inputs = null,
     bool Form = false,
-    bool NeedsFaultAnalysis = false);
+    bool NeedsFaultAnalysis = false,
+    Func<UiSession, Args, Args, CancellationToken, Task<string>>? Prepare = null,
+    Func<UiSession, Args, Args, CancellationToken, Task<OperationProbe?>>? Start = null);
 
 /// <summary>
 /// Everything the browser can change, mirroring the TUI's actions (src/Sfx.Tui/EntityActions.cs): read-only sessions get
@@ -323,6 +335,8 @@ internal static class WebActions
             "System services stuck in quorum loss are forced out; recent writes may be lost.",
             Power: true,
             ConfirmText: t => t["name"]),
+
+        .. LifecycleActions.All,
     ];
 
     private static readonly Dictionary<string, ActionDef> ById = All.ToDictionary(a => a.Id);
@@ -400,15 +414,23 @@ internal static class WebActions
         string title;
         try
         {
-            title = action.Describe(target, inputs);
+            title = action.Prepare is { } prepare ? await prepare(session, target, inputs, cancellationToken) : action.Describe(target, inputs);
         }
         catch (RefusedException ex)
         {
             throw Refusal(ex);
         }
+        OperationProbe? probe = null;
         try
         {
-            await action.Run(session, target, inputs, cancellationToken);
+            if (action.Start is { } start)
+            {
+                probe = await start(session, target, inputs, cancellationToken);
+            }
+            else
+            {
+                await action.Run!(session, target, inputs, cancellationToken);
+            }
         }
         // Refused before anything was asked of the cluster, like an ActionException: nothing to log.
         catch (RefusedException ex)
@@ -423,7 +445,14 @@ internal static class WebActions
 
         // The change is made: whatever happens to the log, don't report it as failed, or a retry would repeat it.
         var logError = session.TryLog(title, "ok");
-        session.Track(action.Id, title, target, inputs);
+        if (action.Start is not null)
+        {
+            session.Track(action.Id, title, probe);
+        }
+        else
+        {
+            session.Track(action.Id, title, target, inputs);
+        }
         return logError is not null
             ? new ActionResult($"{title}. Done, but the action log couldn't be written ({logError})")
             : new ActionResult(title);
@@ -432,11 +461,11 @@ internal static class WebActions
     private static string Describe(Args replica) =>
         replica["role"] == "Instance" ? $"instance {replica["replicaId"]}" : $"{replica["role"].ToLowerInvariant()} replica {replica["replicaId"]}";
 
-    private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
+    internal static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
 
     private static int Positive(int n) => n > 0 ? n : throw new ActionException("Must be more than 0.");
 
-    private static ActionException Refusal(RefusedException ex) =>
+    internal static ActionException Refusal(RefusedException ex) =>
         new(ex.Message, ex.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
 
     private static UpgradePlan Plan(string value) => UpgradePlan.Find(value);

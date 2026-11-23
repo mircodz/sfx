@@ -35,8 +35,51 @@ internal sealed class FakeHost : IActionHost
     public void Ask(string label, string initial, Func<string, string?>? validate, Action<string> submit) =>
         Asks.Add((label, initial, validate, submit));
 
-    public void Edit(string title, Func<CancellationToken, Task<IReadOnlyList<FormField>>> load, Func<IReadOnlyList<FormField>, Operation> review) =>
-        Edits.Add((title, load(CancellationToken.None).GetAwaiter().GetResult(), review));
+    public List<bool> EditUnchanged { get; } = [];
+    public List<(string Title, IReadOnlyList<IResourceView> Pages, bool Replace)> Opens { get; } = [];
+    public List<string> Warnings { get; } = [];
+    public List<string> Errors { get; } = [];
+    public List<string> Commands { get; } = [];
+
+    public void Edit(
+        string title,
+        Func<CancellationToken, Task<IReadOnlyList<FormField>>> load,
+        Func<IReadOnlyList<FormField>, Operation> review,
+        bool unchanged = false)
+    {
+        try
+        {
+            Edits.Add((title, load(CancellationToken.None).GetAwaiter().GetResult(), review));
+            EditUnchanged.Add(unchanged);
+        }
+        catch (Exception ex)
+        {
+            Errors.Add($"{title}: {ex.GetBaseException().Message}");
+        }
+    }
+
+    /// <summary>Loads right away, as the screen would off the UI thread; a failure is recorded as an error.</summary>
+    public void Load<T>(string title, Func<CancellationToken, Task<T>> load, Action<T> then)
+    {
+        T value;
+        try
+        {
+            value = load(CancellationToken.None).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            Errors.Add($"{title}: {ex.GetBaseException().Message}");
+            return;
+        }
+        then(value);
+    }
+
+    public void Open(string title, Func<CancellationToken, Task<IReadOnlyList<IResourceView>>> load, bool replace = false) =>
+        Load(title, load, pages => Opens.Add((title, pages, replace)));
+
+    public void Warn(string message) => Warnings.Add(message);
+
+    public void Command(string text) => Commands.Add(text);
 
     public bool Allows(ActionRisk risk, bool power) => (risk == ActionRisk.None || !ReadOnly) && (!power || Power);
 }

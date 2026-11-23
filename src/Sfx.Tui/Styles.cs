@@ -42,6 +42,26 @@ internal static class Styles
     /// <summary>A folder's label, bold in the folder's color.</summary>
     public static StyledText FolderLabel(string label, string? color) => StyledText.Of(label).Bold().Fg(FolderColor(color));
 
+    /// <summary>"512 B", "3.4 KB", "1.2 GB": bytes in 1024s, one decimal below 10.</summary>
+    public static string Bytes(long? bytes)
+    {
+        if (bytes is not { } value)
+        {
+            return "";
+        }
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double size = value;
+        var unit = 0;
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+        return unit == 0 ? $"{value} B"
+            : size < 10 ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{size:0.0} {units[unit]}")
+            : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{size:0} {units[unit]}");
+    }
+
     public static string Duration(TimeSpan? value) => value switch
     {
         null => "-",

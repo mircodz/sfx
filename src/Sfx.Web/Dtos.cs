@@ -8,9 +8,13 @@ namespace Sfx.Web;
 /// <param name="EventStore">Whether the cluster runs the event store; without it there are no events to show.</param>
 /// <param name="RepairManager">Whether it runs the repair manager; without it there are no repair tasks.</param>
 /// <param name="FaultAnalysis">Whether it runs the Fault Analysis Service, which stopping nodes and restarting partitions need.</param>
+/// <param name="ImageStore">
+/// Whether the image store can be browsed through the cluster: false only when the cluster refuses because its store
+/// isn't the native one (a file share or Azure blob storage).
+/// </param>
 public sealed record SessionDto(
     string Context, string Endpoint, bool ReadOnly, bool Power, string Version, bool EventStore, string? Folder, string? Label, string? Color,
-    bool RepairManager, bool FaultAnalysis);
+    bool RepairManager, bool FaultAnalysis, bool ImageStore = true);
 
 /// <summary>The optional system services a cluster may run; what isn't there isn't offered.</summary>
 public sealed record SystemServices(bool EventStore, bool RepairManager, bool FaultAnalysis);
@@ -153,6 +157,8 @@ public sealed record DomainDto(string Name, string State);
 
 public sealed record UpgradingNodeDto(string Node, string Phase, IReadOnlyList<string> PendingSafetyChecks);
 
+/// <param name="Actions">upgrade.resume, upgrade.rollback and change-upgrade-plan, where they apply.</param>
+/// <param name="Plan">The id of the <see cref="UpgradePlan"/> it follows (e.g. "monitored-manual"); null when it doesn't say.</param>
 public sealed record UpgradeDto(
     string Name,
     string Kind,
@@ -169,7 +175,8 @@ public sealed record UpgradeDto(
     string FailureReason,
     string HealthCheckPhase,
     IReadOnlyList<EvaluationDto> Evaluations,
-    IReadOnlyList<ActionDto> Actions);
+    IReadOnlyList<ActionDto> Actions,
+    string? Plan = null);
 
 /// <param name="EntityKind">What <paramref name="Entity"/> is: cluster, node, application, service, partition or replica.</param>
 public sealed record EventDto(DateTime Time, string Kind, string EntityKind, string Category, string Entity, string Details);
@@ -233,6 +240,7 @@ internal static class Dto
             r.FailureReason,
             r.HealthCheckPhase,
             r.Evaluations.Select(Evaluation).ToList(),
-            actions);
+            actions,
+            LifecycleActions.PlanOf(r)?.Id);
     }
 }

@@ -26,6 +26,8 @@ internal sealed class Shell : IActionHost
     private const string ContextsPage = "contexts";
 
     private static readonly TimeSpan TrackEvery = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan SummaryEvery = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan SearchIndexFor = TimeSpan.FromSeconds(30);
 
     private readonly App _app;
     private readonly ClusterConnector _connector;
@@ -43,6 +45,7 @@ internal sealed class Shell : IActionHost
     private readonly StatusItem _updatedItem;
     private readonly ActionLog _log;
     private readonly SessionActivity _activity;
+    private readonly Label _summary = new(StyledText.Empty());
 
     private ClusterSession _session;
     private Views _views;
@@ -55,6 +58,10 @@ internal sealed class Shell : IActionHost
     private StyledText? _loadError;
     private List<Operation>? _batch;
     private bool _batchRefused;
+    private DateTime _summaryAt;
+    private bool _summaryLoading;
+    private (DateTime At, string Text)? _lastError;
+    private (ClusterSession Session, DateTime At, Task<IReadOnlyList<SearchHit>> Index)? _searchIndex;
 
     public Shell(App app, ClusterSession session, ClusterConnector connector, ContextStore store, TimeSpan refreshInterval)
     {
@@ -119,6 +126,7 @@ internal sealed class Shell : IActionHost
         _main.Show(ClusterPage);
 
         app.Root = new Stack(Direction.Vertical)
+            .Add(_summary, Constraint.Length(1))
             .Add(_main, Constraint.Fill())
             .Add(new Footer(_line, new ActivityStrip(_activity.Tasks), _activity.Tasks), Constraint.Length(1));
 
@@ -169,6 +177,11 @@ internal sealed class Shell : IActionHost
             Keys = ["r"], Commands = ["refresh"], ArgumentHint = "[interval|off]",
         },
         new("copy", "Copy the selected name, or the text being read", Copy) { Keys = ["y"], Commands = ["copy"] },
+        new("find", "Find a node, application or service by name, type or address; a partition by its id", Find)
+        {
+            Keys = ["ctrl+f"], Commands = ["find", "f"], ArgumentHint = "[text|partition id]", Footer = "find",
+        },
+        new("last-error", "Show the last error in full", ShowLastError) { Keys = ["!"], Commands = ["error", "errors"] },
         new("quit", "Quit", _app.Quit) { Keys = ["q", "ctrl+c"], Commands = ["quit", "q"], Footer = "quit" },
 
         new("back", "Back", Back) { Group = Navigation, Keys = ["backspace", "h"], Commands = ["back"], Footer = "back" },
@@ -180,11 +193,27 @@ internal sealed class Shell : IActionHost
             Group = PagesGroup, Commands = ["apps", "app", "applications"],
         },
         new("go.cluster", "Cluster", () => ShowRoot(_views.DescribeCluster(_session.Context.Name))) { Group = PagesGroup, Commands = ["cluster"] },
-        new("go.health", "Cluster health", () => ShowRoot(_views.DescribeCluster(_session.Context.Name, Views.ClusterHealthTab)))
+        new("go.health", "Everything unhealthy, and why", () => ShowRoot(_views.Unhealthy()))
         {
-            Group = PagesGroup, Commands = ["health"],
+            Group = PagesGroup, Commands = ["health", "unhealthy"],
         },
-        new("go.upgrades", "Upgrades of the cluster and applications", () => ShowRoot(_views.Upgrades()))
+        new("go.cluster-health", "Cluster health: evaluations and events", () => ShowRoot(_views.DescribeCluster(_session.Context.Name, Views.ClusterHealthTab)))
+        {
+            Group = PagesGroup, Commands = ["cluster-health"],
+        },
+        new("go.types", "Application types: provisioned versions and their service types", () => ShowRoot(_views.ApplicationTypes()))
+        {
+            Group = PagesGroup, Commands = ["types", "apptypes"],
+        },
+        new("go.store", "Image store: packages, folders and files", () => ShowRoot(_views.ImageStoreRoot()))
+        {
+            Group = PagesGroup, Commands = ["store", "imagestore"],
+        },
+        new("provision", "Upload a local application package (folder, .sfpkg or .zip) and provision it", Provision)
+        {
+            Commands = ["provision"], ArgumentHint = "<path>", When = () => Allows(ActionRisk.Confirm, power: false),
+        },
+        new("go.upgrades", "Upgrades of the cluster and applications", () => ShowRoot(_views.Upgrades(_session.Context.Name)))
         {
             Group = PagesGroup, Commands = ["upgrades", "updates", "up"],
         },
@@ -229,12 +258,13 @@ internal sealed class Shell : IActionHost
         new("last", "Last row", () => Forward(Key.End)) { Group = Movement, Keys = ["G"], ShowInPalette = false },
     ];
 
-    private IEnumerable<string> Arguments(AppAction action, string typed) => action.Id switch
+    internal IEnumerable<string> Arguments(AppAction action, string typed) => action.Id switch
     {
         "go.contexts" => _store.Contexts.Select(context => context.Name),
         "go.events" => ["30m", "1h", "6h", "24h", "48h"],
         "refresh" => ["2s", "5s", "10s", "30s", "1m", "off"],
         "group" => Current is { } page ? page.Columns : [],
+        "provision" or Views.UploadActionId => PathCompletion.Complete(typed),
         _ => [],
     };
 
@@ -422,6 +452,7 @@ internal sealed class Shell : IActionHost
         var session = _session;
         var title = Titled(operation, options);
         var task = _activity.Start(session.Context.Name, title);
+        operation.Progress?.Attach(state => task.Report(state.Fraction, state.Detail));
         _ = Task.Run(async () =>
         {
             var requested = DateTimeOffset.UtcNow;
@@ -619,7 +650,11 @@ internal sealed class Shell : IActionHost
         _line.Ask(label, initial, validate, text => submit(text.Trim()));
     }
 
-    public void Edit(string title, Func<CancellationToken, Task<IReadOnlyList<FormField>>> load, Func<IReadOnlyList<FormField>, Operation> review)
+    public void Edit(
+        string title,
+        Func<CancellationToken, Task<IReadOnlyList<FormField>>> load,
+        Func<IReadOnlyList<FormField>, Operation> review,
+        bool unchanged = false)
     {
         if (_batch is not null)
         {
@@ -648,7 +683,7 @@ internal sealed class Shell : IActionHost
                     }
                     if (_app.TopOverlay is null)
                     {
-                        ShowForm(title, fields, review);
+                        ShowForm(title, fields, review, unchanged);
                     }
                 });
             }
@@ -659,22 +694,163 @@ internal sealed class Shell : IActionHost
         });
     }
 
-    /// <summary>The form, then its review: the confirmation lists what changed, and no goes back to the form.</summary>
-    private void ShowForm(string title, IReadOnlyList<FormField> fields, Func<IReadOnlyList<FormField>, Operation> review) =>
-        FormDialog.Show(_app, $" {title} ", fields, _ =>
+    /// <summary>
+    /// The form, then its review: the confirmation lists what changed, and no goes back to the form. A review that
+    /// refuses what was typed says why and opens the form again, as it was.
+    /// </summary>
+    private void ShowForm(string title, IReadOnlyList<FormField> fields, Func<IReadOnlyList<FormField>, Operation> review, bool unchanged)
+    {
+        var dialog = FormDialog.Show(_app, $" {title} ", fields, _ =>
         {
             Operation operation;
             try
             {
                 operation = review(fields);
             }
-            catch (Exception ex) when (ex is FormatException or InvalidOperationException or ArgumentException)
+            catch (Exception ex) when (ex is RefusedException or FormatException or InvalidOperationException or ArgumentException)
             {
                 Error($"{title}: {ex.Message}");
+                ShowForm(title, fields, review, unchanged);
                 return;
             }
-            Confirm(operation, back: () => ShowForm(title, fields, review));
+            Confirm(operation, back: () => ShowForm(title, fields, review, unchanged));
         }, width: Math.Min(_app.Size.Width - 4, Math.Max(60, _app.Size.Width * 60 / 100)));
+        dialog.Form.AllowEmptySubmit = unchanged;
+    }
+
+    public void Load<T>(string title, Func<CancellationToken, Task<T>> load, Action<T> then)
+    {
+        if (_batch is not null)
+        {
+            _batchRefused = true;
+            return;
+        }
+
+        var loading = StyledText.Of(title + "…");
+        Status.Show(loading, StatusLevel.Info, Timeout.InfiniteTimeSpan);
+        var session = _session;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var value = await load(CancellationToken.None);
+                Post(() =>
+                {
+                    if (ReferenceEquals(Status.Message?.Text, loading))
+                    {
+                        Status.Dismiss();
+                    }
+                    if (session == _session)
+                    {
+                        then(value);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Post(() => Error($"{title}: {ex.GetBaseException().Message}"));
+            }
+        });
+    }
+
+    public void Open(string title, Func<CancellationToken, Task<IReadOnlyList<IResourceView>>> load, bool replace = false) =>
+        Load(title, load, pages =>
+        {
+            if (pages.Count == 0)
+            {
+                return;
+            }
+            if (replace)
+            {
+                ShowRoot(pages[0]);
+            }
+            foreach (var page in pages.Skip(replace ? 1 : 0))
+            {
+                Push(page);
+            }
+        });
+
+    public void Command(string text) => _line.Open(_commands, text);
+
+    /// <summary>
+    /// <c>ctrl+f</c>: a search over every node, application and service, by name, type or address, as it's typed;
+    /// a partition id finds the partition. The chosen one opens where it sits: applications › services › partitions.
+    /// </summary>
+    private void Find(string? text)
+    {
+        var views = _views;
+        var index = SearchIndex();
+        SearchPicker? picker = null;
+        picker = new SearchPicker(query => views.SearchChoices(index.IsCompletedSuccessfully ? index.Result : null, query), text ?? "")
+        {
+            Loading = () => !index.IsCompleted,
+        };
+        if (!index.IsCompleted)
+        {
+            _ = index.ContinueWith(_ => Post(() => picker.Refresh()), TaskScheduler.Default);
+        }
+
+        var overlay = new Overlay(picker)
+        {
+            Placement = OverlayPlacement.Top,
+            WidthPercent = 70,
+            Height = Math.Max(8, Math.Min(24, _app.Size.Height - 4)),
+            Margin = 3,
+            Modal = true,
+            ScrimOpacity = 0.4,
+        };
+        picker.OnClose = () => _app.RemoveOverlay(overlay);
+        _app.PushOverlay(overlay);
+    }
+
+    /// <summary>Every node, application and service, kept for a little while so searching again is instant.</summary>
+    private Task<IReadOnlyList<SearchHit>> SearchIndex()
+    {
+        if (_searchIndex is { } cached && cached.Session == _session && DateTime.UtcNow - cached.At < SearchIndexFor && !cached.Index.IsFaulted)
+        {
+            return cached.Index;
+        }
+
+        var session = _session;
+        var index = _views.Overview.GetSearchIndexAsync(CancellationToken.None);
+        _searchIndex = (session, DateTime.UtcNow, index);
+        _ = index.ContinueWith(t => Post(() => Error($"find: {t.Exception!.GetBaseException().Message}")),
+            CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+        return index;
+    }
+
+    /// <summary><c>!</c>: the last error, whole, however long; the status line only has room for its start.</summary>
+    private void ShowLastError()
+    {
+        if (_lastError is not { } error)
+        {
+            Info("no errors so far");
+            return;
+        }
+
+        var viewer = new TextViewer($"{error.At:HH:mm:ss}\n\n{error.Text}") { Wrap = true, SearchPrompt = false };
+        var panel = new Panel(viewer, " last error · esc closes ") { BorderStyle = BorderStyle.Rounded };
+        var width = Math.Max(40, _app.Size.Width * 70 / 100);
+        var lines = error.Text.Split('\n').Sum(line => Math.Max(1, (line.Length + width - 5) / Math.Max(1, width - 4))) + 2;
+        _app.PushOverlay(new Overlay(panel)
+        {
+            Width = width,
+            Height = Math.Min(lines + 2, Math.Max(5, _app.Size.Height - 4)),
+            Modal = true,
+            ScrimOpacity = 0.4,
+        });
+    }
+
+    /// <summary><c>:provision path</c>: uploads and provisions a package from this machine; without a path, asks for one.</summary>
+    private void Provision(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            Command("provision ");
+            return;
+        }
+        _views.ProvisionLocal(path);
+    }
 
     private void Copy()
     {
@@ -772,6 +948,8 @@ internal sealed class Shell : IActionHost
                     _session = session;
                     _power = session.Context.Power;
                     _views = new Views(session.Queries, this);
+                    _summary.Content = StyledText.Empty();
+                    _summaryAt = default;
                     _store.Active = context.Name;
                     _store.Save();
                     ShowRoot(_views.Nodes());
@@ -812,6 +990,7 @@ internal sealed class Shell : IActionHost
 
         var loading = _loading = new CancellationTokenSource();
         UpdateStatus();
+        RefreshSummary();
 
         _ = Task.Run(async () =>
         {
@@ -851,6 +1030,40 @@ internal sealed class Shell : IActionHost
                     }
                 });
             }
+        });
+    }
+
+    /// <summary>The summary line: asked again with the page, but not more often than every few seconds.</summary>
+    private void RefreshSummary()
+    {
+        if (_summaryLoading || DateTime.UtcNow - _summaryAt < SummaryEvery)
+        {
+            return;
+        }
+
+        _summaryLoading = true;
+        _summaryAt = DateTime.UtcNow;
+        var session = _session;
+        var views = _views;
+        _ = Task.Run(async () =>
+        {
+            StyledText text;
+            try
+            {
+                text = Views.SummaryLine(await views.Overview.GetSummaryAsync(CancellationToken.None));
+            }
+            catch (Exception ex)
+            {
+                text = Styles.Muted($" summary unavailable: {ex.GetBaseException().Message}");
+            }
+            Post(() =>
+            {
+                _summaryLoading = false;
+                if (session == _session)
+                {
+                    _summary.Content = text;
+                }
+            });
         });
     }
 
@@ -927,10 +1140,11 @@ internal sealed class Shell : IActionHost
 
     private void Info(string text) => Status.Show(StyledText.Of(text), StatusLevel.Info);
 
-    private void Warn(string text) => Status.Show(StyledText.Of(text), StatusLevel.Warning);
+    public void Warn(string text) => Status.Show(StyledText.Of(text), StatusLevel.Warning);
 
     private StyledText Error(string text)
     {
+        _lastError = (DateTime.Now, text);
         var message = StyledText.Of(text);
         Status.ShowError(message);
         return message;

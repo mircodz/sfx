@@ -9,6 +9,7 @@ public sealed record UpgradeDomainRow(string Name, string State);
 public sealed record UpgradingNodeRow(string Node, string Phase, IReadOnlyList<string> PendingSafetyChecks, string Duration);
 
 /// <summary>An application or cluster upgrade, in the same shape for both.</summary>
+/// <param name="OnFailure">A monitored upgrade's failure action (Rollback or Manual); empty when it doesn't say.</param>
 public sealed record UpgradeReport(
     string State,
     string Mode,
@@ -22,7 +23,8 @@ public sealed record UpgradeReport(
     IReadOnlyList<UpgradeDomainRow> Domains,
     string CurrentDomain,
     IReadOnlyList<UpgradingNodeRow> CurrentNodes,
-    IReadOnlyList<HealthEvaluationRow> Evaluations)
+    IReadOnlyList<HealthEvaluationRow> Evaluations,
+    string OnFailure = "")
 {
     public bool InProgress => State is nameof(UpgradeState.RollingForwardInProgress)
         or nameof(UpgradeState.RollingBackInProgress)
@@ -41,7 +43,8 @@ public sealed record UpgradeReport(
         ToDomains(upgrade.UpgradeDomains),
         upgrade.CurrentUpgradeDomainProgress?.DomainName ?? "",
         ToNodes(upgrade.CurrentUpgradeDomainProgress?.NodeUpgradeProgressList),
-        HealthReport.Flatten(upgrade.UnhealthyEvaluations));
+        HealthReport.Flatten(upgrade.UnhealthyEvaluations),
+        Text(upgrade.UpgradeDescription?.MonitoringPolicy?.FailureAction));
 
     public static UpgradeReport From(ClusterUpgradeProgressObject upgrade) => new(
         Text(upgrade.UpgradeState),
@@ -56,7 +59,8 @@ public sealed record UpgradeReport(
         ToDomains(upgrade.UpgradeDomains),
         upgrade.CurrentUpgradeDomainProgress?.DomainName ?? "",
         ToNodes(upgrade.CurrentUpgradeDomainProgress?.NodeUpgradeProgressList),
-        HealthReport.Flatten(upgrade.UnhealthyEvaluations));
+        HealthReport.Flatten(upgrade.UnhealthyEvaluations),
+        Text(upgrade.UpgradeDescription?.MonitoringPolicy?.FailureAction));
 
     private static IReadOnlyList<UpgradeDomainRow> ToDomains(IEnumerable<UpgradeDomainInfo>? domains) =>
         (domains ?? []).Select(d => new UpgradeDomainRow(d.Name ?? "", Text(d.State))).ToList();

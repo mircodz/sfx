@@ -41,6 +41,11 @@ public interface IResourceView
     {
     }
 
+    /// <summary>Puts the cursor on the row with this key once the rows are next loaded, e.g. the one a search found.</summary>
+    void Select(string key)
+    {
+    }
+
     /// <summary>Fetches rows off the UI thread; the returned action shows them and must run on the UI thread.</summary>
     Task<Action> LoadAsync(CancellationToken cancellationToken);
 }
@@ -64,6 +69,7 @@ public sealed class ResourceView<T> : IResourceView
     private IActionHost? _host;
     private Func<T, IResourceView>? _describe;
     private string _filter = "";
+    private string? _select;
 
     public ResourceView(string kind, string crumb, Func<CancellationToken, Task<IReadOnlyList<T>>> load, Func<T, string> key)
     {
@@ -198,6 +204,19 @@ public sealed class ResourceView<T> : IResourceView
     /// <summary>What the table says when it has no rows, once loaded.</summary>
     public string Empty { get; init; } = "nothing here";
 
+    /// <summary>Said in the title after the row count once loaded, e.g. how much space is used; null for nothing.</summary>
+    public Func<string?>? Note { get; init; }
+
+    /// <summary>Actions on the page rather than a row, e.g. creating something; they say when they're available.</summary>
+    public ResourceView<T> Offering(IEnumerable<AppAction> actions)
+    {
+        _actions.AddRange(actions);
+        _all = null;
+        return this;
+    }
+
+    public void Select(string key) => _select = key;
+
     /// <summary>Lets <c>d</c> describe the selected row; Enter does too when the row has nothing to drill into.</summary>
     public ResourceView<T> Describing(Func<T, IResourceView> describe)
     {
@@ -226,6 +245,11 @@ public sealed class ResourceView<T> : IResourceView
         {
             Table.EmptyText = Styles.Muted(Empty);
             Table.SetRows(rows);
+            if (_select is { } key && rows.FirstOrDefault(row => Equals(Table.RowKey?.Invoke(row), key)) is { } found)
+            {
+                Table.SelectRow(found);
+            }
+            _select = null;
             UpdateTitle();
         };
     }
@@ -270,6 +294,7 @@ public sealed class ResourceView<T> : IResourceView
             + (Table.GroupColumn >= 0 && Table.GroupColumn < Table.Columns.Count ? $" · by {Table.Columns[Table.GroupColumn].Header.ToLowerInvariant()}" : "")
             + (marked > 0 ? $" · {marked} marked" : "")
             + (_filter.Length > 0 ? $" /{_filter}" : "")
+            + (Note?.Invoke() is { Length: > 0 } note ? $" · {note}" : "")
             + " ";
     }
 }

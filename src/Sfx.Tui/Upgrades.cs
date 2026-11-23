@@ -13,10 +13,12 @@ public sealed partial class Views
     private UpgradeQueries UpgradeQueries => _upgrades ??= new UpgradeQueries(queries);
 
     /// <summary>The cluster's upgrade and every application's, running ones first.</summary>
-    public IResourceView Upgrades() =>
+    /// <param name="clusterName">The context's name, which confirming a cluster upgrade asks to type.</param>
+    public IResourceView Upgrades(string clusterName = "cluster") =>
         new ResourceView<UpgradeRow>("upgrades", "upgrades", UpgradeQueries.GetUpgradesAsync, u => u.Kind + u.Name) { Empty = "no upgrades" }
             .HighlightingChanges()
-            .Describing(DescribeUpgrade)
+            .Describing(u => DescribeUpgrade(u, clusterName))
+            .Acting(UpgradeRowActions(clusterName), host)
             .Column("NAME", Constraint.Fill(2), u => Plain(u.Name), u => u.Name)
             .Column("KIND", Constraint.Length(11), u => Plain(u.Kind), u => u.Kind)
             .Column("VERSION", Constraint.Fill(2), u => Plain(u.From.Length > 0 ? $"{u.From} → {u.Report.Target}" : u.Report.Target), u => u.Report.Target)
@@ -35,7 +37,7 @@ public sealed partial class Views
             ? Colored("finishing", Cellar.Theming.Theme.Current.Warning)
             : UpgradeState(upgrade.Report.State);
 
-    public IResourceView DescribeUpgrade(UpgradeRow upgrade) =>
+    public IResourceView DescribeUpgrade(UpgradeRow upgrade, string clusterName = "cluster") =>
         new DescribeView("upgrade", upgrade.Name,
         [
             Tab("Progress", async ct => Lines.Upgrade(upgrade.ApplicationId is { } id
@@ -44,5 +46,5 @@ public sealed partial class Views
             Tab("Raw", async ct => Lines.Json(upgrade.ApplicationId is { } id
                 ? await _inspect.GetApplicationUpgradeAsync(id, ct)
                 : await _inspect.GetClusterUpgradeAsync(ct))),
-        ]);
+        ], actions: Bind(UpgradeRowActions(clusterName), upgrade, "Upgrade"));
 }

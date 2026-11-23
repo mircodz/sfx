@@ -26,6 +26,7 @@ public static class SfxHost
         ContextStore store;
         ClusterContext context;
         bool ui;
+        AnsiTerminal? terminal = null;
         try
         {
             options = CommandLine.Parse(args, flags);
@@ -53,12 +54,31 @@ public static class SfxHost
                 options = options with { Arguments = options.Arguments.Skip(1).ToList() };
             }
 
+            if (NeedsPick(options, store) && !Console.IsInputRedirected && !Console.IsOutputRedirected)
+            {
+                terminal = new AnsiTerminal();
+                if (await ContextPicker.PickAsync(terminal, store) is not { } picked)
+                {
+                    terminal.Dispose();
+                    return 0;
+                }
+                store.Active = picked.Name;
+                store.Save();
+            }
+
             context = SelectContext(options, store);
             connector.Resolve(context);
         }
         catch (Exception ex) when (ex is UsageException or AuthConfigurationException)
         {
+            terminal?.Dispose();
             return UsageError(ex.Message, connector.Providers);
+        }
+
+        if (ui)
+        {
+            terminal?.Dispose();
+            terminal = null;
         }
 
         // Auth messages (e.g. device codes) go to the console until the UI is up, then to its status line.
@@ -76,10 +96,12 @@ public static class SfxHost
         }
         catch (Exception ex) when (ex is AuthConfigurationException or FormatException)
         {
+            terminal?.Dispose();
             return UsageError(ex.Message, connector.Providers);
         }
         catch (Exception ex)
         {
+            terminal?.Dispose();
             Console.Error.WriteLine($"sfx: could not connect to {context.Name}: {ex.GetBaseException().Message}");
             return 1;
         }
@@ -91,8 +113,8 @@ public static class SfxHost
             return await WebServer.RunAsync(new UiHost(session, store, connector, log, Version), web, CancellationToken.None);
         }
 
-        using var terminal = new AnsiTerminal();
-        using var app = new App(terminal);
+        using var screen = terminal ?? new AnsiTerminal();
+        using var app = new App(screen);
         var shell = new Shell(app, session, connector, store, options.RefreshInterval);
         notify = shell.NotifyAsync;
         await app.RunAsync(CancellationToken.None);
@@ -107,6 +129,11 @@ public static class SfxHost
     public static string Version =>
         (typeof(SfxHost).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0")
             .Split('+')[0];
+
+    /// <summary>Whether to ask which context to open: none given, none active, and some saved.</summary>
+    internal static bool NeedsPick(CommandLineOptions options, ContextStore store) =>
+        options.Arguments is [] && options.Context is null && store.Active is null && store.Contexts.Count > 0
+        && options.AuthMethods.Count == 0 && !options.AuthOptions.Keys.Any();
 
     /// <summary>An endpoint on the command line, else <c>-c</c>, else the active saved context.</summary>
     internal static ClusterContext SelectContext(CommandLineOptions options, ContextStore store)

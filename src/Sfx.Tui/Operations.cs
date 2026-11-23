@@ -60,6 +60,32 @@ public sealed record Operation(
 
     /// <summary>How long <see cref="Track"/> keeps asking before it leaves the change to the cluster.</summary>
     public TimeSpan TrackFor { get; init; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>Where <see cref="Run"/> says how far it has got, e.g. an upload; the activity strip shows it.</summary>
+    public OperationProgress? Progress { get; init; }
+}
+
+/// <summary>
+/// How far a long request has got while it runs (an upload, say), before the cluster has accepted it. Created before
+/// the operation so its <see cref="Operation.Run"/> can report to it; the screen shows the reports.
+/// </summary>
+public sealed class OperationProgress : IProgress<OperationState>
+{
+    private Action<OperationState>? _listener;
+
+    /// <summary>The last report, if any.</summary>
+    public OperationState? Last { get; private set; }
+
+    public void Report(OperationState value)
+    {
+        Last = value;
+        _listener?.Invoke(value);
+    }
+
+    public void Report(double? fraction, string detail) => Report(OperationState.Running(detail, fraction));
+
+    /// <summary>Sends every report to <paramref name="listener"/> from now on.</summary>
+    public void Attach(Action<OperationState> listener) => _listener = listener;
 }
 
 /// <summary>One entry of a pick list.</summary>
@@ -90,9 +116,31 @@ public interface IActionHost
 
     /// <summary>
     /// Loads a form's fields off the UI thread and shows them; once submitted, <paramref name="review"/> turns the
-    /// edited fields into the operation to confirm. Going back from the confirmation returns to the form.
+    /// edited fields into the operation to confirm. Going back from the confirmation returns to the form, and so does
+    /// a review that refuses what was typed (it says why).
     /// </summary>
-    void Edit(string title, Func<CancellationToken, Task<IReadOnlyList<FormField>>> load, Func<IReadOnlyList<FormField>, Operation> review);
+    /// <param name="unchanged">Whether the form may be submitted as it opened, e.g. one creating something with defaults.</param>
+    void Edit(
+        string title,
+        Func<CancellationToken, Task<IReadOnlyList<FormField>>> load,
+        Func<IReadOnlyList<FormField>, Operation> review,
+        bool unchanged = false);
+
+    /// <summary>Loads something off the UI thread (saying <paramref name="title"/> meanwhile), then hands it to
+    /// <paramref name="then"/> on the UI thread; a failure is shown as an error instead.</summary>
+    void Load<T>(string title, Func<CancellationToken, Task<T>> load, Action<T> then);
+
+    /// <summary>
+    /// Shows the pages <paramref name="load"/> returns, the first one at the bottom: with <paramref name="replace"/>,
+    /// instead of the pages shown now (the first is a root page, e.g. the applications); otherwise on top of them.
+    /// </summary>
+    void Open(string title, Func<CancellationToken, Task<IReadOnlyList<IResourceView>>> load, bool replace = false);
+
+    /// <summary>Says something in the footer, e.g. why an action can't run here.</summary>
+    void Warn(string message);
+
+    /// <summary>Opens the <c>:</c> prompt with <paramref name="text"/> typed, e.g. a command that takes a path.</summary>
+    void Command(string text);
 
     /// <summary>Whether actions of this risk are offered: read-only contexts allow none that change the cluster,
     /// and power actions wait for <c>:power</c>.</summary>

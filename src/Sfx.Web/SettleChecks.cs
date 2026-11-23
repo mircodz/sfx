@@ -96,6 +96,73 @@ internal static class SettleChecks
         _ => (Running, currentDomain.Length > 0 ? $"Rolling back, UD {currentDomain}." : "Rolling back."),
     };
 
+    /// <summary>How long a provisioned type may take to be listed at all before the provisioning counts as lost.</summary>
+    public static readonly TimeSpan ListingWait = TimeSpan.FromMinutes(2);
+
+    /// <summary>A new application or service reached <paramref name="ready"/> (Ready, Active).</summary>
+    /// <param name="status">Its status now; null while the cluster doesn't list it.</param>
+    /// <param name="noun">"application" or "service".</param>
+    public static (string State, string? Detail) EntityStatus(string? status, string ready, string noun) => status switch
+    {
+        null or "" => (Running, $"Waiting for the {noun} to appear."),
+        _ when status == ready => (Done, $"{Capital(noun)} is {ready}."),
+        "Failed" => (Failed, $"{Capital(noun)} failed."),
+        _ => (Running, $"{Capital(noun)} is {status}."),
+    };
+
+    /// <summary>A type version provisioned: Available. <paramref name="row"/> is null while the cluster doesn't list it.</summary>
+    public static (string State, string? Detail) TypeProvisioned(Sfx.Core.ApplicationTypeRow? row, string name, string version, TimeSpan elapsed) => row?.Status switch
+    {
+        "Available" => (Done, $"{name} {version} is available."),
+        "Failed" => (Failed, row.StatusDetails is { Length: > 0 } details ? $"Provisioning failed: {details.TrimEnd('.')}." : "Provisioning failed."),
+        "Provisioning" => (Running, $"Provisioning {name} {version}."),
+        null when elapsed >= ListingWait => (Failed, $"The cluster never listed {name} {version}; check the package's manifests."),
+        null => (Running, $"Waiting for the cluster to list {name} {version}."),
+        var other => (Running, $"{name} {version} is {other}."),
+    };
+
+    /// <summary>
+    /// A package provisioned whose type and version weren't known up front: judged by the type versions the cluster
+    /// lists now that it didn't before.
+    /// </summary>
+    public static (string State, string? Detail) NewTypeProvisioned(
+        IReadOnlySet<(string Name, string Version)> before, IReadOnlyList<Sfx.Core.ApplicationTypeRow> now, TimeSpan elapsed)
+    {
+        var added = now.Where(t => !before.Contains((t.Name, t.Version))).ToList();
+        if (added.FirstOrDefault(t => t.Status == "Provisioning") is { } provisioning)
+        {
+            return TypeProvisioned(provisioning, provisioning.Name, provisioning.Version, elapsed);
+        }
+        if (added.FirstOrDefault(t => t.Status == "Failed") is { } failed)
+        {
+            return TypeProvisioned(failed, failed.Name, failed.Version, elapsed);
+        }
+        if (added.FirstOrDefault(t => t.Status == "Available") is { } available)
+        {
+            return TypeProvisioned(available, available.Name, available.Version, elapsed);
+        }
+        return elapsed >= ListingWait
+            ? (Failed, "The cluster never listed a new application type; check the package's manifests.")
+            : (Running, "Waiting for the cluster to list the application type.");
+    }
+
+    /// <summary>A type version unprovisioned: no longer listed.</summary>
+    public static (string State, string? Detail) TypeUnprovisioned(Sfx.Core.ApplicationTypeRow? row) => row?.Status switch
+    {
+        null => (Done, "Unprovisioned."),
+        "Failed" => (Failed, row.StatusDetails is { Length: > 0 } details ? $"Failed: {details.TrimEnd('.')}." : "Failed."),
+        var status => (Running, $"{status}."),
+    };
+
+    /// <summary>A running upgrade switched to the plan <paramref name="wanted"/>.</summary>
+    /// <param name="current">The plan it follows now, by id; null when it doesn't say.</param>
+    public static (string State, string? Detail) PlanSwitched(string? current, Sfx.Core.UpgradePlan wanted, bool inProgress) =>
+        current == wanted.Id ? (Done, $"Now {wanted.Title.ToLowerInvariant()}.")
+        : !inProgress ? (Done, "The upgrade is no longer running.")
+        : (Running, "Waiting for the upgrade to switch.");
+
+    private static string Capital(string noun) => noun.Length == 0 ? noun : char.ToUpperInvariant(noun[0]) + noun[1..];
+
     private static string Reason(string what, string failureReason) =>
         failureReason is { Length: > 0 } and not "None" ? $"{what}: {failureReason}." : $"{what}.";
 }

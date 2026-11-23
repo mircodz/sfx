@@ -25,7 +25,7 @@ internal static class Api
         });
         api.MapPost("/contexts/dismiss", () => host.Dismiss());
 
-        api.MapGet("/session", async (UiSession s, CancellationToken ct) => SessionInfo(s, await s.GetSystemServicesAsync(ct)));
+        api.MapGet("/session", (UiSession s, CancellationToken ct) => SessionInfoAsync(s, ct));
 
         api.MapPost("/session/power", async (UiSession s, PowerRequest request, CancellationToken ct) =>
         {
@@ -34,7 +34,7 @@ internal static class Api
                 throw new ActionException("This context is read-only.", StatusCodes.Status403Forbidden);
             }
             s.Power = request.On;
-            return SessionInfo(s, await s.GetSystemServicesAsync(ct));
+            return await SessionInfoAsync(s, ct);
         });
 
         api.MapGet("/cluster", async (UiSession s, CancellationToken ct) =>
@@ -95,6 +95,8 @@ internal static class Api
             var upgrade = s.Inspector.GetApplicationUpgradeAsync(appId, ct);
             var manifest = s.Inspector.GetApplicationManifestAsync(info.TypeName, info.TypeVersion, ct);
             var defaultServicesUpgrade = s.DefaultServicesUpgradeEnabledAsync(ct);
+            // Only for the create-service form, so a read-only session doesn't ask.
+            var serviceTypes = s.ReadOnly ? Task.FromResult("") : ServiceTypesTargetAsync(s, info.TypeName, info.TypeVersion, ct);
 
             var current = info.Parameters ?? new Dictionary<string, string>();
             var types = await versions;
@@ -112,6 +114,7 @@ internal static class Api
             var target = new Dictionary<string, string>
             {
                 ["applicationId"] = row.Id, ["name"] = row.Name, ["typeName"] = row.TypeName, ["version"] = row.TypeVersion,
+                ["serviceTypes"] = await serviceTypes,
             };
             return new ApplicationDetailDto(
                 Dto.Application(row),
@@ -143,21 +146,10 @@ internal static class Api
             var partitions = s.Queries.GetPartitionsAsync(serviceId, ct);
 
             var d = await description;
-            var (count, min) = d switch
-            {
-                StatefulServiceDescription f => (f.TargetReplicaSetSize?.ToString(CultureInfo.InvariantCulture), f.MinReplicaSetSize?.ToString(CultureInfo.InvariantCulture)),
-                StatelessServiceDescription l => (l.InstanceCount?.ToString(CultureInfo.InvariantCulture), null),
-                _ => (null, null),
-            };
-            var target = new Dictionary<string, string>
-            {
-                ["serviceId"] = service.Id, ["applicationId"] = appId, ["name"] = service.Name, ["kind"] = service.Kind,
-                ["count"] = count ?? "", ["min"] = min ?? "",
-            };
             return new ServiceDetailDto(
                 service, appId, Dto.Health(await health), Describe(d),
                 (await partitions).Select(Dto.Partition).ToList(),
-                WebActions.For(s, "service", target));
+                WebActions.For(s, "service", ServiceTarget(service, appId, d)));
         });
 
         api.MapGet("/applications/{appId}/services/{serviceId}/manifest", async (UiSession s, string appId, string serviceId, CancellationToken ct) =>
@@ -254,13 +246,20 @@ internal static class Api
         ApiRepairs.Map(api);
         ApiLoad.Map(api);
         ApiOverview.Map(api);
+        ApiLifecycle.Map(api);
+        ApiSearch.Map(api);
+        ApiImageStore.Map(api);
     }
 
     public sealed record PowerRequest(bool On);
 
-    private static SessionDto SessionInfo(UiSession s, SystemServices services) =>
-        new(s.Context.Name, s.Cluster.Endpoint.ToString(), s.ReadOnly, s.Power, s.Version, services.EventStore, s.Context.Folder, s.Label, s.Color,
-            services.RepairManager, services.FaultAnalysis);
+    private static async Task<SessionDto> SessionInfoAsync(UiSession s, CancellationToken ct)
+    {
+        var imageStore = s.ImageStoreBrowsableAsync(ct);
+        var services = await s.GetSystemServicesAsync(ct);
+        return new(s.Context.Name, s.Cluster.Endpoint.ToString(), s.ReadOnly, s.Power, s.Version, services.EventStore, s.Context.Folder, s.Label, s.Color,
+            services.RepairManager, services.FaultAnalysis, await imageStore);
+    }
 
     /// <summary>
     /// The replicas on a node, system services' included (as application "fabric:/System", which the node's application
@@ -303,15 +302,44 @@ internal static class Api
         n.Uptime is { } up ? (long)up.TotalSeconds : null,
         WebActions.For(s, "node", new Dictionary<string, string> { ["node"] = n.Name, ["status"] = n.Status }));
 
-    private static ServiceDto Service(ServiceInfo s) => new(
+    internal static ServiceDto Service(ServiceInfo s) => new(
         s.Id, s.Name.ToString(), s.TypeName ?? "", s.ServiceKind.ToString() ?? "", s.ServiceStatus?.ToString() ?? "", Dto.Health(s.HealthState));
 
     internal static IReadOnlyList<ActionDto> UpgradeActions(UiSession s, UpgradeRow u) =>
         WebActions.For(s, "upgrade", new Dictionary<string, string>
         {
             ["kind"] = u.Kind, ["applicationId"] = u.ApplicationId ?? "", ["name"] = u.Name, ["state"] = u.Report.State,
-            ["nextDomain"] = u.Report.NextDomain,
+            ["nextDomain"] = u.Report.NextDomain, ["plan"] = LifecycleActions.PlanOf(u.Report)?.Id ?? "",
         });
+
+    /// <summary>The target of a service's actions, with its counts from its description.</summary>
+    internal static Dictionary<string, string> ServiceTarget(ServiceDto service, string appId, ServiceDescription d)
+    {
+        var (count, min) = d switch
+        {
+            StatefulServiceDescription f => (f.TargetReplicaSetSize?.ToString(CultureInfo.InvariantCulture), f.MinReplicaSetSize?.ToString(CultureInfo.InvariantCulture)),
+            StatelessServiceDescription l => (l.InstanceCount?.ToString(CultureInfo.InvariantCulture), null),
+            _ => (null, null),
+        };
+        return new Dictionary<string, string>
+        {
+            ["serviceId"] = service.Id, ["applicationId"] = appId, ["name"] = service.Name, ["kind"] = service.Kind,
+            ["count"] = count ?? "", ["min"] = min ?? "",
+        };
+    }
+
+    /// <summary>The service types an application's version provides, for its create-service action; none when they can't be read.</summary>
+    private static async Task<string> ServiceTypesTargetAsync(UiSession s, string typeName, string typeVersion, CancellationToken ct)
+    {
+        try
+        {
+            return LifecycleActions.ServiceTypesTarget(await s.Queries.GetServiceTypesAsync(typeName, typeVersion, ct));
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            return "";
+        }
+    }
 
     private static IReadOnlyList<FieldDto> Describe(ServiceDescription d)
     {

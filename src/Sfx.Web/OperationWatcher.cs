@@ -65,6 +65,31 @@ internal static class OperationWatcher
             return SettleChecks.RollbackOutcome(report.State, report.FailureReason, report.CurrentDomain);
         },
 
+        "change-upgrade-plan" => async ct =>
+        {
+            var report = await UpgradeAsync(s, target, ct);
+            return SettleChecks.PlanSwitched(LifecycleActions.PlanOf(report)?.Id, UpgradePlan.Find(inputs["plan"]), report.InProgress);
+        },
+
+        "create-application" => async ct =>
+        {
+            var id = ClusterInspector.IdOf(LifecycleActions.ApplicationName(inputs["name"]));
+            return SettleChecks.EntityStatus((await s.Queries.GetApplicationAsync(id, ct))?.Status, nameof(ApplicationStatus.Ready), "application");
+        },
+
+        "create-service" => async ct =>
+        {
+            var serviceId = ClusterInspector.IdOf(LifecycleActions.ServiceName(target["name"], inputs["name"]));
+            return SettleChecks.EntityStatus(
+                (await s.Queries.GetServiceAsync(target["applicationId"], serviceId, ct))?.Status, nameof(ServiceStatus.Active), "service");
+        },
+
+        "unprovision-type" => async ct => SettleChecks.TypeUnprovisioned(
+            (await s.Queries.GetApplicationTypesAsync(ct)).FirstOrDefault(t => t.Name == target["typeName"] && t.Version == target["version"])),
+
+        // A new count is followed like a scale; other settings take effect once accepted.
+        "edit-service-settings" when inputs.Optional("count") is not null => ScaleProbe(s, target, inputs),
+
         _ => null,
     };
 
