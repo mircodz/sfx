@@ -7,7 +7,7 @@ import "./Overlay.css";
  * A modal <dialog>: focus stays inside, Esc and the backdrop close it. `onCancel` lets the owner veto closing
  * (e.g. to ask about unsaved edits); without it, closing just closes.
  */
-function useModal(onClose: () => void, onCancel?: () => boolean) {
+export function useModal(onClose: () => void, onCancel?: () => boolean) {
     const ref = useRef<HTMLDialogElement>(null);
     useEffect(() => {
         ref.current?.showModal();

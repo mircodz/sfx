@@ -223,6 +223,10 @@ Sidebar
 232px wide, full height, sticky; hairline right border, --surface-1.
 Top to bottom: "sfx" in Cascadia Code's cursive italic (the one flourish); the context block (folder path in 11px secondary, the context name in 500 with its folder label pill; links to the Contexts page, also "c"); the pages, each an 18px Tabler icon and a 13px label, 34px tall, the current one with the ghost background and 500; at the bottom, after a hairline, the power toggle (amber pair while on, or a Read-only row), the theme button, and the version in muted 11px.
 A running-operations count sits on Activity as a small accent badge.
+Under the context block, "Find" with its shortcut (⌘K, or ctrl+K) in a hairline kbd on the right.
+
+Find
+A dialog near the top of the window (640px, 12vh down): one input, then up to 20 results as 40px rows (Tabler icon, name in 500, type or address under it, the kind on the right), the active one on the ghost fill. Arrows move, Enter opens the entity at its place under its application and service, Esc closes. A pasted partition id finds the partition. ctrl+F stays the browser's own find.
 Under 1100px the sidebar collapses to 60px of icons with tooltips; under 640px it becomes a scrolling strip across the top.
 
 Page
@@ -345,6 +349,10 @@ In the review step: one row per change. Name (mono, 12px), then old value (secon
 13.6 Page templates
 
 List page: page header (no breadcrumb), metric cards when they help, list toolbar, grouped rows.
+Types page: types as group headings, one disclosure row per version (status, applications using it, parameters); opened, it lists the applications as links, the service types and the default parameters, with create application and unprovision. "Provision a package" (primary) opens a side panel to pick a folder or an .sfpkg/.zip, reads the manifest's type and version before uploading, and the upload's progress shows on Activity.
+
+Image store page: breadcrumbs down the path, the disk meter at the root, then folders (packages with their type, version and whether provisioned; Service Fabric's own folders marked and never deletable) and files, sizes on the right. Rows open folders; their actions sit beside the link, not in it.
+
 Detail page: page header with breadcrumb, actions and refresh; tabs. The Overview tab shows errors and warnings (collapsed), key facts (fields), load (meters), then children as link rows. Once the page is 960px wide (a container query), it splits: errors and warnings and the children on the left, facts and load in a 320px column on the right, one field per line. Narrower, the facts come first, in one column.
 Overview (the cluster's page): a dashboard. Metric cards across (nodes, applications, services, partitions, replicas, upgrades running), then a 12-column grid of cards: Health (a stacked health bar per entity kind, then errors and warnings, collapsed) and Unhealthy (link rows with reasons); Nodes (a compact map by upgrade domain, with the cluster's node types, domains and seed nodes in a line under it) and Upgrades (running ones with their domain strips); Load (meters for metrics with a capacity), Recent changes (one line per change) and Events (only when the cluster has an event store). Every card's aside links to the page with the rest. The cluster manifest and cluster actions are on the cluster's tabs and menu, like any other entity.
 

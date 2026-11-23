@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { duration, lowerFirst, plural, shortName } from "../src/lib/format";
+import { bytes, duration, lowerFirst, plural, shortName } from "../src/lib/format";
 import { byHealth, isUnhealthy, matches, toneOf, worst } from "../src/lib/health";
 import { appIdOfService, idOf } from "../src/lib/router";
 import type { Upgrade } from "../src/lib/types";
@@ -103,5 +103,15 @@ describe("upgrades", () => {
     test("monitored modes", () => {
         expect(isMonitored("monitored-manual")).toBe(true);
         expect(isMonitored("unmonitored-auto")).toBe(false);
+    });
+});
+
+describe("bytes", () => {
+    test("reads like a file manager", () => {
+        expect(bytes(1)).toBe("1 byte");
+        expect(bytes(512)).toBe("512 bytes");
+        expect(bytes(1536)).toBe("1.5 KB");
+        expect(bytes(52 * 1024 * 1024)).toBe("52 MB");
+        expect(bytes(3 * 1024 ** 3)).toBe("3.0 GB");
     });
 });

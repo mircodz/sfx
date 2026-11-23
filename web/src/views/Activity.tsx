@@ -6,6 +6,7 @@ import { Load } from "../ui/Load";
 import { PageHeader } from "../ui/PageHeader";
 import { Empty, Section } from "../ui/Section";
 import { TimelineRow } from "../ui/Timeline";
+import { ProgressBar } from "../ui/Meter";
 
 export function Activity() {
     const activity = useResource("activity", api.activity);
@@ -24,7 +25,16 @@ export function Activity() {
                                     time={when(o.started)}
                                     title={o.title}
                                     sub={o.finished ? `Took ${duration((new Date(o.finished).getTime() - new Date(o.started).getTime()) / 1000)}` : "Following it until the cluster is done"}
-                                    detail={o.detail}
+                                    detail={
+                                        o.state === "running" && o.progress != null ? (
+                                            <>
+                                                {o.detail}
+                                                <ProgressBar pct={Math.round(o.progress * 100)} label={`${o.title}: ${Math.round(o.progress * 100)}%`} />
+                                            </>
+                                        ) : (
+                                            o.detail
+                                        )
+                                    }
                                     detailTone={o.state === "failed" ? "danger" : undefined}
                                     status={o.state === "running" ? "In progress" : o.state === "done" ? "Done" : "Failed"}
                                 />

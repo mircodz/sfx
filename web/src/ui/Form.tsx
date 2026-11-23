@@ -46,7 +46,7 @@ export function ChoiceField<T extends string>({
     onChange,
 }: {
     label: string;
-    choices: { value: T; label: string; hint?: string }[];
+    choices: { value: T; label: string; hint?: string | null }[];
     value: T;
     onChange: (value: T) => void;
 }) {

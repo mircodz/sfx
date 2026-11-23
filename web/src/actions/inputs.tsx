@@ -16,6 +16,12 @@ export function ActionInputField({
     onChange: (value: string) => void;
 }) {
     switch (input.kind) {
+        case "text":
+            return (
+                <Field label={input.name.startsWith("param:") ? <span className="mono">{input.label}</span> : input.label}>
+                    {(id) => <input id={id} value={value} spellCheck={false} onChange={(e) => onChange(e.target.value)} />}
+                </Field>
+            );
         case "number":
             return <Field label={input.label}>{(id) => <input id={id} type="number" value={value} onChange={(e) => onChange(e.target.value)} />}</Field>;
         case "flag":
@@ -61,5 +67,5 @@ export function NodePicker({ label, exclude, value, onChange }: { label: string;
 }
 
 export function defaultInputs(inputs: ActionInput[]) {
-    return Object.fromEntries(inputs.filter((i) => i.default !== undefined).map((i) => [i.name, i.default!]));
+    return Object.fromEntries(inputs.filter((i) => i.default != null).map((i) => [i.name, i.default!]));
 }

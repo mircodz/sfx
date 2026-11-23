@@ -17,11 +17,14 @@ import { PartitionDetail } from "./views/PartitionDetail";
 import { Replicas } from "./views/Replicas";
 import { ServiceDetail } from "./views/ServiceDetail";
 import { Upgrades } from "./views/Upgrades";
+import { Types } from "./views/Types";
+import { ImageStore } from "./views/ImageStore";
 import { Contexts } from "./views/Contexts";
 import { SessionContext } from "./lib/session";
 import { OperationsContext, useOperationsPoll } from "./lib/operations";
 import "./views/views.css";
 import { Gallery } from "./gallery/Gallery";
+import { Find } from "./ui/Find";
 
 /** #/nodes/:name, #/apps/:app/services/:service/partitions/:partition and the top-level pages. */
 function Page({ path }: { path: string[] }) {
@@ -40,6 +43,10 @@ function Page({ path }: { path: string[] }) {
             return <Replicas />;
         case "upgrades":
             return <Upgrades />;
+        case "types":
+            return <Types />;
+        case "store":
+            return <ImageStore />;
         case "events":
             return <Events />;
         case "activity":
@@ -60,6 +67,7 @@ export function App() {
     const bump = useCallback(() => setGeneration((g) => g + 1), []);
     const refresh = useMemo(() => ({ generation, bump }), [generation, bump]);
     const [outcome, setOutcome] = useState<Outcome | null>(null);
+    const [finding, setFinding] = useState(false);
     const notify = useCallback((text: string, ok: boolean) => setOutcome({ text, ok }), []);
     // When a change actually finishes: say so, and load what's on screen again.
     const operations = useOperationsPoll(generation, (op) => {
@@ -78,8 +86,14 @@ export function App() {
     }, [generation, reloadSession]);
 
     // As in the terminal: "c" opens the contexts, "/" finds the page's filter box; not while typing or in a dialog.
+    // ⌘K or ctrl+K finds anything on the cluster, from anywhere (ctrl+F stays the browser's own find).
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
+            if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
+                e.preventDefault();
+                setFinding(true);
+                return;
+            }
             const el = e.target as HTMLElement;
             if (e.metaKey || e.ctrlKey || e.altKey || el.closest("input, textarea, select, [contenteditable], dialog")) return;
             if (e.key === "c" && !location.hash.startsWith("#/contexts")) {
@@ -109,7 +123,8 @@ export function App() {
             <OperationsContext.Provider value={operations}>
             <NoticeContext.Provider value={notify}>
                 <div className="app">
-                    <Sidebar session={session.data} current={path[0] ?? ""} onSessionChange={session.reload} />
+                    <Sidebar session={session.data} current={path[0] ?? ""} onSessionChange={session.reload} onFind={() => setFinding(true)} />
+                    {finding && session.data && <Find onClose={() => setFinding(false)} />}
                     <div className="main">
                         <div className="main-inner">
                             {outcome && (

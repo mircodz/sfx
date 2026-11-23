@@ -7,10 +7,14 @@ import { ApplicationEditor } from "./editors/ApplicationEditor";
 import { GenericEditor } from "./editors/GenericEditor";
 import { ScaleEditor } from "./editors/ScaleEditor";
 import { ClusterUpgradeEditor } from "./editors/ClusterUpgradeEditor";
+import { ServiceSettingsEditor } from "./editors/ServiceSettingsEditor";
+
+// The id the server gives the "edit settings" action (dotted like the others, or as first agreed).
+const settingsActions = new Set(["service.settings", "service.edit-settings", "edit-service-settings"]);
 import "./actions.css";
 
 /** What some editors need from the page they're opened on. */
-export type ActionContext = { application?: ApplicationDetail };
+export type ActionContext = { application?: ApplicationDetail; service?: { appId: string; serviceId: string } };
 
 /**
  * An entity's actions: the two most common as buttons, the rest (and everything destructive) in a "More actions"
@@ -41,5 +45,6 @@ function ActionView({ action, context, onClose }: { action: Action; context?: Ac
     if (action.id === "application.upgrade" && context?.application) return <ApplicationEditor action={action} app={context.application} onClose={onClose} />;
     if (action.id === "service.scale") return <ScaleEditor action={action} onClose={onClose} />;
     if (action.id === "cluster.upgrade") return <ClusterUpgradeEditor action={action} onClose={onClose} />;
+    if (settingsActions.has(action.id) && context?.service) return <ServiceSettingsEditor action={action} {...context.service} onClose={onClose} />;
     return <GenericEditor action={action} onClose={onClose} />;
 }

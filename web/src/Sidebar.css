@@ -257,3 +257,18 @@
         padding: 0 var(--space-4);
     }
 }
+
+/* Find sits between the context and the pages, with its shortcut on the right. */
+.sidebar-find {
+    margin-top: var(--space-1);
+}
+
+.sidebar-kbd {
+    margin-left: auto;
+    padding: 0 4px;
+    border: 0.5px solid var(--border);
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--text-muted);
+}

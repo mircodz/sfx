@@ -76,3 +76,15 @@ export function partitionKey(p: { scheme: string; lowKey?: string | null; highKe
     if (p.lowKey != null && p.highKey != null) return p.lowKey === p.highKey ? `key ${p.lowKey}` : `keys ${p.lowKey} to ${p.highKey}`;
     return p.scheme;
 }
+
+/** "12.4 MB": sizes in the units people read (1 KB = 1024 bytes, as the image store and file managers count). */
+export function bytes(n: number) {
+    const units = ["bytes", "KB", "MB", "GB", "TB"];
+    let i = 0;
+    let v = n;
+    while (v >= 1024 && i < units.length - 1) {
+        v /= 1024;
+        i++;
+    }
+    return i === 0 ? `${n.toLocaleString()} ${n === 1 ? "byte" : "bytes"}` : `${v < 10 ? v.toFixed(1) : Math.round(v).toLocaleString()} ${units[i]}`;
+}

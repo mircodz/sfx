@@ -17,6 +17,8 @@ export interface Session {
     repairManager: boolean;
     /** Whether it runs the Fault Analysis Service; the server only offers the actions that need it when it does. */
     faultAnalysis: boolean;
+    /** Whether the image store can be browsed. */
+    imageStore?: boolean;
     folder?: string;
     label?: string;
     color?: FolderColor;
@@ -79,15 +81,15 @@ export interface UpgradeDefaults {
 export interface ActionChoice {
     value: string;
     label: string;
-    hint?: string;
+    hint?: string | null;
 }
 
 export interface ActionInput {
     name: string;
     label: string;
-    kind: "number" | "choice" | "flag" | "node" | "version" | "parameters";
-    choices?: ActionChoice[];
-    default?: string;
+    kind: "number" | "choice" | "flag" | "node" | "version" | "parameters" | "text";
+    choices?: ActionChoice[] | null;
+    default?: string | null;
 }
 
 export interface Action {
@@ -347,6 +349,8 @@ export interface Operation {
     state: "running" | "done" | "failed";
     detail?: string;
     finished?: string;
+    /** 0 to 1 while a package uploads. */
+    progress?: number | null;
 }
 
 export interface ClusterUpgradeOptions {
@@ -427,4 +431,97 @@ export interface Overview {
     counts: HealthCount[];
     load: Omit<LoadMetric, "nodes">[];
     runningUpgrades: Upgrade[];
+}
+
+/** A search result, with the ids to open it at its place: node, application, service, partition. */
+export interface SearchHit {
+    kind: "node" | "application" | "service" | "partition";
+    title: string;
+    /** Its type, address or parent. */
+    sub?: string;
+    node?: string;
+    applicationId?: string;
+    serviceId?: string;
+    partitionId?: string;
+}
+
+/** A provisioned application type version, with what uses it and what can be done with it. */
+export interface ApplicationType {
+    name: string;
+    version: string;
+    status: string;
+    statusDetails?: string;
+    defaultParameters: Record<string, string>;
+    /** fabric:/ names of the applications of this type and version. */
+    applications: string[];
+    actions: Action[];
+}
+
+export interface ServiceType {
+    name: string;
+    stateful: boolean;
+    manifest: string;
+    manifestVersion: string;
+}
+
+export interface ServiceSettingInfo {
+    key: string;
+    title: string;
+    kind: "count" | "seconds" | "text" | "choice" | "flag";
+    /** "" when the cluster default applies. */
+    value: string;
+    choices?: string[] | null;
+    min?: number | null;
+    max?: number | null;
+}
+
+export interface ServiceSettingsInfo {
+    stateful: boolean;
+    settings: ServiceSettingInfo[];
+    /** Null where it can't be changed: a System service, or a read-only context. */
+    action: Action | null;
+}
+
+export interface StoreFolder {
+    path: string;
+    name: string;
+    fileCount?: number | null;
+    size?: number | null;
+    /** An application package: the type and version its manifest declares, where they can be told. */
+    package?: { typeName: string | null; typeVersion: string | null; provisioned: boolean; status: string | null } | null;
+    /** Service Fabric's own (Store, WindowsFabricStore): never deleted. */
+    reserved: boolean;
+    actions: Action[];
+}
+
+export interface StoreFile {
+    path: string;
+    name: string;
+    size?: number | null;
+    version?: string | null;
+    modified?: string | null;
+    actions: Action[];
+}
+
+export interface StoreListing {
+    path: string;
+    kind: "Native" | "FileShare" | "AzureBlob" | "Unknown";
+    /** Only at the root, and only on clusters that report it. */
+    usage?: StoreUsage | null;
+    folders: StoreFolder[];
+    files: StoreFile[];
+}
+
+export interface StoreUse {
+    bytes?: number | null;
+    files?: number | null;
+}
+
+export interface StoreUsage {
+    diskCapacity?: number | null;
+    diskAvailable?: number | null;
+    metadata?: StoreUse | null;
+    staging?: StoreUse | null;
+    copy?: StoreUse | null;
+    register?: StoreUse | null;
 }

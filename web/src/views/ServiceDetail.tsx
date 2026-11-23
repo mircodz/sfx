@@ -49,7 +49,7 @@ export function ServiceDetail({ appId, serviceId }: { appId: string; serviceId: 
                             status={s.health}
                             onRefresh={service.reload}
                             updated={service.at}
-                            actions={<ActionGroup actions={d.actions} label="Service actions" />}
+                            actions={<ActionGroup actions={d.actions} context={{ service: { appId, serviceId } }} label="Service actions" />}
                         />
                         <Tabs
                             value={tab}

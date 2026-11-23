@@ -75,6 +75,8 @@ export const href = {
         return q ? `#/replicas?${q}` : "#/replicas";
     },
     upgrades: "#/upgrades",
+    types: "#/types",
+    store: (path = "") => (path ? `#/store?path=${seg(path)}` : "#/store"),
     events: "#/events",
     activity: "#/activity",
     node: (name: string) => `#/nodes/${seg(name)}`,

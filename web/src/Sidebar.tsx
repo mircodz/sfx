@@ -14,8 +14,10 @@ const pages = [
     { path: "", label: "Overview", icon: "layout-dashboard" },
     { path: "nodes", label: "Nodes", icon: "server" },
     { path: "apps", label: "Applications", icon: "apps" },
+    { path: "types", label: "Types", icon: "package" },
     { path: "replicas", label: "Replicas", icon: "stack-2" },
     { path: "upgrades", label: "Upgrades", icon: "arrow-big-up-lines" },
+    { path: "store", label: "Image store", icon: "folders" },
     { path: "events", label: "Events", icon: "timeline-event" },
     { path: "activity", label: "Activity", icon: "history" },
 ];
@@ -24,7 +26,8 @@ const pages = [
  * The one navigation on every page: which cluster (and switching it), the pages, what's running, and at the bottom
  * the power mode and theme. Icons only on narrower windows; a strip across the top on a phone.
  */
-export function Sidebar({ session, current, onSessionChange }: { session?: Session; current: string; onSessionChange: () => void }) {
+export function Sidebar({ session, current, onSessionChange, onFind }: { session?: Session; current: string; onSessionChange: () => void; onFind: () => void }) {
+    const mac = /Mac|iPhone|iPad/.test(navigator.platform);
     const running = useOperations().filter((o) => o.state === "running");
     return (
         <aside className="sidebar">
@@ -32,9 +35,16 @@ export function Sidebar({ session, current, onSessionChange }: { session?: Sessi
                 sfx
             </a>
             {session && <ContextBlock session={session} active={current === "contexts"} />}
+            {session && (
+                <button type="button" className="sidebar-link sidebar-find" onClick={onFind} title={`Find a node, application, service or partition (${mac ? "⌘K" : "ctrl+K"})`}>
+                    <Icon name="search" className="sidebar-icon" />
+                    <span className="sidebar-label">Find</span>
+                    <kbd className="sidebar-label sidebar-kbd">{mac ? "⌘K" : "ctrl K"}</kbd>
+                </button>
+            )}
             <nav className="sidebar-nav" aria-label="Pages">
                 {pages
-                    .filter((p) => p.path !== "events" || session?.eventStore !== false)
+                    .filter((p) => (p.path !== "events" || session?.eventStore !== false) && (p.path !== "store" || session?.imageStore !== false))
                     .map((p) => (
                         <a key={p.path} className="sidebar-link" href={`#/${p.path}`} aria-current={p.path === current ? "page" : undefined} title={p.label}>
                             <Icon name={p.icon} className="sidebar-icon" />
