@@ -28,3 +28,12 @@ public sealed record PartitionRow(
     string? LowKey = null, string? HighKey = null, string? Name = null);
 
 public sealed record ReplicaRow(string Id, string NodeName, string Role, string Status, HealthState Health, string Address);
+
+/// <summary>One provisioned version of an application type.</summary>
+/// <param name="Status">Provisioning, Available, Unprovisioning or Failed.</param>
+/// <param name="StatusDetails">Why provisioning failed, when it did; empty otherwise.</param>
+public sealed record ApplicationTypeRow(
+    string Name, string Version, string Status, IReadOnlyDictionary<string, string> DefaultParameters, string StatusDetails = "");
+
+/// <param name="Manifest">The service manifest that declares it.</param>
+public sealed record ServiceTypeRow(string Name, bool Stateful, string Manifest, string ManifestVersion);

@@ -6,13 +6,13 @@ namespace Sfx.Tests;
 
 public class UpgradePolicyTests
 {
-    private static Args Inputs(params (string Name, string Value)[] values) =>
-        new(values.ToDictionary(v => "policy." + v.Name, v => v.Value));
+    private static Dictionary<string, string> Inputs(params (string Name, string Value)[] values) =>
+        values.ToDictionary(v => v.Name, v => v.Value);
 
     [Fact]
     public void No_policy_inputs_mean_no_policy()
     {
-        Assert.Null(UpgradePolicies.Parse(new Args(new Dictionary<string, string> { ["version"] = "2.0.0" }), monitored: true));
+        Assert.Null(UpgradePolicy.Parse(new Dictionary<string, string>(), monitored: true));
     }
 
     [Fact]
@@ -20,14 +20,14 @@ public class UpgradePolicyTests
     {
         var inputs = Inputs(("healthCheckWait", ""), ("forceRestart", ""), ("maxPercentUnhealthyServices", ""));
 
-        Assert.Null(UpgradePolicies.Parse(inputs, monitored: true));
-        Assert.Null(UpgradePolicies.Parse(inputs, monitored: false));
+        Assert.Null(UpgradePolicy.Parse(inputs, monitored: true));
+        Assert.Null(UpgradePolicy.Parse(inputs, monitored: false));
     }
 
     [Fact]
     public void Reads_durations_as_seconds()
     {
-        var policy = UpgradePolicies.Parse(
+        var policy = UpgradePolicy.Parse(
             Inputs(
                 ("healthCheckWait", "30"), ("healthCheckStable", "120"), ("healthCheckRetry", "600"),
                 ("upgradeDomainTimeout", "3600"), ("upgradeTimeout", "0"), ("replicaSetCheckTimeout", "4294967295")),
@@ -47,7 +47,7 @@ public class UpgradePolicyTests
     [Fact]
     public void Reads_flags()
     {
-        var policy = UpgradePolicies.Parse(Inputs(("forceRestart", "true"), ("considerWarningAsError", "false")), monitored: true);
+        var policy = UpgradePolicy.Parse(Inputs(("forceRestart", "true"), ("considerWarningAsError", "false")), monitored: true);
 
         Assert.Equal(new UpgradePolicy(ForceRestart: true, ConsiderWarningAsError: false), policy);
     }
@@ -55,7 +55,7 @@ public class UpgradePolicyTests
     [Fact]
     public void Reads_percentages()
     {
-        var policy = UpgradePolicies.Parse(
+        var policy = UpgradePolicy.Parse(
             Inputs(
                 ("maxPercentUnhealthyDeployedApplications", "0"), ("maxPercentUnhealthyServices", "10"),
                 ("maxPercentUnhealthyPartitionsPerService", "20"), ("maxPercentUnhealthyReplicasPerPartition", "100")),
@@ -85,10 +85,10 @@ public class UpgradePolicyTests
     [InlineData("maxPercentUnhealthyReplicasPerPartition", "50%", "Max unhealthy replicas per partition must be a percentage from 0 to 100.")]
     public void Names_the_field_it_cannot_read(string name, string value, string message)
     {
-        var ex = Assert.Throws<ActionException>(() => UpgradePolicies.Parse(Inputs((name, value)), monitored: true));
+        var ex = Assert.Throws<RefusedException>(() => UpgradePolicy.Parse(Inputs((name, value)), monitored: true));
 
         Assert.Equal(message, ex.Message);
-        Assert.Equal(400, ex.Status);
+        Assert.False(ex.Conflict);
     }
 
     [Theory]
@@ -104,8 +104,8 @@ public class UpgradePolicyTests
     [InlineData("maxPercentUnhealthyReplicasPerPartition", "10")]
     public void Timeouts_and_health_checks_need_a_monitored_upgrade(string name, string value)
     {
-        Assert.NotNull(UpgradePolicies.Parse(Inputs((name, value)), monitored: true));
-        var ex = Assert.Throws<ActionException>(() => UpgradePolicies.Parse(Inputs((name, value)), monitored: false));
+        Assert.NotNull(UpgradePolicy.Parse(Inputs((name, value)), monitored: true));
+        var ex = Assert.Throws<RefusedException>(() => UpgradePolicy.Parse(Inputs((name, value)), monitored: false));
 
         Assert.Equal("Timeouts and health checks only apply to monitored upgrades.", ex.Message);
     }
@@ -115,7 +115,7 @@ public class UpgradePolicyTests
     [InlineData("forceRestart", "true")]
     public void Other_settings_apply_to_any_upgrade(string name, string value)
     {
-        Assert.NotNull(UpgradePolicies.Parse(Inputs((name, value)), monitored: false));
+        Assert.NotNull(UpgradePolicy.Parse(Inputs((name, value)), monitored: false));
     }
 
     [Fact]

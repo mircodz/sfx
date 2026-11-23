@@ -1,6 +1,7 @@
-namespace Sfx.Web;
+namespace Sfx.Core;
 
-internal static class Bounded
+/// <summary>Runs work over many items with a cap on how many calls are open at once, so a large cluster isn't asked everything at the same moment.</summary>
+public static class Bounded
 {
     public const int Parallelism = 8;
 

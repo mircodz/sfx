@@ -22,7 +22,9 @@ public sealed record HealthEventRow(
 /// <summary>One step of the chain explaining an unhealthy state; <see cref="Depth"/> nests it under the step above.</summary>
 public sealed record HealthEvaluationRow(int Depth, string Kind, HealthState State, string Description);
 
-public sealed record HealthReport(HealthState State, IReadOnlyList<HealthEventRow> Events, IReadOnlyList<HealthEvaluationRow> Evaluations)
+/// <param name="Reason">One line on why it isn't healthy (see <see cref="HealthReasons.From"/>); null when nothing says.</param>
+public sealed record HealthReport(
+    HealthState State, IReadOnlyList<HealthEventRow> Events, IReadOnlyList<HealthEvaluationRow> Evaluations, string? Reason = null)
 {
     public static HealthReport From(EntityHealth health) => new(
         health.AggregatedHealthState ?? HealthState.Unknown,
@@ -35,7 +37,8 @@ public sealed record HealthReport(HealthState State, IReadOnlyList<HealthEventRo
                 e.LastModifiedUtcTimestamp,
                 e.IsExpired ?? false))
             .ToList(),
-        Flatten(health.UnhealthyEvaluations));
+        Flatten(health.UnhealthyEvaluations),
+        health.AggregatedHealthState is HealthState.Ok ? null : HealthReasons.From(health));
 
     /// <summary>Flattens nested unhealthy evaluations, depth first, so the cause reads top-down.</summary>
     public static IReadOnlyList<HealthEvaluationRow> Flatten(IEnumerable<HealthEvaluationWrapper>? evaluations)

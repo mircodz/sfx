@@ -161,36 +161,43 @@ public class ClusterUpgradeTests
             inputs["codeVersion"] = code;
         }
 
-        Assert.Equal(expected, ClusterUpgrades.Describe(new Args(inputs), Label(mode), Mode(mode)));
+        Assert.Equal(expected, ClusterUpgrades.Describe(inputs.GetValueOrDefault("codeVersion"), config, UpgradePlan.Find(mode), customPolicy: false));
     }
 
     [Fact]
     public void Says_when_the_policy_is_custom()
     {
-        var inputs = new Args(new Dictionary<string, string> { ["codeVersion"] = "10.1", ["policy.maxPercentUnhealthyNodes"] = "10" });
-
-        Assert.EndsWith(", custom policy", ClusterUpgrades.Describe(inputs, "Monitored, roll back on failure", UpgradeMode.Monitored));
+        Assert.EndsWith(", custom policy", ClusterUpgrades.Describe("10.1", null, UpgradePlan.MonitoredRollback, customPolicy: true));
     }
 
-    private static string Label(string mode) => mode switch
+    [Fact]
+    public void Describing_needs_a_version()
     {
-        "monitored-rollback" => "Monitored, roll back on failure",
-        "monitored-manual" => "Monitored, stop on failure",
-        _ => "Unmonitored, automatic",
-    };
+        var ex = Assert.Throws<RefusedException>(() => ClusterUpgrades.Describe(null, " ", UpgradePlan.MonitoredRollback, customPolicy: false));
 
-    private static UpgradeMode Mode(string mode) => mode.StartsWith("monitored", StringComparison.Ordinal) ? UpgradeMode.Monitored : UpgradeMode.UnmonitoredAuto;
+        Assert.Equal("Choose a code version, a config version or both.", ex.Message);
+    }
+
+    [Fact]
+    public void Offers_the_upgrade_plans_in_order()
+    {
+        var action = WebActions.For(Session(), "cluster", Cluster("false")).Single(a => a.Id == "cluster.upgrade");
+        var mode = action.Inputs.Single(i => i.Name == "mode");
+
+        Assert.Equal(["monitored-rollback", "monitored-manual", "unmonitored-auto", "unmonitored-manual"], mode.Choices!.Select(c => c.Value));
+        Assert.Equal("Monitored, roll back on failure", mode.Choices![0].Label);
+    }
 }
 
 public class ClusterUpgradePolicyTests
 {
-    private static Args Inputs(params (string Name, string Value)[] values) =>
-        new(values.ToDictionary(v => "policy." + v.Name, v => v.Value));
+    private static Dictionary<string, string> Inputs(params (string Name, string Value)[] values) =>
+        values.ToDictionary(v => v.Name, v => v.Value);
 
     [Fact]
     public void Reads_cluster_limits_for_a_cluster_upgrade()
     {
-        var policy = UpgradePolicies.Parse(Inputs(("maxPercentUnhealthyNodes", "10"), ("maxPercentUnhealthyApplications", "0")), monitored: true, cluster: true);
+        var policy = UpgradePolicy.Parse(Inputs(("maxPercentUnhealthyNodes", "10"), ("maxPercentUnhealthyApplications", "0")), monitored: true, cluster: true);
 
         Assert.Equal(new UpgradePolicy(MaxPercentUnhealthyNodes: 10, MaxPercentUnhealthyApplications: 0), policy);
         Assert.True(policy!.HasClusterHealthPolicy);
@@ -200,7 +207,7 @@ public class ClusterUpgradePolicyTests
     [Fact]
     public void Reads_the_shared_settings_for_a_cluster_upgrade()
     {
-        var policy = UpgradePolicies.Parse(
+        var policy = UpgradePolicy.Parse(
             Inputs(("healthCheckWait", "30"), ("forceRestart", "true"), ("considerWarningAsError", "true")), monitored: true, cluster: true);
 
         Assert.Equal(new UpgradePolicy(HealthCheckWait: TimeSpan.FromSeconds(30), ForceRestart: true, ConsiderWarningAsError: true), policy);
@@ -211,7 +218,7 @@ public class ClusterUpgradePolicyTests
     [InlineData("maxPercentUnhealthyApplications")]
     public void Cluster_limits_need_a_monitored_upgrade(string name)
     {
-        var ex = Assert.Throws<ActionException>(() => UpgradePolicies.Parse(Inputs((name, "10")), monitored: false, cluster: true));
+        var ex = Assert.Throws<RefusedException>(() => UpgradePolicy.Parse(Inputs((name, "10")), monitored: false, cluster: true));
 
         Assert.Equal("Timeouts and health checks only apply to monitored upgrades.", ex.Message);
     }
@@ -221,7 +228,7 @@ public class ClusterUpgradePolicyTests
     [InlineData("maxPercentUnhealthyApplications", "x", "Max unhealthy applications must be a percentage from 0 to 100.")]
     public void Names_the_cluster_limit_it_cannot_read(string name, string value, string message)
     {
-        var ex = Assert.Throws<ActionException>(() => UpgradePolicies.Parse(Inputs((name, value)), monitored: true, cluster: true));
+        var ex = Assert.Throws<RefusedException>(() => UpgradePolicy.Parse(Inputs((name, value)), monitored: true, cluster: true));
 
         Assert.Equal(message, ex.Message);
     }
@@ -231,7 +238,7 @@ public class ClusterUpgradePolicyTests
     [InlineData("maxPercentUnhealthyApplications", "Max unhealthy applications only applies to cluster upgrades.")]
     public void Cluster_limits_are_refused_for_an_application(string name, string message)
     {
-        var ex = Assert.Throws<ActionException>(() => UpgradePolicies.Parse(Inputs((name, "10")), monitored: true));
+        var ex = Assert.Throws<RefusedException>(() => UpgradePolicy.Parse(Inputs((name, "10")), monitored: true));
 
         Assert.Equal(message, ex.Message);
     }
@@ -243,7 +250,7 @@ public class ClusterUpgradePolicyTests
     [InlineData("maxPercentUnhealthyReplicasPerPartition", "Max unhealthy replicas per partition only applies to application upgrades.")]
     public void Application_limits_are_refused_for_the_cluster(string name, string message)
     {
-        var ex = Assert.Throws<ActionException>(() => UpgradePolicies.Parse(Inputs((name, "10")), monitored: true, cluster: true));
+        var ex = Assert.Throws<RefusedException>(() => UpgradePolicy.Parse(Inputs((name, "10")), monitored: true, cluster: true));
 
         Assert.Equal(message, ex.Message);
     }
@@ -251,7 +258,7 @@ public class ClusterUpgradePolicyTests
     [Fact]
     public void Empty_cluster_limits_mean_the_clusters_default()
     {
-        Assert.Null(UpgradePolicies.Parse(Inputs(("maxPercentUnhealthyNodes", ""), ("maxPercentUnhealthyServices", "")), monitored: false, cluster: true));
-        Assert.Null(UpgradePolicies.Parse(Inputs(("maxPercentUnhealthyNodes", "")), monitored: false));
+        Assert.Null(UpgradePolicy.Parse(Inputs(("maxPercentUnhealthyNodes", ""), ("maxPercentUnhealthyServices", "")), monitored: false, cluster: true));
+        Assert.Null(UpgradePolicy.Parse(Inputs(("maxPercentUnhealthyNodes", "")), monitored: false));
     }
 }

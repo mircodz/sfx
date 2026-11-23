@@ -40,7 +40,7 @@ public class OverviewTests
         var statistics = new HealthStatistics([Count(EntityKind.Application, 1, 0, 0), new EntityKindHealthStateCount(EntityKind.Node, null)]);
 
         Assert.Equal([new HealthCountDto("Node", 0, 0, 0), new HealthCountDto("Application", 1, 0, 0)], Dto.HealthCounts(statistics));
-        Assert.Empty(Dto.HealthCounts(null));
+        Assert.Empty(ClusterOverview.Counts(null));
     }
 
     private static LoadMetricInformation Metric(

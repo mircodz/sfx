@@ -1,5 +1,5 @@
 using Microsoft.ServiceFabric.Common;
-using Sfx.Web;
+using Sfx.Core;
 
 namespace Sfx.Tests;
 
@@ -19,7 +19,7 @@ public class ReasonTests
         var health = Node([Wrap(new EventHealthEvaluation(HealthState.Warning, "Unhealthy event: SourceId='Watchdog'.", false,
             Event(HealthState.Warning, "Disk is 95% full.")))]);
 
-        Assert.Equal("Disk is 95% full.", Reasons.From(health));
+        Assert.Equal("Disk is 95% full.", HealthReasons.From(health));
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public class ReasonTests
         var health = Node([Wrap(new EventHealthEvaluation(HealthState.Error, "Unhealthy event: SourceId='Watchdog'.", false,
             Event(HealthState.Error, "  ")))]);
 
-        Assert.Equal("Unhealthy event: SourceId='Watchdog'.", Reasons.From(health));
+        Assert.Equal("Unhealthy event: SourceId='Watchdog'.", HealthReasons.From(health));
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public class ReasonTests
             Wrap(new EventHealthEvaluation(HealthState.Warning, "Second.", false, Event(HealthState.Warning, "Not this one."))),
         ]);
 
-        Assert.Equal("Lease lost.", Reasons.From(health));
+        Assert.Equal("Lease lost.", HealthReasons.From(health));
     }
 
     [Fact]
@@ -55,23 +55,23 @@ public class ReasonTests
     {
         var health = Node(null, Event(HealthState.Ok, "Fine."), Event(HealthState.Warning, "Certificate expires soon."), Event(HealthState.Error, "Later."));
 
-        Assert.Equal("Certificate expires soon.", Reasons.From(health));
+        Assert.Equal("Certificate expires soon.", HealthReasons.From(health));
     }
 
     [Fact]
     public void Has_no_reason_when_nothing_explains_it()
     {
-        Assert.Null(Reasons.From(Node(null, Event(HealthState.Ok, "Fine."))));
+        Assert.Null(HealthReasons.From(Node(null, Event(HealthState.Ok, "Fine."))));
     }
 
     [Fact]
     public void Collapses_whitespace_and_cuts_long_text()
     {
-        Assert.Equal("Disk is full on D:.", Reasons.Clean("  Disk is\r\n  full\ton D:. \n"));
+        Assert.Equal("Disk is full on D:.", HealthReasons.Clean("  Disk is\r\n  full\ton D:. \n"));
 
-        var cut = Reasons.Clean(string.Concat(Enumerable.Repeat("word ", 100)))!;
-        Assert.Equal(Reasons.MaxLength, cut.Length);
+        var cut = HealthReasons.Clean(string.Concat(Enumerable.Repeat("word ", 100)))!;
+        Assert.Equal(HealthReasons.MaxLength, cut.Length);
         Assert.EndsWith("…", cut);
-        Assert.Equal(new string('x', 160), Reasons.Clean(new string('x', 160)));
+        Assert.Equal(new string('x', 160), HealthReasons.Clean(new string('x', 160)));
     }
 }

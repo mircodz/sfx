@@ -10,13 +10,8 @@ public sealed partial class UiSession
     private static readonly TimeSpan FirstPoll = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(3);
 
-    /// <summary>What Azure says to anyone upgrading a cluster it manages.</summary>
-    internal const string AzureManagedNote =
-        "This cluster is managed by Azure: upgrade it from the Azure portal or with ARM, so it doesn't fight the resource provider.";
-
     private readonly Lock _operationsLock = new();
     private readonly List<OperationDto> _operations = [];
-    private Cached<bool>? _azureManaged;
 
     /// <summary>The last operations, newest first.</summary>
     internal IReadOnlyList<OperationDto> GetOperations()
@@ -114,10 +109,7 @@ public sealed partial class UiSession
     }
 
     /// <summary>Whether Azure's Service Fabric resource provider manages this cluster; read from the cluster manifest once.</summary>
-    internal Task<bool> IsAzureManagedAsync(CancellationToken cancellationToken) =>
-        LazyInitializer.EnsureInitialized(ref _azureManaged, () => new Cached<bool>(
-                TimeSpan.MaxValue, async ct => ClusterKind.IsAzureManaged(await Inspector.GetClusterManifestAsync(ct))))
-            .GetAsync(cancellationToken);
+    internal Task<bool> IsAzureManagedAsync(CancellationToken cancellationToken) => ClusterUpgrades.IsAzureManagedAsync(cancellationToken);
 
     /// <summary>The cluster target's "azureManaged": "true", "false", or "unknown" when the manifest couldn't be read.</summary>
     internal async Task<string> AzureManagedTargetAsync(CancellationToken cancellationToken)

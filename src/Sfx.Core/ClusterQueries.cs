@@ -41,10 +41,24 @@ public sealed class ClusterQueries(IServiceFabricClient client)
         {
             new(SystemApplicationId, SystemApplicationName, "System", "", "Ready", await system),
         };
-        rows.AddRange(apps.Select(a => new ApplicationRow(
-            a.Id, a.Name.ToString(), a.TypeName ?? "", a.TypeVersion ?? "", Text(a.Status), a.HealthState ?? HealthState.Unknown)));
+        rows.AddRange(apps.Select(Row));
         return rows;
     }
+
+    /// <summary>One application's row; null when there's no such application. The system application works too.</summary>
+    public async Task<ApplicationRow?> GetApplicationAsync(string applicationId, CancellationToken cancellationToken)
+    {
+        if (applicationId == SystemApplicationId)
+        {
+            return new(SystemApplicationId, SystemApplicationName, "System", "", "Ready", await GetSystemApplicationHealthAsync(cancellationToken));
+        }
+        var app = await OrNullAsync(() => client.Applications.GetApplicationInfoAsync(
+            applicationId, excludeApplicationParameters: true, cancellationToken: cancellationToken));
+        return app is null ? null : Row(app);
+    }
+
+    private static ApplicationRow Row(ApplicationInfo a) =>
+        new(a.Id, a.Name.ToString(), a.TypeName ?? "", a.TypeVersion ?? "", Text(a.Status), a.HealthState ?? HealthState.Unknown);
 
     /// <summary>
     /// The system application's health, which the application list doesn't carry: one small call that leaves out its
@@ -70,31 +84,49 @@ public sealed class ClusterQueries(IServiceFabricClient client)
         var services = await PageAsync(token => client.Services.GetServiceInfoListAsync(
             applicationId, continuationToken: token, cancellationToken: cancellationToken));
 
-        return services.Select(s => new ServiceRow(
-            s.Id, s.Name.ToString(), s.TypeName ?? "", Text(s.ServiceKind), Text(s.ServiceStatus), s.HealthState ?? HealthState.Unknown)).ToList();
+        return services.Select(Row).ToList();
     }
+
+    /// <summary>One service's row; null when there's no such service.</summary>
+    public async Task<ServiceRow?> GetServiceAsync(string applicationId, string serviceId, CancellationToken cancellationToken)
+    {
+        var service = await OrNullAsync(() => client.Services.GetServiceInfoAsync(applicationId, serviceId, cancellationToken: cancellationToken));
+        return service is null ? null : Row(service);
+    }
+
+    private static ServiceRow Row(ServiceInfo s) =>
+        new(s.Id, s.Name.ToString(), s.TypeName ?? "", Text(s.ServiceKind), Text(s.ServiceStatus), s.HealthState ?? HealthState.Unknown);
 
     public async Task<IReadOnlyList<PartitionRow>> GetPartitionsAsync(string serviceId, CancellationToken cancellationToken)
     {
         var partitions = await PageAsync(token => client.Partitions.GetPartitionInfoListAsync(
             serviceId, continuationToken: token, cancellationToken: cancellationToken));
 
-        return partitions.Select(p => new PartitionRow(
-            p.PartitionInformation.Id,
-            Text(p.ServiceKind),
-            Text(p.PartitionInformation.ServicePartitionKind),
-            Text(p.PartitionStatus),
-            p.HealthState ?? HealthState.Unknown,
-            p switch
-            {
-                StatefulServicePartitionInfo s => $"{s.TargetReplicaSetSize}/{s.MinReplicaSetSize}",
-                StatelessServicePartitionInfo s => s.InstanceCount == -1 ? "all nodes" : $"{s.InstanceCount}",
-                _ => "",
-            },
-            (p.PartitionInformation as Int64RangePartitionInformation)?.LowKey,
-            (p.PartitionInformation as Int64RangePartitionInformation)?.HighKey,
-            (p.PartitionInformation as NamedPartitionInformation)?.Name)).ToList();
+        return partitions.Select(Row).ToList();
     }
+
+    /// <summary>One partition's row; null when there's no such partition.</summary>
+    public async Task<PartitionRow?> GetPartitionAsync(PartitionId partitionId, CancellationToken cancellationToken)
+    {
+        var partition = await OrNullAsync(() => client.Partitions.GetPartitionInfoAsync(partitionId, cancellationToken: cancellationToken));
+        return partition is null ? null : Row(partition);
+    }
+
+    private static PartitionRow Row(ServicePartitionInfo p) => new(
+        p.PartitionInformation.Id,
+        Text(p.ServiceKind),
+        Text(p.PartitionInformation.ServicePartitionKind),
+        Text(p.PartitionStatus),
+        p.HealthState ?? HealthState.Unknown,
+        p switch
+        {
+            StatefulServicePartitionInfo s => $"{s.TargetReplicaSetSize}/{s.MinReplicaSetSize}",
+            StatelessServicePartitionInfo s => s.InstanceCount == -1 ? "all nodes" : $"{s.InstanceCount}",
+            _ => "",
+        },
+        (p.PartitionInformation as Int64RangePartitionInformation)?.LowKey,
+        (p.PartitionInformation as Int64RangePartitionInformation)?.HighKey,
+        (p.PartitionInformation as NamedPartitionInformation)?.Name);
 
     public async Task<IReadOnlyList<ReplicaRow>> GetReplicasAsync(PartitionId partitionId, CancellationToken cancellationToken)
     {
@@ -115,6 +147,33 @@ public sealed class ClusterQueries(IServiceFabricClient client)
             r.Address ?? "")).ToList();
     }
 
+    /// <summary>Every provisioned version of every application type, by name then version (newest first).</summary>
+    public async Task<IReadOnlyList<ApplicationTypeRow>> GetApplicationTypesAsync(CancellationToken cancellationToken)
+    {
+        var types = await PageAsync(token => client.ApplicationTypes.GetApplicationTypeInfoListAsync(
+            excludeApplicationParameters: false, continuationToken: token, cancellationToken: cancellationToken));
+
+        return types
+            .Select(t => new ApplicationTypeRow(
+                t.Name ?? "", t.Version ?? "", Text(t.Status), t.DefaultParameterList ?? new Dictionary<string, string>(), t.StatusDetails ?? ""))
+            .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenByDescending(t => t.Version, VersionComparer.Instance)
+            .ToList();
+    }
+
+    /// <summary>The service types one version of an application type provides.</summary>
+    public async Task<IReadOnlyList<ServiceTypeRow>> GetServiceTypesAsync(string typeName, string typeVersion, CancellationToken cancellationToken)
+    {
+        var types = await client.ServiceTypes.GetServiceTypeInfoListAsync(typeName, typeVersion, cancellationToken: cancellationToken);
+        return (types ?? [])
+            .Select(t => new ServiceTypeRow(
+                t.ServiceTypeDescription?.ServiceTypeName ?? "",
+                t.ServiceTypeDescription?.IsStateful ?? t.ServiceTypeDescription is StatefulServiceTypeDescription,
+                t.ServiceManifestName ?? "",
+                t.ServiceManifestVersion ?? ""))
+            .ToList();
+    }
+
     /// <summary>
     /// Whether a system service runs, e.g. <c>EventStoreService</c>. Optional ones are missing on many clusters, and
     /// asking them anything then waits for the gateway's timeout instead of failing.
@@ -132,6 +191,19 @@ public sealed class ClusterQueries(IServiceFabricClient client)
     /// <summary>Whether the cluster says the entity doesn't exist, e.g. because it was deleted since its parent was listed.</summary>
     public static bool IsGone(ServiceFabricException ex) =>
         ex.ErrorCode.ToString() is var code && (code.Contains("NOT_FOUND", StringComparison.Ordinal) || code.Contains("DOES_NOT_EXIST", StringComparison.Ordinal));
+
+    /// <summary>What the query returns; null when the cluster says the entity doesn't exist (or answers with nothing).</summary>
+    private static async Task<T?> OrNullAsync<T>(Func<Task<T>> query) where T : class
+    {
+        try
+        {
+            return await query();
+        }
+        catch (ServiceFabricException ex) when (IsGone(ex))
+        {
+            return null;
+        }
+    }
 
     /// <summary>Follows continuation tokens until the last page.</summary>
     public static async Task<List<T>> PageAsync<T>(Func<ContinuationToken?, Task<PagedData<T>>> query)

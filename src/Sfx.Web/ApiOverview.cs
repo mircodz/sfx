@@ -23,17 +23,16 @@ internal static class ApiOverview
 
     public static async Task<Overview> LoadAsync(UiSession s, CancellationToken ct)
     {
-        var version = s.Inspector.GetClusterVersionAsync(ct);
-        var health = s.Inspector.GetClusterHealthSummaryAsync(ct);
+        var summary = s.Overview.GetSummaryAsync(ct);
         var load = s.Inspector.GetClusterLoadAsync(ct);
         var upgrades = s.Upgrades.GetRunningUpgradesAsync(ct);
 
-        var h = await health;
+        var h = await summary;
         var summaries = await ApiLoad.SummariesAsync(s, await load, null, ct);
         return new Overview(
-            (await version).Version ?? "",
-            Dto.Health(HealthReport.From(h)),
-            Dto.HealthCounts(h.HealthStatistics),
+            h.CodeVersion,
+            Dto.Health(h.Health),
+            Dto.HealthCounts(h.Counts),
             summaries,
             (await upgrades).OrderBy(u => u.Urgency).ThenByDescending(u => u.StartedUtc).ToList());
     }

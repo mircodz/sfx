@@ -170,6 +170,10 @@ public sealed class ClusterInspector(IServiceFabricClient client)
     /// <summary>"fabric:/orders/Counter" for the id "orders~Counter": ids are names without "fabric:/" and with '~' for '/'.</summary>
     public static string NameOf(string id) => "fabric:/" + id.Replace('~', '/');
 
+    /// <summary>"orders~Counter" for the name "fabric:/orders/Counter", the other way from <see cref="NameOf"/>; "fabric:/" may be left out.</summary>
+    public static string IdOf(string name) =>
+        (name.StartsWith("fabric:/", StringComparison.Ordinal) ? name["fabric:/".Length..] : name).Replace('/', '~');
+
     /// <summary>
     /// The cluster answers a lookup of something that isn't there with nothing at all (HTTP 204) or with a not-found
     /// error, depending on the query; both become a <see cref="NotFoundException"/> saying what's missing.

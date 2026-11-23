@@ -159,6 +159,19 @@ public sealed class ClusterOperations(IServiceFabricClient client)
     public Task RollbackClusterUpgradeAsync(CancellationToken cancellationToken) =>
         client.Cluster.RollbackClusterUpgradeAsync(cancellationToken: cancellationToken);
 
+    /// <summary>Switches an application's running upgrade to another plan, e.g. from manual to automatic.</summary>
+    public Task ChangeApplicationUpgradePlanAsync(string applicationId, UpgradePlan plan, CancellationToken cancellationToken) =>
+        client.Applications.UpdateApplicationUpgradeAsync(
+            applicationId,
+            new ApplicationUpgradeUpdateDescription(
+                new ApplicationName(ClusterInspector.NameOf(applicationId)), UpgradeKind.Rolling, updateDescription: plan.UpdateDescription()),
+            cancellationToken: cancellationToken);
+
+    /// <summary>Switches the cluster's running upgrade to another plan.</summary>
+    public Task ChangeClusterUpgradePlanAsync(UpgradePlan plan, CancellationToken cancellationToken) =>
+        client.Cluster.UpdateClusterUpgradeAsync(
+            new UpdateClusterUpgradeDescription(UpgradeType.Rolling, plan.UpdateDescription()), cancellationToken: cancellationToken);
+
     /// <summary>Upgrades the cluster's code, configuration or both to versions already provisioned.</summary>
     /// <param name="codeVersion">The Service Fabric version to move to, or null to keep today's.</param>
     /// <param name="configVersion">The cluster configuration version to move to, or null to keep today's.</param>
@@ -236,14 +249,6 @@ public sealed class ClusterOperations(IServiceFabricClient client)
                 targetReplicaSetSize: targetReplicaSetSize,
                 minReplicaSetSize: minReplicaSetSize),
             cancellationToken: cancellationToken);
-    }
-
-    /// <summary>Which fields of a service update are set; values from the REST API's ServiceUpdateDescription.Flags.</summary>
-    [Flags]
-    private enum ServiceUpdateFlags
-    {
-        Count = 1,
-        MinReplicaSetSize = 16,
     }
 
     public Task RecoverAllPartitionsAsync(CancellationToken cancellationToken) =>

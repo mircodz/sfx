@@ -18,6 +18,13 @@ public sealed partial class UiSession(ClusterSession session, ActionLog log, str
     public DeployedQueries Deployed { get; } = new(session.Queries.Client);
     public UpgradeQueries Upgrades { get; } = new(session.Queries);
     public EventQueries Events { get; } = new(session.Queries);
+    public ClusterUpgrades ClusterUpgrades { get; } = new(session.Queries.Client);
+    public ClusterOverview Overview { get; } = new(session.Queries);
+
+    /// <summary>Applications' lifecycle, sharing this session's cached EnableDefaultServicesUpgrade.</summary>
+    public ApplicationLifecycle Lifecycle => _lifecycle ??= new(Queries.Client, DefaultServicesUpgradeEnabledAsync);
+
+    private ApplicationLifecycle? _lifecycle;
     public string Version => version;
 
     public bool ReadOnly => session.Context.ReadOnly;

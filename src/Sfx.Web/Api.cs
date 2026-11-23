@@ -247,7 +247,7 @@ internal static class Api
             .ToList());
 
         api.MapPost("/actions/{id}", (UiSession s, string id, ActionRequest request, CancellationToken ct) => WebActions.RunAsync(s, id, request, ct));
-        ClusterUpgrades.Map(api);
+        ApiClusterUpgrades.Map(api);
         ApiOperations.Map(api);
         ApiReasons.Map(api);
         ApiPackages.Map(api);
@@ -407,13 +407,4 @@ internal static class Api
             }
         }));
     }
-}
-
-/// <summary>Orders versions like "1.10.0" after "1.9.0", falling back to text for anything else.</summary>
-internal sealed class VersionComparer : IComparer<string>
-{
-    public static readonly VersionComparer Instance = new();
-
-    public int Compare(string? x, string? y) =>
-        Version.TryParse(x, out var a) && Version.TryParse(y, out var b) ? a.CompareTo(b) : string.CompareOrdinal(x, y);
 }

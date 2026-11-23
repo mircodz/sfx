@@ -82,13 +82,7 @@ internal static class WebActions
 {
     private const string NotForProduction = "Uses the Fault Analysis Service; meant for testing, not production.";
 
-    private static readonly ActionChoice[] UpgradeModes =
-    [
-        new("monitored-rollback", "Monitored, roll back on failure"),
-        new("monitored-manual", "Monitored, stop on failure"),
-        new("unmonitored-auto", "Unmonitored, automatic"),
-        new("unmonitored-manual", "Unmonitored, manual"),
-    ];
+    private static readonly ActionChoice[] UpgradeModes = UpgradePlan.All.Select(p => new ActionChoice(p.Id, p.Title)).ToArray();
 
     private static readonly IReadOnlyList<ActionDef> All =
     [
@@ -261,87 +255,8 @@ internal static class WebActions
         // Applications: target applicationId, name, typeName, version
 
         new("application.upgrade", "application", "Edit", Risk.Confirm,
-            (t, i) => $"Upgrade {t["name"]} to {i["version"]} ({Mode(i["mode"]).Label.ToLowerInvariant()})" + ChangedParameters(i)
-                + (UpgradePolicies.Parse(i, ParseMode(i["mode"]).Mode == UpgradeMode.Monitored) is null ? "" : ", custom policy"),
-            async (s, t, i, ct) =>
-            {
-                var (mode, failure) = ParseMode(i["mode"]);
-                var policy = UpgradePolicies.Parse(i, mode == UpgradeMode.Monitored);
-                var current = await s.Inspector.GetApplicationAsync(t["applicationId"], ct);
-                var versions = await s.Inspector.GetApplicationTypeVersionsAsync(current.TypeName, ct);
-                var allowed = (versions.FirstOrDefault(v => v.Version == i["version"])
-                        ?? throw new ActionException($"Version {i["version"]} of {current.TypeName} isn't provisioned."))
-                    .DefaultParameterList?.Keys.ToHashSet() ?? [];
-
-                // Keep today's values the target version still has; a parameter it dropped would make the cluster refuse.
-                var parameters = (current.Parameters ?? new Dictionary<string, string>())
-                    .Where(kv => allowed.Contains(kv.Key))
-                    .ToDictionary(kv => kv.Key, kv => kv.Value);
-                foreach (var (key, value) in i.Values.Where(kv => kv.Key.StartsWith("param:", StringComparison.Ordinal)))
-                {
-                    var name = key["param:".Length..];
-                    parameters[allowed.Contains(name) ? name : throw new ActionException($"Version {i["version"]} has no parameter '{name}'.")] = value;
-                }
-
-                // "reset:Name" takes a value off the application, so the parameter follows its version's default again.
-                foreach (var key in i.Values.Keys.Where(k => k.StartsWith("reset:", StringComparison.Ordinal)))
-                {
-                    var name = key["reset:".Length..];
-                    if (i.Values.ContainsKey("param:" + name))
-                    {
-                        throw new ActionException($"'{name}' can't be both set and reset to its default.");
-                    }
-                    parameters.Remove(name);
-                }
-
-                // What a parameter is worth before and after, defaults included: one left unset follows the target
-                // version's default, so a default that changed between versions changes the services that use it too.
-                var currentDefaults = versions.FirstOrDefault(v => v.Version == current.TypeVersion)?.DefaultParameterList ?? new Dictionary<string, string>();
-                var targetDefaults = versions.First(v => v.Version == i["version"]).DefaultParameterList ?? new Dictionary<string, string>();
-                var changed = DefaultServices.ChangedParameters(
-                    current.Parameters ?? new Dictionary<string, string>(), currentDefaults, parameters, targetDefaults);
-
-                // Catch what the cluster would refuse with only "aka.ms/upgrade-defaultservices", and say why.
-                // Only services that exist can be refused; default services new in the target version are simply created.
-                var existing = (await s.Queries.GetServicesAsync(t["applicationId"], ct))
-                    .Select(svc => svc.Name[(t["name"].Length + 1)..])
-                    .ToHashSet();
-                var targetManifest = await s.Inspector.GetApplicationManifestAsync(current.TypeName, i["version"], ct);
-                var uses = DefaultServices.ParameterUses(targetManifest);
-                var enabled = await s.DefaultServicesUpgradeEnabledAsync(ct);
-                foreach (var use in uses.Where(u => changed.Contains(u.Parameter) && existing.Contains(u.Service)))
-                {
-                    if (use.Partitioning)
-                    {
-                        throw new ActionException(
-                            $"{use.Parameter} sets how {use.Service} is partitioned ({use.Setting}), which can't change once the service exists. " +
-                            "Repartitioning means creating the service again.", StatusCodes.Status409Conflict);
-                    }
-                    if (!enabled)
-                    {
-                        throw new ActionException(
-                            $"{use.Parameter} sets the {use.Setting} of the default service {use.Service}, and this cluster doesn't let " +
-                            "upgrades change default services (ClusterManager/EnableDefaultServicesUpgrade is off). " +
-                            (use.Setting is "InstanceCount" or "TargetReplicaSetSize" or "MinReplicaSetSize"
-                                ? $"Scale {use.Service} instead."
-                                : "Turn that setting on, or change the service directly."),
-                            StatusCodes.Status409Conflict);
-                    }
-                }
-
-                try
-                {
-                    await s.Operations.UpgradeApplicationAsync(
-                        t["applicationId"], t["name"], i["version"], parameters, mode, failure, policy, targetManifest, ct);
-                }
-                catch (Exception ex) when (DefaultServices.IsRefusal(ex))
-                {
-                    throw new ActionException(
-                        $"The cluster refused: version {i["version"]} changes a default service, and this cluster doesn't let upgrades " +
-                        "change default services (ClusterManager/EnableDefaultServicesUpgrade is off, see aka.ms/upgrade-defaultservices).",
-                        StatusCodes.Status409Conflict);
-                }
-            },
+            (t, i) => ApplicationLifecycle.Describe(t["name"], UpgradeRequest(i)),
+            (s, t, i, ct) => s.Lifecycle.UpgradeAsync(t["applicationId"], UpgradeRequest(i), ct),
             "Services restart domain by domain with the new version or parameters.",
             Applies: t => t["applicationId"] != ClusterQueries.SystemApplicationId,
             Inputs: t =>
@@ -381,8 +296,9 @@ internal static class WebActions
         // Cluster: target name, azureManaged ("true", "false" or "unknown")
 
         new("cluster.upgrade", "cluster", "Upgrade", Risk.Confirm,
-            (_, i) => ClusterUpgrades.Describe(i, Mode(i["mode"]).Label, ParseMode(i["mode"]).Mode),
-            (s, _, i, ct) => ClusterUpgrades.RunAsync(s, i, ParseMode(i["mode"]).Mode, ParseMode(i["mode"]).Failure, ct),
+            (_, i) => ClusterUpgrades.Describe(
+                i.Optional("codeVersion"), i.Optional("configVersion"), Plan(i["mode"]), ClusterPolicy(i) is not null),
+            (s, _, i, ct) => s.ClusterUpgrades.StartAsync(i.Optional("codeVersion"), i.Optional("configVersion"), Plan(i["mode"]), ClusterPolicy(i), ct),
             "Nodes restart domain by domain on the new version or configuration.",
             // Azure's resource provider owns the upgrades of the clusters it manages.
             Applies: t => t.Optional("azureManaged") == "false",
@@ -481,10 +397,23 @@ internal static class WebActions
             throw new ActionException($"Type '{expected}' to confirm.");
         }
 
-        var title = action.Describe(target, inputs);
+        string title;
+        try
+        {
+            title = action.Describe(target, inputs);
+        }
+        catch (RefusedException ex)
+        {
+            throw Refusal(ex);
+        }
         try
         {
             await action.Run(session, target, inputs, cancellationToken);
+        }
+        // Refused before anything was asked of the cluster, like an ActionException: nothing to log.
+        catch (RefusedException ex)
+        {
+            throw Refusal(ex);
         }
         catch (Exception ex) when (ex is not ActionException)
         {
@@ -507,21 +436,28 @@ internal static class WebActions
 
     private static int Positive(int n) => n > 0 ? n : throw new ActionException("Must be more than 0.");
 
-    private static ActionChoice Mode(string value) =>
-        UpgradeModes.FirstOrDefault(m => m.Value == value) ?? throw new ActionException($"Unknown upgrade mode '{value}'.");
+    private static ActionException Refusal(RefusedException ex) =>
+        new(ex.Message, ex.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest);
 
-    private static (UpgradeMode Mode, FailureAction? Failure) ParseMode(string value) => Mode(value).Value switch
-    {
-        "monitored-rollback" => (UpgradeMode.Monitored, FailureAction.Rollback),
-        "monitored-manual" => (UpgradeMode.Monitored, FailureAction.Manual),
-        "unmonitored-auto" => (UpgradeMode.UnmonitoredAuto, null),
-        _ => (UpgradeMode.UnmonitoredManual, null),
-    };
+    private static UpgradePlan Plan(string value) => UpgradePlan.Find(value);
 
-    private static string ChangedParameters(Args inputs)
+    /// <summary>The "policy.*" inputs, without the prefix.</summary>
+    private static Dictionary<string, string> PolicyFields(Args inputs) => inputs.Values
+        .Where(kv => kv.Key.StartsWith(PolicyPrefix, StringComparison.Ordinal))
+        .ToDictionary(kv => kv.Key[PolicyPrefix.Length..], kv => kv.Value);
+
+    private const string PolicyPrefix = "policy.";
+
+    private static UpgradePolicy? ClusterPolicy(Args inputs) => UpgradePolicy.Parse(PolicyFields(inputs), Plan(inputs["mode"]).Monitored, cluster: true);
+
+    /// <summary>An application upgrade from its form: "version", "mode", "param:{name}" to set, "reset:{name}" to reset, "policy.*".</summary>
+    private static ApplicationUpgradeRequest UpgradeRequest(Args inputs)
     {
-        var set = inputs.Values.Keys.Where(k => k.StartsWith("param:", StringComparison.Ordinal)).Select(k => k["param:".Length..]).ToList();
+        var plan = Plan(inputs["mode"]);
+        var set = inputs.Values
+            .Where(kv => kv.Key.StartsWith("param:", StringComparison.Ordinal))
+            .ToDictionary(kv => kv.Key["param:".Length..], kv => kv.Value);
         var reset = inputs.Values.Keys.Where(k => k.StartsWith("reset:", StringComparison.Ordinal)).Select(k => k["reset:".Length..]).ToList();
-        return (set.Count == 0 ? "" : $", setting {string.Join(", ", set)}") + (reset.Count == 0 ? "" : $", resetting {string.Join(", ", reset)}");
+        return new ApplicationUpgradeRequest(inputs["version"], plan, set, reset, UpgradePolicy.Parse(PolicyFields(inputs), plan.Monitored));
     }
 }

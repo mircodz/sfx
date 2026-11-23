@@ -199,17 +199,11 @@ internal static class Dto
             .Select(e => new HealthEventDto(e.Source, e.Property, Health(e.State), e.Description, e.LastModifiedUtc, e.IsExpired))
             .ToList());
 
-    private static readonly EntityKind[] CountedKinds = [EntityKind.Node, EntityKind.Application, EntityKind.Service, EntityKind.Partition, EntityKind.Replica];
-
     /// <summary>The counts of nodes, applications, services, partitions and replicas, in that order; other kinds are left out.</summary>
-    public static IReadOnlyList<HealthCountDto> HealthCounts(HealthStatistics? statistics)
-    {
-        var counts = statistics?.HealthStateCountList ?? [];
-        return CountedKinds
-            .SelectMany(kind => counts.Where(c => c.EntityKind == kind).Take(1).Select(c => new HealthCountDto(
-                kind.ToString(), c.HealthStateCount?.OkCount ?? 0, c.HealthStateCount?.WarningCount ?? 0, c.HealthStateCount?.ErrorCount ?? 0)))
-            .ToList();
-    }
+    public static IReadOnlyList<HealthCountDto> HealthCounts(HealthStatistics? statistics) => HealthCounts(ClusterOverview.Counts(statistics));
+
+    public static IReadOnlyList<HealthCountDto> HealthCounts(IReadOnlyList<HealthCount> counts) =>
+        counts.Select(c => new HealthCountDto(c.Kind, c.Healthy, c.Warning, c.Error)).ToList();
 
     public static EvaluationDto Evaluation(HealthEvaluationRow e) => new(e.Depth, e.Kind, Health(e.State), e.Description);
 

@@ -1,4 +1,3 @@
-using Microsoft.ServiceFabric.Common;
 using Sfx.Core;
 
 namespace Sfx.Web;
@@ -70,24 +69,7 @@ public sealed partial class UiSession
         try
         {
             using var timeout = new CancellationTokenSource(ReasonTimeout);
-            var client = Queries.Client;
-            // Only the entity's own evaluations and unhealthy events: no children's states, which on a large application
-            // or service would be most of the answer.
-            const int none = HealthFilter.None, unhealthy = HealthFilter.WarningOrError;
-            EntityHealth health = kind switch
-            {
-                "node" => await client.Nodes.GetNodeHealthAsync(new NodeName(id), eventsHealthStateFilter: unhealthy, cancellationToken: timeout.Token),
-                "application" => await client.Applications.GetApplicationHealthAsync(
-                    id, eventsHealthStateFilter: unhealthy, deployedApplicationsHealthStateFilter: none, servicesHealthStateFilter: none,
-                    excludeHealthStatistics: true, cancellationToken: timeout.Token),
-                "service" => await client.Services.GetServiceHealthAsync(
-                    id, eventsHealthStateFilter: unhealthy, partitionsHealthStateFilter: none, excludeHealthStatistics: true, cancellationToken: timeout.Token),
-                "partition" => await client.Partitions.GetPartitionHealthAsync(
-                    new PartitionId(Guid.Parse(id)), eventsHealthStateFilter: unhealthy, replicasHealthStateFilter: none,
-                    excludeHealthStatistics: true, cancellationToken: timeout.Token),
-                _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
-            };
-            return Reasons.From(health);
+            return await HealthReasons.FetchAsync(Queries.Client, kind, id, timeout.Token);
         }
         finally
         {

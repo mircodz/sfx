@@ -66,6 +66,10 @@ public static class WebServer
             {
                 await Error(context, ex.Status, ex.Message);
             }
+            catch (RefusedException ex)
+            {
+                await Error(context, ex.Conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest, ex.Message);
+            }
             catch (BadHttpRequestException ex)
             {
                 await Error(context, StatusCodes.Status400BadRequest, ex.Message);
