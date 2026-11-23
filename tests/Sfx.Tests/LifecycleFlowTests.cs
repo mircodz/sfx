@@ -87,6 +87,20 @@ public sealed class ShellFeatureKeymapTests : IDisposable
     private static KeyEvent Char(char c, KeyModifiers modifiers = KeyModifiers.None) => new(Key.Char, new Rune(c), modifiers);
 
     [Fact]
+    public void The_contexts_page_gets_the_keys_and_gives_them_back()
+    {
+        var shell = Shell();
+        Assert.False(shell.ContextsTable.HasFocus);
+
+        Assert.True(shell.Keymap.RunCommand("ctx"));
+        // A table ignores keys without focus, so arrows did nothing on the contexts page.
+        Assert.True(shell.ContextsTable.HasFocus);
+
+        Assert.True(shell.Keymap.RunCommand("back"));
+        Assert.False(shell.ContextsTable.HasFocus);
+    }
+
+    [Fact]
     public void Find_and_the_last_error_have_keys()
     {
         var keymap = Shell().Keymap;
