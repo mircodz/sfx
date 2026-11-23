@@ -168,7 +168,7 @@ public class OverviewPageTests
             new HealthCount("Service", 7, 0, 0),
         ]);
 
-        Assert.Equal(" ▲ Warning  ·  5 nodes ⚠1  ·  3 apps ✗1  ·  7 services  ·  v10.1.2", Views.SummaryLine(summary).PlainText);
+        Assert.Equal(" Warning  ·  5 nodes W1  ·  3 apps E1  ·  7 services  ·  v10.1.2", Views.SummaryLine(summary).PlainText);
     }
 
     [Fact]

@@ -28,20 +28,20 @@ public sealed partial class Views
     };
 
     /// <summary>
-    /// The cluster in one line: its health, how many of each kind of entity it has (with those in warning ⚠ and
-    /// error ✗), and its version.
+    /// The cluster in one line: its health in words, how many of each kind of entity it has (with those in warning
+    /// and error as W2 E1, in their colors), and its version. Plain ASCII, so it reads in any terminal and font.
     /// </summary>
     public static StyledText SummaryLine(ClusterSummary summary)
     {
         var theme = Theme.Current;
-        var (glyph, color) = summary.Health.State switch
+        var color = summary.Health.State switch
         {
-            HealthState.Ok => ("●", theme.Success),
-            HealthState.Warning => ("▲", theme.Warning),
-            HealthState.Error => ("✗", theme.Error),
-            _ => ("○", theme.Muted),
+            HealthState.Ok => theme.Success,
+            HealthState.Warning => theme.Warning,
+            HealthState.Error => theme.Error,
+            _ => theme.Muted,
         };
-        var line = StyledText.Of($" {glyph} ").Fg(color)
+        var line = StyledText.Of(" ")
             .Append(summary.Health.State == HealthState.Invalid ? "Unknown" : summary.Health.State.ToString()).Bold().Fg(color);
         foreach (var count in summary.Counts)
         {
@@ -49,11 +49,11 @@ public sealed partial class Views
                 .Append($"{count.Healthy + count.Warning + count.Error} {Plurals.GetValueOrDefault(count.Kind, count.Kind.ToLowerInvariant())}").Fg(theme.Foreground);
             if (count.Warning > 0)
             {
-                line.Append($" ⚠{count.Warning}").Fg(theme.Warning);
+                line.Append($" W{count.Warning}").Fg(theme.Warning);
             }
             if (count.Error > 0)
             {
-                line.Append($" ✗{count.Error}").Fg(theme.Error);
+                line.Append($" E{count.Error}").Fg(theme.Error);
             }
         }
         if (summary.CodeVersion.Length > 0)
