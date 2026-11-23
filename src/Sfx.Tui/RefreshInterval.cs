@@ -23,6 +23,11 @@ public static class RefreshInterval
             return false;
         }
 
+        if (unit == 'h' && value > TimeSpan.MaxValue.TotalHours)
+        {
+            return false;
+        }
+
         interval = unit switch
         {
             's' => TimeSpan.FromSeconds(value),
