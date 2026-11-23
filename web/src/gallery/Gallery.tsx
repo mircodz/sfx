@@ -43,7 +43,7 @@ function Specimen({ name, children }: { name: string; children: ReactNode }) {
 }
 
 /**
- * Every component of docs/style.md §13 in every state it can be in, from fixtures: no cluster needed. It's what the
+ * Every component in every state it can be in, from fixtures: no cluster needed. It's what the
  * screenshot check (web/scripts/check-gallery.ts) renders; open it at #/gallery.
  */
 export function Gallery() {
@@ -57,7 +57,7 @@ export function Gallery() {
 
     return (
         <div className="gallery">
-            <PageHeader title="Component gallery" summary="Every component in every state, from made-up data. See docs/style.md §13." />
+            <PageHeader title="Component gallery" summary="Every component in every state, from made-up data." />
 
             <Specimen name="Pills">
                 <div className="cluster">

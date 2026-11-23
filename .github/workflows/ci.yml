@@ -55,7 +55,7 @@ jobs:
       - name: Type check and build
         run: bun run build
 
-      - name: Style rules (docs/style.md)
+      - name: Style rules
         run: bun run check
 
       - name: Unit tests

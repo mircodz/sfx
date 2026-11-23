@@ -1,4 +1,4 @@
-// Checks the rules of docs/style.md that a machine can check, so they hold without anyone remembering them.
+// Checks the UI's style rules that a machine can check, so they hold without anyone remembering them.
 // Run: bun run check
 
 import { Glob } from "bun";
@@ -58,7 +58,7 @@ for (const rule of rules) {
 }
 
 if (failures > 0) {
-    console.log(`\n${failures} ${failures === 1 ? "place breaks" : "places break"} the style rules (docs/style.md).`);
+    console.log(`\n${failures} ${failures === 1 ? "place breaks" : "places break"} the style rules.`);
     process.exit(1);
 }
 console.log(`Style rules hold (${rules.length} rules).`);
