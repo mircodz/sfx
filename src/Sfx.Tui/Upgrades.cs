@@ -14,8 +14,8 @@ public sealed partial class Views
 
     /// <summary>The cluster's upgrade and every application's, running ones first.</summary>
     public IResourceView Upgrades() =>
-        new ResourceView<UpgradeRow>("upgrades", "upgrades", UpgradeQueries.GetUpgradesAsync, u => u.Kind + u.Name)
-            .InView(View, u => u.ApplicationId is null ? null : u.Name)
+        new ResourceView<UpgradeRow>("upgrades", "upgrades", UpgradeQueries.GetUpgradesAsync, u => u.Kind + u.Name) { Empty = "no upgrades" }
+            .HighlightingChanges()
             .Describing(DescribeUpgrade)
             .Column("NAME", Constraint.Fill(2), u => Plain(u.Name), u => u.Name)
             .Column("KIND", Constraint.Length(11), u => Plain(u.Kind), u => u.Kind)

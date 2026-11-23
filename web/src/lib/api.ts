@@ -21,7 +21,6 @@ import type {
     LoadMetric,
     Overview,
 } from "./types";
-import { withView } from "./view";
 
 // sfx ui opens the page as /?token=…; keep the token for this tab and take it out of the address bar (only it).
 const tokenKey = "sfx-token";
@@ -46,7 +45,7 @@ export class ApiError extends Error {
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
     let response: Response;
     try {
-        response = await fetch(`/api${withView(method, path)}`, {
+        response = await fetch(`/api${path}`, {
             method,
             headers: {
                 "X-Sfx-Token": sessionStorage.getItem(tokenKey) ?? "",

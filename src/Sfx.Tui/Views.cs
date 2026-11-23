@@ -1,6 +1,7 @@
 using Cellar.Layout;
 using Cellar.Text;
 using Cellar.Theming;
+using Cellar.Widgets;
 using Sfx.Core;
 using static Sfx.Tui.Styles;
 
@@ -8,22 +9,18 @@ namespace Sfx.Tui;
 
 /// <summary>
 /// The pages of sfx. Every table follows the same rules: Enter (or a second click) drills into a row, <c>d</c>
-/// describes it, and the row's actions are those of its entity, also offered on its describe page. Lists of
-/// applications, and of what belongs to them across the cluster, show only what the current view includes.
+/// describes it, and the row's actions are those of its entity, also offered on its describe page.
 /// </summary>
-/// <param name="view">The view in use, asked on every load so switching it takes effect on the next refresh.</param>
-public sealed partial class Views(ClusterQueries queries, IActionHost host, Func<ViewFilter>? view = null)
+public sealed partial class Views(ClusterQueries queries, IActionHost host)
 {
-    private ViewFilter View() => view?.Invoke() ?? ViewFilter.None;
-
     private readonly ClusterInspector _inspect = new(queries.Client);
     private readonly ClusterOperations _ops = new(queries.Client);
     private readonly DeployedQueries _deployed = new(queries.Client);
 
     public IResourceView Nodes() =>
-        new ResourceView<NodeRow>("nodes", "nodes", queries.GetNodesAsync, n => n.Name) { OnOpen = DeployedApplications }
+        new ResourceView<NodeRow>("nodes", "nodes", queries.GetNodesAsync, n => n.Name) { OnOpen = DeployedApplications, Empty = "no nodes" }
             .Describing(DescribeNode)
-            .Acting(NodeActions())
+            .Acting(NodeActions(), host)
             .Column("NAME", Constraint.Fill(2), n => Plain(n.Name), n => n.Name)
             .Column("STATUS", Constraint.Length(9), n => Status(n.Status), n => n.Status)
             .Column("HEALTH", Constraint.Length(7), n => Health(n.Health), n => n.Health)
@@ -36,10 +33,10 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host, Func
             .Column("UPTIME", Constraint.Length(7), n => Plain(Duration(n.Uptime)), n => n.Uptime, Justify.Right);
 
     public IResourceView Applications() =>
-        new ResourceView<ApplicationRow>("applications", "apps", queries.GetApplicationsAsync, a => a.Id) { OnOpen = Services }
-            .InView(View, a => a.Name)
+        new ResourceView<ApplicationRow>("applications", "apps", queries.GetApplicationsAsync, a => a.Id) { OnOpen = Services, Empty = "no applications" }
+            .HighlightingChanges()
             .Describing(DescribeApplication)
-            .Acting(ApplicationActions())
+            .Acting(ApplicationActions(), host)
             .Column("NAME", Constraint.Fill(2), a => Plain(a.Name), a => a.Name)
             .Column("TYPE", Constraint.Fill(1), a => Plain(a.TypeName), a => a.TypeName)
             .Column("VERSION", Constraint.Length(12), a => Plain(a.TypeVersion), a => a.TypeVersion)
@@ -47,9 +44,10 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host, Func
             .Column("HEALTH", Constraint.Length(8), a => Health(a.Health), a => a.Health);
 
     public IResourceView Services(ApplicationRow app) =>
-        new ResourceView<ServiceRow>("services", app.Name, ct => queries.GetServicesAsync(app.Id, ct), s => s.Id) { OnOpen = Partitions }
+        new ResourceView<ServiceRow>("services", app.Name, ct => queries.GetServicesAsync(app.Id, ct), s => s.Id) { OnOpen = Partitions, Empty = "no services" }
+            .HighlightingChanges()
             .Describing(service => DescribeService(app, service))
-            .Acting(ServiceActions(app))
+            .Acting(ServiceActions(app), host)
             .Column("NAME", Constraint.Fill(2), s => Plain(s.Name), s => s.Name)
             .Column("TYPE", Constraint.Fill(1), s => Plain(s.TypeName), s => s.TypeName)
             .Column("KIND", Constraint.Length(10), s => Plain(s.Kind), s => s.Kind)
@@ -60,9 +58,11 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host, Func
         new ResourceView<PartitionRow>("partitions", service.Name, ct => queries.GetPartitionsAsync(service.Id, ct), p => p.Id.ToString())
             {
                 OnOpen = partition => Replicas(service, partition),
+                Empty = "no partitions",
             }
+            .HighlightingChanges()
             .Describing(partition => DescribePartition(service, partition))
-            .Acting(PartitionActions(service))
+            .Acting(PartitionActions(service), host)
             .Column("ID", Constraint.Length(36), p => Plain(p.Id.ToString()), p => p.Id.ToString())
             .Column("KIND", Constraint.Length(10), p => Plain(p.Kind), p => p.Kind)
             .Column("PARTITIONING", Constraint.Length(13), p => Plain(p.PartitionKind), p => p.PartitionKind)
@@ -72,8 +72,12 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host, Func
 
     public IResourceView Replicas(ServiceRow service, PartitionRow partition) =>
         new ResourceView<ReplicaRow>("replicas", partition.Id.ToString(), ct => queries.GetReplicasAsync(partition.Id, ct), r => r.Id)
+            {
+                Empty = "no replicas",
+            }
+            .HighlightingChanges()
             .Describing(replica => DescribeReplica(service, partition, replica))
-            .Acting(ReplicaActions(service, partition))
+            .Acting(ReplicaActions(service, partition), host)
             .Column("ID", Constraint.Length(19), r => Plain(r.Id), r => r.Id)
             .Column("NODE", Constraint.Fill(1), r => Plain(r.NodeName), r => r.NodeName)
             .Column("ROLE", Constraint.Length(16), r => Role(r.Role), r => r.Role)
@@ -87,8 +91,9 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host, Func
         new ResourceView<DeployedApplicationRow>("deployed applications", node.Name, ct => _deployed.GetApplicationsAsync(node.Name, ct), a => a.Id)
             {
                 OnOpen = app => ServicePackages(node.Name, app),
+                Empty = "nothing deployed on this node",
             }
-            .InView(View, a => a.Name)
+            .HighlightingChanges()
             .Column("NAME", Constraint.Fill(2), a => Plain(a.Name), a => a.Name)
             .Column("TYPE", Constraint.Fill(1), a => Plain(a.TypeName), a => a.TypeName)
             .Column("STATUS", Constraint.Length(10), a => Status(a.Status), a => a.Status)
@@ -98,7 +103,9 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host, Func
         new ResourceView<DeployedServicePackageRow>("service packages", app.Name, ct => _deployed.GetServicePackagesAsync(node, app.Id, ct), p => p.Name + p.ActivationId)
             {
                 OnOpen = package => CodePackages(node, app, package),
+                Empty = "no service packages",
             }
+            .HighlightingChanges()
             .Describing(package => DescribeServicePackage(node, app, package))
             .Column("NAME", Constraint.Fill(2), p => Plain(p.Name), p => p.Name)
             .Column("VERSION", Constraint.Length(12), p => Plain(p.Version), p => p.Version)
@@ -111,8 +118,12 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host, Func
                     .Where(c => c.ActivationId == package.ActivationId)
                     .ToList(),
                 c => c.Name)
+            {
+                Empty = "no code packages",
+            }
+            .HighlightingChanges()
             .Describing(codePackage => DescribeCodePackage(node, app, codePackage))
-            .Acting(CodePackageActions(node, app))
+            .Acting(CodePackageActions(node, app), host)
             .Column("NAME", Constraint.Fill(2), c => Plain(c.Name), c => c.Name)
             .Column("STATUS", Constraint.Length(10), c => Status(c.Status), c => c.Status)
             .Column("VERSION", Constraint.Length(10), c => Plain(c.Version), c => c.Version)
@@ -123,10 +134,10 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host, Func
             .Column("FAILED", Constraint.Length(7), c => c.ActivationFailures > 0 ? Colored(c.ActivationFailures.ToString(), Theme.Current.Error) : Muted("0"), c => c.ActivationFailures, Justify.Right);
 
     /// <summary>
-    /// The saved contexts, grouped by folder, with the mode and label their folders give them; opening one calls
-    /// <paramref name="use"/> instead of navigating.
+    /// The saved contexts, grouped by folder (each folder's label and mode after its name), with the mode their
+    /// folders give them; opening one calls <paramref name="use"/> instead of navigating.
     /// </summary>
-    public static IResourceView Contexts(ContextStore store, string current, Action<ClusterContext> use) =>
+    public static ResourceView<ResolvedContext> Contexts(ContextStore store, Func<string> current, Action<ClusterContext> use) =>
         new ResourceView<ResolvedContext>("contexts", "contexts", _ => Task.FromResult<IReadOnlyList<ResolvedContext>>(store.Contexts.Select(store.Resolve).ToList()), c => c.Context.Name)
             {
                 OnOpen = context =>
@@ -134,19 +145,27 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host, Func
                     use(context.Context);
                     return null;
                 },
+                Empty = $"no contexts; sfx context add <name> <endpoint> saves one",
             }
-            .Column("NAME", Constraint.Fill(1), c => c.Context.Name == current ? Colored(c.Context.Name + " *", Theme.Current.Accent) : Plain(c.Context.Name), c => c.Context.Name)
+            .Column("NAME", Constraint.Fill(1), c => c.Context.Name == current() ? Colored(c.Context.Name + " *", Theme.Current.Accent) : Plain(c.Context.Name), c => c.Context.Name)
             .Column("FOLDER", Constraint.Fill(1), Folder, c => new FolderOrder(c.Context.Folder, c.Context.Name))
             .Column("AUTH", Constraint.Length(14), c => Plain(c.Context.Auth.Count > 0 ? string.Join(",", c.Context.Auth) : "none"))
             .Column("MODE", Constraint.Length(9), c => Plain(ContextCommand.Mode(c.Context)))
             .Column("ENDPOINT", Constraint.Fill(2), c => Plain(c.Context.Endpoint), c => c.Context.Endpoint)
-            .Sorting("FOLDER");
+            .Sorting("FOLDER")
+            .Grouping("FOLDER", FolderSummary);
 
     /// <summary>"prod/europe PROD": the path, so filtering matches it, then the label in the folder's color.</summary>
     private static StyledText Folder(ResolvedContext context) =>
-        context.Context.Folder is not { } path ? Muted("-")
+        context.Context.Folder is not { } path ? StyledText.Empty()
         : context.Label is { } label ? StyledText.Of(path + " ").Append(label).Bold().Fg(FolderColor(context.Color))
         : StyledText.Of(path);
+
+    /// <summary>After a folder's header: "read-only" when its rules make its contexts so.</summary>
+    private static StyledText FolderSummary(TableGroup<ResolvedContext> group) =>
+        group.Rows.Count > 0 && group.Rows.All(c => c.Context.ReadOnly) && group.Rows[0].Context.Folder is not null
+            ? Muted("read-only")
+            : StyledText.Empty();
 
     private static StyledText Role(string role) => role == "Primary" ? Colored(role, Theme.Current.Accent) : Plain(role);
 }

@@ -36,7 +36,6 @@ downloaded with a browser is quarantined; clear it with `xattr -d com.apple.quar
 sfx [-c <context>]                           open a saved context (default: the active one)
 sfx <endpoint> [--auth <methods>] [options]  open a cluster directly
 sfx context <command>                        manage saved contexts
-sfx view list                                list views and their patterns
 sfx ui [<endpoint> | -c <context>]           open the cluster in the browser instead
 ```
 
@@ -78,19 +77,6 @@ color = "danger"
 readonly = true
 ```
 
-Views show only some applications, on any cluster. `apps` includes and `exclude` removes, by glob on the name: `*`
-matches within a segment, `**` across. Pick one with `--view <name>` or `:view <name>` (`:view` alone shows every
-application); `sfx context set-view prod-weu payments` makes it a context's default, and `--none` clears it. It filters
-applications, upgrades, events and a node's replicas, but never hides cluster health. `sfx view list` prints them.
-
-```toml
-[views.payments]
-apps = ["fabric:/payments", "fabric:/payments/*", "fabric:/shared-*"]
-
-[views.no-system]
-exclude = ["fabric:/System"]
-```
-
 A `--readonly` context hides every action that changes the cluster. The riskiest actions (recover from quorum loss,
 remove node state, delete…) stay hidden until unlocked with `:power`, or `--power` on the context.
 
@@ -115,14 +101,20 @@ Only this machine can reach it, and only through the link it prints, which carri
 | --- | --- |
 | `enter` / `l` | open the selected row |
 | `d` | describe the selected row |
-| `backspace` / `h` / `esc` | back |
+| `backspace` / `h` | back |
+| `esc` | dismiss an error, then clear the marks, then the filter, then go back |
 | `/` | filter rows, or search the text being read (`n` / `N` step through matches) |
-| `:` | command, e.g. `:nodes`, `:apps`, `:cluster`, `:health`, `:ctx prod` (below) |
+| `:` | command, e.g. `:nodes`, `:apps`, `:cluster`, `:health`, `:ctx prod` (below); `tab` completes |
 | `ctrl+p` | command palette |
+| `space` / `*` | mark the row / mark every row, to run an action on all of them at once |
+| `:group` | group the rows by a column, e.g. `:group type`; `:group` alone stops grouping |
 | `r` | refresh; `:refresh 2s`, `:refresh 1m` or `:refresh off` changes how often it refreshes on its own |
 | `y` | copy the selected name, or the text being read |
 | `?` | every key on the current page |
 | `q` | quit |
+
+On a describe page, `]` / `[` switch tabs, `#` shows line numbers and `w` wraps long lines. `up` / `down` in the
+`:` and `/` prompts go through earlier entries, kept in a `history` file next to the config.
 
 Besides nodes and applications, `:` opens views across the whole cluster:
 
@@ -134,7 +126,9 @@ Besides nodes and applications, `:` opens views across the whole cluster:
 | `:repairs` | repair tasks: reboots, patching and other infrastructure work, active ones first |
 
 Actions on the selected entity use the same key everywhere: `ctrl+r` restart, `ctrl+k` remove, `ctrl+d` delete,
-`m` move, `x` deactivate, `a` activate. Every change asks for confirmation and is appended to `~/.sfx/actions.log`.
+`m` move, `x` deactivate, `a` activate, `s` scale. Every change asks for confirmation and is appended to
+`~/.sfx/actions.log`. Changes that take a while (restarts, moves, scaling, deactivations, deletes) show in the footer
+until the cluster has caught up.
 
 ## Development
 

@@ -257,33 +257,3 @@
         padding: 0 var(--space-4);
     }
 }
-
-/* The view picker: a select stretched invisibly over a sidebar row. */
-.sidebar-view {
-    position: relative;
-    margin-top: var(--space-1);
-}
-
-.sidebar-view.active {
-    color: var(--text-accent);
-}
-
-.sidebar-view-text {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.sidebar-view-select {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    opacity: 0;
-    cursor: pointer;
-}
-
-.sidebar-view:focus-within {
-    box-shadow: 0 0 0 2px var(--border-accent);
-}

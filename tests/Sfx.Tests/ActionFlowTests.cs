@@ -1,5 +1,6 @@
 using System.Text;
 using Cellar.Terminal;
+using Cellar.Widgets;
 using Microsoft.ServiceFabric.Common;
 using Sfx.Core;
 using Sfx.Core.Auth;
@@ -12,14 +13,32 @@ internal sealed class FakeHost : IActionHost
 {
     public List<Operation> Operations { get; } = [];
     public List<(string Title, IReadOnlyList<Choice> Choices)> Picks { get; } = [];
-    public List<(string Label, string Initial, Action<string> Submit)> Asks { get; } = [];
+    public List<(string Label, string Initial, Func<string, string?>? Validate, Action<string> Submit)> Asks { get; } = [];
+    public List<(string Title, IReadOnlyList<Operation> Operations, string? Note)> Batches { get; } = [];
+    public List<(string Title, IReadOnlyList<FormField> Fields, Func<IReadOnlyList<FormField>, Operation> Review)> Edits { get; } = [];
+    public bool ReadOnly { get; set; }
+    public bool Power { get; set; }
 
     public void Run(Operation operation) => Operations.Add(operation);
+
+    public void Batch(string title, Action queue, string? note = null, Action? started = null)
+    {
+        var before = Operations.Count;
+        queue();
+        Batches.Add((title, Operations.Skip(before).ToList(), note));
+        started?.Invoke();
+    }
 
     public void Pick(string title, Func<CancellationToken, Task<IReadOnlyList<Choice>>> load) =>
         Picks.Add((title, load(CancellationToken.None).GetAwaiter().GetResult()));
 
-    public void Ask(string label, string initial, Action<string> submit) => Asks.Add((label, initial, submit));
+    public void Ask(string label, string initial, Func<string, string?>? validate, Action<string> submit) =>
+        Asks.Add((label, initial, validate, submit));
+
+    public void Edit(string title, Func<CancellationToken, Task<IReadOnlyList<FormField>>> load, Func<IReadOnlyList<FormField>, Operation> review) =>
+        Edits.Add((title, load(CancellationToken.None).GetAwaiter().GetResult(), review));
+
+    public bool Allows(ActionRisk risk, bool power) => (risk == ActionRisk.None || !ReadOnly) && (!power || Power);
 }
 
 public class EntityActionTests
@@ -112,63 +131,101 @@ public class EntityActionTests
         Assert.True(replica.Single(a => a.Title == "Force-remove replica").Power);
         Assert.True(node.Single(a => a.Title == "Remove node state").Power);
         // ctrl+r restarts on every entity that can restart.
-        Assert.Equal(KeyChord.Ctrl('r'), replica.Single(a => a.Title == "Restart replica").Keys![0]);
-        Assert.Equal(KeyChord.Ctrl('r'), node.Single(a => a.Title == "Restart node").Keys![0]);
+        Assert.Equal(KeySequence.Parse("ctrl+r"), replica.Single(a => a.Title == "Restart replica").Keys![0]);
+        Assert.Equal(KeySequence.Parse("ctrl+r"), node.Single(a => a.Title == "Restart node").Keys![0]);
     }
 }
 
 public class ConfirmDialogTests
 {
-    private static KeyEvent Key(char c) => new(Cellar.Terminal.Key.Char, new Rune(c), KeyModifiers.None);
+    private static KeyEvent Key(char c, KeyModifiers modifiers = KeyModifiers.None) => new(Cellar.Terminal.Key.Char, new Rune(c), modifiers);
 
     private static readonly KeyEvent Enter = new(Cellar.Terminal.Key.Enter, default, KeyModifiers.None);
 
     private static Operation Op(ActionRisk risk, params OperationOption[] options) =>
         new("Remove replica 131", "131", risk, (_, _) => Task.CompletedTask, Options: options);
 
+    private static (ConfirmDialog Dialog, List<ConfirmResult> Results) Dialog(ConfirmDialog dialog)
+    {
+        List<ConfirmResult> results = [];
+        dialog.OnResult = results.Add;
+        // Shown, its overlay focuses it.
+        dialog.HasFocus = true;
+        return (dialog, results);
+    }
+
     [Fact]
     public void Plain_confirmation_runs_on_y_with_the_options_toggled_on()
     {
-        IReadOnlySet<char>? confirmed = null;
-        var dialog = new ConfirmDialog(Op(ActionRisk.Confirm, new OperationOption('i', "ignore constraints")), o => confirmed = o, () => { });
+        var (dialog, results) = Dialog(Confirmations.For(Op(ActionRisk.Confirm, new OperationOption('i', "ignore constraints"))));
 
         dialog.OnEvent(Key('i'));
         dialog.OnEvent(Key('y'));
 
-        Assert.Equal(['i'], confirmed!);
+        var result = Assert.Single(results);
+        Assert.True(result.Confirmed);
+        Assert.Equal(['i'], Confirmations.Chosen(result));
     }
 
     [Fact]
-    public void Destructive_confirmation_needs_the_exact_target()
+    public void Destructive_confirmation_needs_the_exact_target_and_toggles_take_alt()
     {
-        var confirmed = false;
-        var cancelled = false;
-        var dialog = new ConfirmDialog(Op(ActionRisk.Destructive), _ => confirmed = true, () => cancelled = true);
+        var (dialog, results) = Dialog(Confirmations.For(Op(ActionRisk.Destructive, new OperationOption('f', "force"))));
 
+        Assert.Equal(ConfirmRisk.Destructive, dialog.Risk);
         // y is just a character here, not a yes.
         dialog.OnEvent(Key('y'));
         dialog.OnEvent(Enter);
-        Assert.False(confirmed);
+        Assert.Empty(results);
 
         dialog.OnEvent(new KeyEvent(Cellar.Terminal.Key.Backspace, default, KeyModifiers.None));
+        dialog.OnEvent(Key('f', KeyModifiers.Alt));
         foreach (var c in "131")
         {
             dialog.OnEvent(Key(c));
         }
         dialog.OnEvent(Enter);
-        Assert.True(confirmed);
-        Assert.False(cancelled);
+
+        var result = Assert.Single(results);
+        Assert.True(result.Confirmed);
+        Assert.Equal(['f'], Confirmations.Chosen(result));
     }
 
     [Fact]
     public void Escape_cancels()
     {
-        var cancelled = false;
-        var dialog = new ConfirmDialog(Op(ActionRisk.Destructive), _ => { }, () => cancelled = true);
+        var (dialog, results) = Dialog(Confirmations.For(Op(ActionRisk.Destructive)));
 
         dialog.OnEvent(new KeyEvent(Cellar.Terminal.Key.Escape, default, KeyModifiers.None));
 
-        Assert.True(cancelled);
+        Assert.False(Assert.Single(results).Confirmed);
+    }
+
+    [Fact]
+    public void A_batch_lists_its_operations_and_a_destructive_one_asks_to_type_how_many()
+    {
+        var operations = Enumerable.Range(1, 10)
+            .Select(i => new Operation($"Remove replica {i}", $"{i}", i == 3 ? ActionRisk.Destructive : ActionRisk.Confirm, (_, _) => Task.CompletedTask))
+            .ToList();
+
+        var dialog = Confirmations.ForBatch("Remove replica: 10 marked rows", operations, "1 marked row is left out: it doesn't apply to it.");
+        var details = dialog.Details.Select(line => line.PlainText).ToList();
+
+        Assert.Equal(ConfirmRisk.Destructive, dialog.Risk);
+        Assert.Equal("10", dialog.ConfirmText);
+        Assert.Equal(Confirmations.Listed + 2, details.Count);
+        Assert.Equal("  Remove replica 1", details[0]);
+        Assert.Equal("  and 2 more", details[Confirmations.Listed]);
+        Assert.Contains("left out", details[^1]);
+        Assert.Contains("stop at the first that fails", dialog.Warning);
+    }
+
+    [Fact]
+    public void A_batch_of_plain_changes_asks_y_or_n()
+    {
+        var operation = new Operation("Restart node a", "a", ActionRisk.Confirm, (_, _) => Task.CompletedTask);
+
+        Assert.Equal(ConfirmRisk.Normal, Confirmations.ForBatch("Restart node: 2 marked rows", [operation, operation], null).Risk);
     }
 }
 
@@ -264,7 +321,7 @@ public class ContextModeTests
     [Fact]
     public void Command_line_reads_readonly_and_power_flags()
     {
-        var options = CommandLine.Parse(["localhost", "--readonly", "--power"], new HashSet<string>());
+        var options = Sfx.Tui.CommandLine.Parse(["localhost", "--readonly", "--power"], new HashSet<string>());
 
         Assert.True(options.ReadOnly);
         Assert.True(options.Power);

@@ -12,7 +12,6 @@ import { LinkRow } from "../ui/Row";
 import { Empty, Section } from "../ui/Section";
 import { useLimited } from "../ui/ShowMore";
 import { SearchBox, Toolbar } from "../ui/Toolbar";
-import { ViewNote } from "../ui/ViewNote";
 
 export function Applications() {
     const apps = useResource("apps", api.applications);
@@ -34,7 +33,6 @@ function ApplicationList({ all, reload, at }: { all: Application[]; reload: () =
                 {plural(all.length, "application")}, {errors} with errors and {warnings} with warnings.
             </h2>
             <PageHeader title="Applications" summary={[plural(all.length, "application"), errors ? plural(errors, "error") : null, warnings ? plural(warnings, "warning") : null].filter(Boolean).join(" · ")} onRefresh={reload} updated={at} />
-            <ViewNote />
             <Toolbar>
                 <SearchBox value={search} onChange={setSearch} placeholder="Filter by name or type" />
                 <Chips label="Filter by health" options={healthFilters} value={filter} onChange={setFilter} />

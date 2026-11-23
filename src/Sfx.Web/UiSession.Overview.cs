@@ -6,13 +6,6 @@ public sealed partial class UiSession
 {
     private Cached<ApiOverview.Overview>? _overview;
     private Cached<IReadOnlyList<UpgradeRow>>? _upgrades;
-    private Cached<IReadOnlyList<ApplicationRow>>? _applications;
-
-    /// <summary>The applications, for what a view hides on the overview; asked at most once per 10 seconds, shared by every tab.</summary>
-    internal Task<IReadOnlyList<ApplicationRow>> GetApplicationListAsync(CancellationToken cancellationToken) =>
-        LazyInitializer.EnsureInitialized(ref _applications, () => new Cached<IReadOnlyList<ApplicationRow>>(
-                TimeSpan.FromSeconds(10), ct => Queries.GetApplicationsAsync(ct)))
-            .GetAsync(cancellationToken);
 
     /// <summary>The overview, asked at most once per 10 seconds, shared by every tab.</summary>
     internal Task<ApiOverview.Overview> GetOverviewAsync(CancellationToken cancellationToken) =>

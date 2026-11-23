@@ -15,7 +15,6 @@ import { PageHeader } from "../ui/PageHeader";
 import { Empty, Section } from "../ui/Section";
 import { SearchBox, Toolbar } from "../ui/Toolbar";
 import "./Contexts.css";
-import { resetView } from "../lib/view";
 
 /** "prod/europe" as the reader sees it. */
 export const folderLabel = (path: string) => path.split("/").join(" / ");
@@ -58,8 +57,6 @@ export function Contexts() {
             target.current = null;
             rememberContext(name);
             notify(`Switched to ${name}.`, true);
-            // Its own default view, not the one chosen for the last cluster.
-            resetView();
             bump();
             location.hash = "#/";
         }
@@ -208,7 +205,6 @@ function ContextRow({
                         {c.folder ? ` · ${folderLabel(c.folder)}` : ""}
                         {!c.saved ? " · from the command line" : ""}
                         {c.readOnly ? " · read-only" : ""}
-                        {c.view ? ` · view ${c.view}` : ""}
                     </span>
                 </span>
                 <ContextLabel label={c.label} color={c.color} />

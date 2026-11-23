@@ -4,8 +4,6 @@ namespace Sfx.Tui;
 
 /// <param name="Arguments">Positional arguments: an endpoint, or a subcommand and its arguments.</param>
 /// <param name="Folder">The folder <c>sfx context add</c> files the context in.</param>
-/// <param name="View">The view to open with, overriding the context's; for <c>sfx context add</c>, the context's view.</param>
-/// <param name="NoView"><c>--none</c>, for <c>sfx context set-view</c>: the context opens without a view.</param>
 public sealed record CommandLineOptions(
     IReadOnlyList<string> Arguments,
     string? Context,
@@ -19,9 +17,7 @@ public sealed record CommandLineOptions(
     bool ShowVersion = false,
     int Port = 0,
     bool NoBrowser = false,
-    string? Folder = null,
-    string? View = null,
-    bool NoView = false);
+    string? Folder = null);
 
 public sealed class UsageException(string message) : Exception(message);
 
@@ -29,8 +25,8 @@ public static class CommandLine
 {
     /// <summary>
     /// Host options (<c>--auth</c>, <c>-c/--context</c>, <c>--refresh</c>, <c>--use</c>, <c>--readonly</c>, <c>--power</c>,
-    /// <c>--help</c>, <c>--version</c>, <c>--view</c>, <c>--port</c> and <c>--no-browser</c> for <c>sfx ui</c>, <c>--folder</c> for
-    /// <c>sfx context add</c>, and <c>--none</c> for <c>sfx context set-view</c>) are read here; every other <c>--key value</c> is collected for the auth providers.
+    /// <c>--help</c>, <c>--version</c>, <c>--port</c> and <c>--no-browser</c> for <c>sfx ui</c>, and <c>--folder</c> for
+    /// <c>sfx context add</c>) are read here; every other <c>--key value</c> is collected for the auth providers.
     /// <paramref name="flags"/> names options that take no value.
     /// </summary>
     public static CommandLineOptions Parse(IReadOnlyList<string> args, IReadOnlySet<string> flags)
@@ -48,8 +44,6 @@ public static class CommandLine
         var port = 0;
         var noBrowser = false;
         string? folder = null;
-        string? view = null;
-        var noView = false;
 
         for (var i = 0; i < args.Count; i++)
         {
@@ -73,9 +67,6 @@ public static class CommandLine
                     continue;
                 case "--no-browser":
                     noBrowser = true;
-                    continue;
-                case "--none":
-                    noView = true;
                     continue;
                 case "-c":
                     context = i + 1 < args.Count ? args[++i] : throw new UsageException("-c needs a context name.");
@@ -121,9 +112,6 @@ public static class CommandLine
                 case "folder":
                     folder = value;
                     break;
-                case "view":
-                    view = value.Trim() is { Length: > 0 } name ? name : throw new UsageException("--view needs a view name.");
-                    break;
                 case "refresh":
                     refresh = RefreshInterval.TryParse(value, out var interval)
                         ? interval
@@ -145,16 +133,6 @@ public static class CommandLine
             throw new UsageException("--folder only applies to 'sfx context add'. To file a saved context elsewhere, use 'sfx context move <name> <folder>'.");
         }
 
-        if (noView && !help && arguments is not ["context", "set-view", ..])
-        {
-            throw new UsageException("--none only applies to 'sfx context set-view <name> --none'.");
-        }
-
-        if (view is not null && !help && arguments is ["context", _, ..] and not ["context", "add", ..])
-        {
-            throw new UsageException("--view applies to opening a cluster and to 'sfx context add'. To change a saved context's view, use 'sfx context set-view <name> <view>'.");
-        }
-
-        return new CommandLineOptions(arguments, context, methods, authOptions, refresh, use, help, readOnly, power, version, port, noBrowser, folder, view, noView);
+        return new CommandLineOptions(arguments, context, methods, authOptions, refresh, use, help, readOnly, power, version, port, noBrowser, folder);
     }
 }

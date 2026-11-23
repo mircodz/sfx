@@ -6,18 +6,8 @@ namespace Sfx.Web;
 
 /// <summary>One connected cluster, shared by every browser tab; <see cref="UiHost"/> replaces it on a context switch.</summary>
 /// <param name="resolved">The context after folder rules, with its folder's label and color; defaults to none.</param>
-/// <param name="views">The views in the config; defaults to none.</param>
-/// <param name="defaultView">The view the browser starts with: <c>--view</c>, else the context's; null for none.</param>
-public sealed partial class UiSession(
-    ClusterSession session, ActionLog log, string version, ResolvedContext? resolved = null, ViewCatalog? views = null, string? defaultView = null)
+public sealed partial class UiSession(ClusterSession session, ActionLog log, string version, ResolvedContext? resolved = null)
 {
-    public ViewCatalog Views { get; } = views ?? ViewCatalog.Empty;
-    public string? DefaultView => defaultView;
-
-    /// <summary>The view a request names in <c>?view=</c>: none when it's absent or empty, a 400 when it isn't defined.</summary>
-    public ViewFilter View(string? name) =>
-        string.IsNullOrWhiteSpace(name) ? ViewFilter.None : Views.Find(name) ?? throw new ActionException(Views.Unknown(name.Trim()));
-
     public string? Label => resolved?.Label;
     public string? Color => resolved?.Color;
     public ClusterSession Cluster => session;

@@ -92,11 +92,6 @@ export function NodeDetail({ name }: { name: string }) {
                                         {!hosting(n.status) && <Empty>The node is {n.status.toLowerCase()}, so nothing runs on it.</Empty>}
                                         {d.replicas.length > 0 && <SearchBox value={search} onChange={setSearch} placeholder="Filter by service, role or application" />}
                                         {hosting(n.status) && replicas.length === 0 && <Empty>No replicas match.</Empty>}
-                                        {!!d.hiddenReplicas && (
-                                            <Empty>
-                                                {plural(d.hiddenReplicas, "replica")} of applications outside the view {d.hiddenReplicas === 1 ? "isn't" : "aren't"} shown.
-                                            </Empty>
-                                        )}
                                         {apps.map((appId) => {
                                             const group = replicas.filter((r) => r.applicationId === appId);
                                             return (

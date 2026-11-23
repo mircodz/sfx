@@ -12,3 +12,4 @@ TestResults/
 samples/demo-cluster/out/
 __pycache__/
 sfx-*.zip
+nuget.config

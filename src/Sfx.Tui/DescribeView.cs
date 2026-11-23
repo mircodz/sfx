@@ -11,15 +11,18 @@ public sealed record DescribeTab(string Title, Func<CancellationToken, Task<IRea
 
 /// <summary>
 /// One entity's details as tabs of text (overview, health, manifest, raw JSON…). Only the tab being read is loaded,
-/// and refreshed; <c>/</c> searches it, <c>n</c>/<c>N</c> step through the matches, <c>y</c> copies it.
+/// and refreshed; <c>/</c> searches it, <c>n</c>/<c>N</c> step through the matches, <c>y</c> copies it, <c>#</c>
+/// numbers its lines and <c>w</c> wraps them.
 /// </summary>
 public sealed class DescribeView : IResourceView
 {
+    private const string Reading = "Reading";
+
     private readonly string _kind;
     private readonly string _name;
     private readonly string? _crumb;
     private readonly IReadOnlyList<DescribeTab> _tabs;
-    private readonly TextView[] _views;
+    private readonly TextViewer[] _viewers;
     private readonly Tabs _tabsWidget = new() { ArrowKeysSwitch = false };
     private readonly Panel _panel;
     private string _filter = "";
@@ -32,26 +35,35 @@ public sealed class DescribeView : IResourceView
         IReadOnlyList<DescribeTab> tabs,
         int activeTab = 0,
         string? crumb = null,
-        IEnumerable<ShellAction>? actions = null)
+        IEnumerable<AppAction>? actions = null)
     {
         _kind = kind;
         _name = name;
         _crumb = crumb;
         _tabs = tabs;
-        _views = tabs.Select(_ => new TextView()).ToArray();
+        // The shell's command line does the searching, so / is the same key on every page.
+        _viewers = tabs.Select(_ => new TextViewer { SearchPrompt = false }).ToArray();
         for (var i = 0; i < tabs.Count; i++)
         {
-            _tabsWidget.Add(tabs[i].Title, _views[i]);
+            _tabsWidget.Add(tabs[i].Title, _viewers[i]);
         }
         _tabsWidget.ActiveIndex = activeTab;
-        _panel = new Panel(new TabsWatcher(_tabsWidget, OnTabChanged), "") { BorderStyle = BorderStyle.Rounded };
+        _panel = new Panel(new Reader(this), "") { BorderStyle = BorderStyle.Rounded };
 
         Actions =
         [
-            new("Next match", "Reading", _ => Step(1), [KeyChord.Of('n')]),
-            new("Previous match", "Reading", _ => Step(-1), [KeyChord.Of('N')]),
-            new("Next tab (also 1-9 and click)", "Reading", _ => SwitchTab(1), [KeyChord.Of(']')]),
-            new("Previous tab", "Reading", _ => SwitchTab(-1), [KeyChord.Of('[')]),
+            new AppAction("reading.next-match", "Next match", () => Step(1)) { Group = Reading, Keys = ["n"] },
+            new AppAction("reading.previous-match", "Previous match", () => Step(-1)) { Group = Reading, Keys = ["N"] },
+            new AppAction("reading.next-tab", "Next tab (also 1-9 and click)", () => SwitchTab(1)) { Group = Reading, Keys = ["]"] },
+            new AppAction("reading.previous-tab", "Previous tab", () => SwitchTab(-1)) { Group = Reading, Keys = ["["] },
+            new AppAction("reading.line-numbers", "Line numbers on or off", () => Active.ShowLineNumbers = !Active.ShowLineNumbers)
+            {
+                Group = Reading, Keys = ["#"],
+            },
+            new AppAction("reading.wrap", "Wrap long lines, or scroll them sideways", () => Active.Wrap = !Active.Wrap)
+            {
+                Group = Reading, Keys = ["w"],
+            },
             .. actions ?? [],
         ];
         UpdateTitle();
@@ -65,7 +77,7 @@ public sealed class DescribeView : IResourceView
 
     public Action? Reload { get; set; }
 
-    public IReadOnlyList<ShellAction> Actions { get; }
+    public IReadOnlyList<AppAction> Actions { get; }
 
     public string? CopyText => Active.Text;
 
@@ -81,7 +93,8 @@ public sealed class DescribeView : IResourceView
         }
     }
 
-    private TextView Active => _views[_tabsWidget.ActiveIndex];
+    /// <summary>The tab being read.</summary>
+    public TextViewer Active => _viewers[_tabsWidget.ActiveIndex];
 
     public async Task<Action> LoadAsync(CancellationToken cancellationToken)
     {
@@ -99,7 +112,15 @@ public sealed class DescribeView : IResourceView
 
         return () =>
         {
-            _views[index].SetLines(lines);
+            var viewer = _viewers[index];
+            var top = viewer.TopLine;
+            viewer.SetLines(lines);
+            // A refresh keeps the place being read.
+            viewer.ScrollToLine(top);
+            if (_filter.Length > 0 && viewer.Search != _filter)
+            {
+                viewer.Find(_filter);
+            }
             UpdateTitle();
         };
     }
@@ -118,7 +139,7 @@ public sealed class DescribeView : IResourceView
 
     private void OnTabChanged()
     {
-        if (_filter.Length > 0)
+        if (Active.Search != _filter)
         {
             Active.Find(_filter);
         }
@@ -130,34 +151,49 @@ public sealed class DescribeView : IResourceView
     {
         var search = _filter.Length == 0 ? ""
             : Active.MatchCount == 0 ? $" /{_filter} (no match)"
-            : $" /{_filter} ({Active.CurrentMatch}/{Active.MatchCount})";
+            : $" /{_filter} ({Math.Max(1, Active.CurrentMatch)}/{Active.MatchCount})";
         _panel.Title = $" {_kind} {_name}{search} ";
     }
 
-    /// <summary>Passes everything to the tabs, and reports when the active tab changes (by key or click).</summary>
-    private sealed class TabsWatcher(Tabs tabs, Action changed) : Widget
+    /// <summary>
+    /// The tabs, minus the viewer keys sfx gives another meaning on every page (<c>h</c> back, <c>l</c> open,
+    /// <c>y</c> copy, <c>esc</c> clear the search, then back); notices when the tab or the match changes.
+    /// </summary>
+    private sealed class Reader(DescribeView page) : Widget
     {
+        private Tabs Tabs => page._tabsWidget;
+
         public override bool IsFocusable => true;
 
         public override bool HasFocus
         {
-            get => tabs.HasFocus;
-            set => tabs.HasFocus = value;
+            get => Tabs.HasFocus;
+            set => Tabs.HasFocus = value;
         }
 
         public override bool OnEvent(InputEvent e)
         {
-            var before = tabs.ActiveIndex;
-            var handled = tabs.OnEvent(e);
-            if (tabs.ActiveIndex != before)
+            if (e is KeyEvent { Modifiers: KeyModifiers.None } key
+                && (key.Key == Key.Escape || key.IsChar && key.Rune.Value is 'h' or 'l' or 'y'))
             {
-                changed();
+                return false;
+            }
+
+            var before = Tabs.ActiveIndex;
+            var handled = Tabs.OnEvent(e);
+            if (Tabs.ActiveIndex != before)
+            {
+                page.OnTabChanged();
+            }
+            else if (handled)
+            {
+                page.UpdateTitle();
             }
             return handled;
         }
 
-        public override void Render(Surface surface, Rect area) => tabs.Render(surface, area);
+        public override void Render(Surface surface, Rect area) => Tabs.Render(surface, area);
 
-        protected override void VisitChildren(Action<Widget> visit) => visit(tabs);
+        protected override void VisitChildren(Action<Widget> visit) => visit(Tabs);
     }
 }

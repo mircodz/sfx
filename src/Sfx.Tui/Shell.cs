@@ -6,84 +6,125 @@ using Cellar.Text;
 using Cellar.Theming;
 using Cellar.Widgets;
 using Sfx.Core;
+using Prompt = Cellar.Widgets.CommandLine;
 
 namespace Sfx.Tui;
 
 /// <summary>
-/// The screen: a page stack under a clickable breadcrumb, and a footer with the status (or the : and / prompt)
-/// and clickable shortcuts. Keys, <c>:</c> commands, the palette, help and the footer all come from <see cref="Actions"/>.
+/// The screen: the cluster's pages (a stack under a clickable breadcrumb) or the contexts page, and a footer that is
+/// the status line or the <c>:</c> and <c>/</c> prompt, with the activity strip on its right. Keys, <c>:</c>
+/// commands, the palette, help and the footer's shortcuts all come from one <see cref="Keymap"/>.
 /// </summary>
 internal sealed class Shell : IActionHost
 {
-    private enum PromptMode { None, Command, Filter, Ask }
-
     private const string General = "General";
     private const string Navigation = "Navigation";
     private const string Movement = "Movement";
-    private const string ViewsGroup = "Views";
+    private const string PagesGroup = "Pages";
+    private const string Rows = "Rows";
+    private const string ClusterPage = "cluster";
+    private const string ContextsPage = "contexts";
+
+    private static readonly TimeSpan TrackEvery = TimeSpan.FromSeconds(3);
 
     private readonly App _app;
-    private readonly ITerminal _terminal;
     private readonly ClusterConnector _connector;
     private readonly ContextStore _store;
     private readonly Navigator _navigator = new() { BackKey = Key.Backspace };
+    private readonly Switcher _main = new();
+    private readonly ResourceView<ResolvedContext> _contexts;
     private readonly Dictionary<Widget, IResourceView> _pages = new(ReferenceEqualityComparer.Instance);
-    private readonly IReadOnlyList<ShellAction> _global;
-    private readonly Label _status = new(StyledText.Empty());
-    private readonly Label _promptLabel = new(StyledText.Empty());
-    private readonly Input _prompt = new();
-    private readonly Slot _footer;
+    private readonly Keymap _keymap = new();
+    private readonly Prompt _line = new();
+    private readonly CommandMode _commands;
+    private readonly CommandMode _filter;
+    private readonly StatusItem _contextItem;
+    private readonly SpinnerStatusItem _loadingItem;
+    private readonly StatusItem _updatedItem;
     private readonly ActionLog _log;
-    private readonly ActivityTracker _activity;
-    private readonly ViewCatalog _viewCatalog;
+    private readonly SessionActivity _activity;
 
-    private Widget _promptRow;
-    private Widget _statusRow;
     private ClusterSession _session;
     private Views _views;
-    private ViewFilter _view;
-    private PromptMode _mode;
-    private Action<string>? _askSubmit;
     private bool _power;
     private CancellationTokenSource? _loading;
     private CancellationTokenSource? _connecting;
     private DateTime? _loadedAt;
     private TimeSpan _refreshInterval;
     private CancellationTokenSource? _autoRefresh;
-    private string? _error;
-    private string? _notice;
+    private StyledText? _loadError;
+    private List<Operation>? _batch;
+    private bool _batchRefused;
 
-    /// <param name="views">The views in the config; none when null.</param>
-    /// <param name="view">The view to start with.</param>
-    /// <param name="notice">Shown in the status line once the UI is up, e.g. that the context's view isn't defined.</param>
-    public Shell(
-        App app, ITerminal terminal, ClusterSession session, ClusterConnector connector, ContextStore store, TimeSpan refreshInterval,
-        ViewCatalog? views = null, ViewFilter? view = null, string? notice = null)
+    public Shell(App app, ClusterSession session, ClusterConnector connector, ContextStore store, TimeSpan refreshInterval)
     {
         _app = app;
-        _terminal = terminal;
         _session = session;
         _power = session.Context.Power;
-        _viewCatalog = views ?? ViewCatalog.Empty;
-        _view = view ?? ViewFilter.None;
-        _notice = notice;
-        _views = new Views(session.Queries, this, () => _view);
+        _views = new Views(session.Queries, this);
         _connector = connector;
         _store = store;
         _log = new ActionLog(SfxHost.ActionLogPath(store));
-        _activity = new ActivityTracker(_log);
-        _global = GlobalActions();
+        _activity = new SessionActivity(_log);
+        _contexts = Views.Contexts(store, () => _session.Context.Name, Connect);
+        _contexts.Reload = Refresh;
 
-        _promptRow = PromptRow(":");
-        _statusRow = BuildStatusRow();
-        _footer = new Slot(_statusRow);
+        _keymap.Global.Add(GlobalActions());
+        _keymap.AddScope("page", () => Current?.Actions ?? [], KeymapScope.PagePrecedence);
+
+        var history = new CommandHistory(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(store.Path))!, "history"));
+        _commands = new CommandMode(":")
+        {
+            Placeholder = "command, e.g. nodes, ctx prod, events 6h (tab completes)",
+            History = history.For(':'),
+            Completion = new KeymapCompletionSource(_keymap) { Arguments = Arguments },
+            OnSubmit = RunCommand,
+        };
+        _filter = new CommandMode("/")
+        {
+            History = history.For('/'),
+            OnChange = text =>
+            {
+                if (Current is { } page)
+                {
+                    page.Filter = text;
+                }
+            },
+            OnSubmit = text =>
+            {
+                if (Current is { } page)
+                {
+                    page.Filter = text;
+                }
+            },
+            OnCancel = () =>
+            {
+                if (Current is { } page)
+                {
+                    page.Filter = "";
+                }
+            },
+        };
+
+        var status = _line.Status;
+        status.Keymap = _keymap;
+        status.MessageDuration = TimeSpan.FromSeconds(8);
+        status.ErrorHint = Styles.Muted("esc dismisses");
+        _contextItem = status.Add(StyledText.Empty(), StatusAlignment.Left, priority: 100);
+        _loadingItem = (SpinnerStatusItem)status.Add(new SpinnerStatusItem("loading…", StatusAlignment.Left, priority: 50));
+        _updatedItem = status.Add(StyledText.Empty(), StatusAlignment.Left, priority: 40);
+
+        _main.Add(ClusterPage, _navigator);
+        _main.Add(ContextsPage, _contexts.Widget);
+        _main.Show(ClusterPage);
 
         app.Root = new Stack(Direction.Vertical)
-            .Add(_navigator, Constraint.Fill())
-            .Add(_footer, Constraint.Length(1));
+            .Add(_main, Constraint.Fill())
+            .Add(new Footer(_line, new ActivityStrip(_activity.Tasks), _activity.Tasks), Constraint.Length(1));
 
-        app.OnEvent = OnPromptEvent;
-        app.OnUnhandledEvent = OnUnhandledEvent;
+        app.OnEvent = _line.Intercept;
+        // An open overlay (help, palette, a dialog) keeps its keys to itself.
+        app.OnUnhandledEvent = e => _app.TopOverlay is null && _keymap.Handle(e);
         app.OnMessage = message =>
         {
             if (message is Action action)
@@ -93,147 +134,133 @@ internal sealed class Shell : IActionHost
             }
         };
         _navigator.OnNavigate = _ => OnNavigated();
-        _prompt.OnChange = text =>
-        {
-            if (_mode == PromptMode.Filter && Current is { } view)
-            {
-                view.Filter = text;
-            }
-        };
 
         ShowRoot(_views.Nodes());
         SetRefreshInterval(refreshInterval);
     }
 
-    private IResourceView? Current =>
-        _navigator.Current is { } page && _pages.TryGetValue(page.Content, out var view) ? view : null;
+    private bool OnContexts => _main.CurrentName == ContextsPage;
 
-    /// <summary>
-    /// The current page's actions, then the global ones, so a page can rebind a key. Read-only contexts drop every
-    /// action that changes the cluster, and power actions stay hidden until unlocked, so keys, help and palette agree.
-    /// </summary>
-    private IEnumerable<ShellAction> Actions => (Current?.Actions ?? [])
-        .Concat(_global)
-        .Where(action => action.Risk == ActionRisk.None || !_session.Context.ReadOnly)
-        .Where(action => !action.Power || _power);
+    private IResourceView? Current =>
+        OnContexts ? _contexts
+        : _navigator.Current is { } page && _pages.TryGetValue(page.Content, out var view) ? view
+        : null;
+
+    private StatusLine Status => _line.Status;
+
+    /// <summary>Every key and command, the page's included.</summary>
+    internal Keymap Keymap => _keymap;
 
     public Task NotifyAsync(string message)
     {
-        Post(() =>
-        {
-            _notice = message;
-            UpdateStatus();
-        });
+        Post(() => Warn(message));
         return Task.CompletedTask;
     }
 
-    private IReadOnlyList<ShellAction> GlobalActions() =>
+    /// <summary>Every key and command that works on any page. Pages add their own, which win on the same key.</summary>
+    private IReadOnlyList<AppAction> GlobalActions() =>
     [
-        new("Command", General, _ => OpenPrompt(PromptMode.Command), [KeyChord.Of(':')], Footer: "cmd"),
-        new("Filter rows", General, _ => OpenPrompt(PromptMode.Filter), [KeyChord.Of('/')], Footer: "filter"),
-        new("Command palette", General, _ => OpenPalette(), [KeyChord.Ctrl('p')], ["palette"], "palette"),
-        new("Keys", General, _ => ShowHelp(), [KeyChord.Of('?')], ["help"], "help"),
-        new("Refresh now; :refresh 2s, 1m or off sets how often it refreshes on its own", General, ChangeRefresh, [KeyChord.Of('r')], ["refresh"]),
-        new("Copy the selected name, or the text being read", General, _ => Copy(), [KeyChord.Of('y')], ["copy"]),
-        new("Quit", General, _ => _app.Quit(), [KeyChord.Of('q'), KeyChord.Ctrl('c')], ["quit", "q"], "quit"),
+        new("command", "Command", () => _line.Open(_commands)) { Keys = [":"], Footer = "cmd" },
+        new("filter", "Filter rows, or search the text being read", OpenFilter) { Keys = ["/"], Footer = "filter" },
+        new("palette", "Command palette", OpenPalette) { Keys = ["ctrl+p"], Commands = ["palette"], Footer = "palette" },
+        new("help", "Keys", () => _keymap.ShowHelp(_app)) { Keys = ["?"], Commands = ["help"], Footer = "help" },
+        new("refresh", "Refresh now; :refresh 2s, 1m or off sets how often it refreshes on its own", ChangeRefresh)
+        {
+            Keys = ["r"], Commands = ["refresh"], ArgumentHint = "[interval|off]",
+        },
+        new("copy", "Copy the selected name, or the text being read", Copy) { Keys = ["y"], Commands = ["copy"] },
+        new("quit", "Quit", _app.Quit) { Keys = ["q", "ctrl+c"], Commands = ["quit", "q"], Footer = "quit" },
 
-        new("Back", Navigation, _ => _navigator.Pop(), [KeyChord.Named(Key.Backspace), KeyChord.Of('h')], ["back"], "back"),
-        new("Clear filter, or back", Navigation, _ => ClearFilterOrBack(), [KeyChord.Named(Key.Escape)]),
+        new("back", "Back", Back) { Group = Navigation, Keys = ["backspace", "h"], Commands = ["back"], Footer = "back" },
+        new("escape", "Dismiss the error or warning, clear the marks or the filter, or go back", Escape) { Group = Navigation, Keys = ["esc"] },
 
-        new("Nodes", ViewsGroup, _ => ShowRoot(_views.Nodes()), Commands: ["nodes", "node", "no"]),
-        new("Applications", ViewsGroup, _ => ShowRoot(_views.Applications()), Commands: ["apps", "app", "applications"]),
-        new("Cluster", ViewsGroup, _ => ShowRoot(_views.DescribeCluster(_session.Context.Name)), Commands: ["cluster"]),
-        new("Cluster health", ViewsGroup, _ => ShowRoot(_views.DescribeCluster(_session.Context.Name, Views.ClusterHealthTab)), Commands: ["health"]),
-        new("Upgrades of the cluster and applications", ViewsGroup, _ => ShowRoot(_views.Upgrades()), Commands: ["upgrades", "updates", "up"]),
-        new("Activity: what sfx changed, this session and before", ViewsGroup, _ => ShowRoot(Views.Activity(_activity)), Commands: ["activity", "act"]),
-        new("Events of the last hour; :events 6h for longer", ViewsGroup, ShowEvents, Commands: ["events", "ev"]),
-        new("Repair tasks: reboots, patching and other infrastructure work", ViewsGroup, _ => ShowRoot(_views.Repairs()), Commands: ["repairs", "repair", "rt"]),
-        new("Contexts; :ctx <name> switches", ViewsGroup, SwitchContext, [KeyChord.Of('c')], ["ctx", "context", "contexts"]),
-        new("Show only a view's applications: :view <name>; :view alone shows them all", General, SwitchView, Commands: ["view"]),
-        new("Unlock or lock power actions (recover, delete, remove node state…)", General, _ => TogglePower(), Commands: ["power"]),
+        new("go.nodes", "Nodes", () => ShowRoot(_views.Nodes())) { Group = PagesGroup, Commands = ["nodes", "node", "no"] },
+        new("go.applications", "Applications", () => ShowRoot(_views.Applications()))
+        {
+            Group = PagesGroup, Commands = ["apps", "app", "applications"],
+        },
+        new("go.cluster", "Cluster", () => ShowRoot(_views.DescribeCluster(_session.Context.Name))) { Group = PagesGroup, Commands = ["cluster"] },
+        new("go.health", "Cluster health", () => ShowRoot(_views.DescribeCluster(_session.Context.Name, Views.ClusterHealthTab)))
+        {
+            Group = PagesGroup, Commands = ["health"],
+        },
+        new("go.upgrades", "Upgrades of the cluster and applications", () => ShowRoot(_views.Upgrades()))
+        {
+            Group = PagesGroup, Commands = ["upgrades", "updates", "up"],
+        },
+        new("go.activity", "Activity: what sfx changed, this session and before", () => ShowRoot(Views.Activity(_activity)))
+        {
+            Group = PagesGroup, Commands = ["activity", "act"],
+        },
+        new("go.events", "Events of the last hour; :events 6h for longer", ShowEvents)
+        {
+            Group = PagesGroup, Commands = ["events", "ev"], ArgumentHint = "[window]",
+        },
+        new("go.repairs", "Repair tasks: reboots, patching and other infrastructure work", () => ShowRoot(_views.Repairs()))
+        {
+            Group = PagesGroup, Commands = ["repairs", "repair", "rt"],
+        },
+        new("go.contexts", "Contexts; :ctx <name> switches", SwitchContext)
+        {
+            Group = PagesGroup, Keys = ["c"], Commands = ["ctx", "context", "contexts"], ArgumentHint = "[name]",
+        },
+        new("power", "Unlock or lock power actions (recover, delete, remove node state…)", TogglePower) { Commands = ["power"] },
 
-        new("Open row (or click it twice)", Movement, _ => Forward(Key.Enter), [KeyChord.Named(Key.Enter), KeyChord.Of('l')]),
-        new("Down", Movement, _ => Forward(Key.Down), [KeyChord.Of('j')]),
-        new("Up", Movement, _ => Forward(Key.Up), [KeyChord.Of('k')]),
-        new("First row", Movement, _ => Forward(Key.Home), [KeyChord.Of('g')]),
-        new("Last row", Movement, _ => Forward(Key.End), [KeyChord.Of('G')]),
+        new("group", "Group rows by a column, e.g. :group type; :group alone ungroups", Group)
+        {
+            Group = Rows, Commands = ["group"], ArgumentHint = "[column]", When = () => Current?.Columns.Count > 0,
+        },
+        new("mark", "Mark the row, so row actions run on every marked row", () => Forward(Key.Char, ' '))
+        {
+            Group = Rows, Keys = ["space"], ShowInPalette = false, When = () => Current is { Actions.Count: > 0, Columns.Count: > 0 },
+        },
+        new("mark-all", "Mark every row shown, or unmark them all", () => Forward(Key.Char, '*'))
+        {
+            Group = Rows, Keys = ["*"], ShowInPalette = false, When = () => Current is { Actions.Count: > 0, Columns.Count: > 0 },
+        },
+
+        new("open", "Open row (or click it twice); on a group, fold or unfold it", () => Forward(Key.Enter))
+        {
+            Group = Movement, Keys = ["enter", "l"], ShowInPalette = false,
+        },
+        new("down", "Down", () => Forward(Key.Down)) { Group = Movement, Keys = ["j"], ShowInPalette = false },
+        new("up", "Up", () => Forward(Key.Up)) { Group = Movement, Keys = ["k"], ShowInPalette = false },
+        new("first", "First row", () => Forward(Key.Home)) { Group = Movement, Keys = ["g"], ShowInPalette = false },
+        new("last", "Last row", () => Forward(Key.End)) { Group = Movement, Keys = ["G"], ShowInPalette = false },
     ];
 
-    // While the prompt is open it takes every key, before the page sees them.
-    private bool OnPromptEvent(InputEvent e)
+    private IEnumerable<string> Arguments(AppAction action, string typed) => action.Id switch
     {
-        if (_mode == PromptMode.None || e is not KeyEvent key)
-        {
-            return false;
-        }
-
-        switch (key.Key)
-        {
-            case Key.Escape:
-                if (_mode == PromptMode.Filter && Current is { } view)
-                {
-                    view.Filter = "";
-                }
-                ClosePrompt();
-                return true;
-            case Key.Enter:
-                var mode = _mode;
-                var text = _prompt.Text.Trim();
-                var submit = _askSubmit;
-                ClosePrompt();
-                if (mode == PromptMode.Command)
-                {
-                    RunCommand(text);
-                }
-                else if (mode == PromptMode.Ask)
-                {
-                    submit?.Invoke(text);
-                }
-                return true;
-            default:
-                _prompt.OnEvent(key);
-                return true;
-        }
-    }
-
-    // Keys the page didn't use. An open overlay (help, palette) keeps its keys to itself.
-    private bool OnUnhandledEvent(InputEvent e)
-    {
-        if (_app.TopOverlay is not null || e is not KeyEvent key || ActionLookup.ForKey(Actions, key) is not { } action)
-        {
-            return false;
-        }
-
-        action.Run(null);
-        return true;
-    }
+        "go.contexts" => _store.Contexts.Select(context => context.Name),
+        "go.events" => ["30m", "1h", "6h", "24h", "48h"],
+        "refresh" => ["2s", "5s", "10s", "30s", "1m", "off"],
+        "group" => Current is { } page ? page.Columns : [],
+        _ => [],
+    };
 
     private void RunCommand(string text)
     {
-        _notice = null;
-        if (text.Length == 0)
+        text = text.Trim();
+        if (text.Length > 0 && !_keymap.RunCommand(text))
         {
-            return;
+            Warn($"unknown command '{text.TrimStart(':')}' (ctrl+p lists everything)");
         }
-
-        if (ActionLookup.ForCommand(Actions, text) is { } match)
-        {
-            match.Action.Run(match.Argument);
-        }
-        else
-        {
-            _notice = $"unknown command '{text}' (ctrl+p lists everything)";
-        }
-        UpdateStatus();
     }
 
-    private bool Forward(Key key) => Current?.Widget.OnEvent(new KeyEvent(key, default, KeyModifiers.None)) ?? false;
-
-    private void ClearFilterOrBack()
+    private void OpenFilter()
     {
-        if (Current is { Filter.Length: > 0 } view)
+        _filter.Placeholder = Current is DescribeView ? "text to find in this tab" : "text in any column";
+        _line.Open(_filter, Current?.Filter ?? "");
+    }
+
+    private bool Forward(Key key, char rune = '\0') =>
+        Current?.Widget.OnEvent(new KeyEvent(key, new System.Text.Rune(rune), KeyModifiers.None)) ?? false;
+
+    private void Back()
+    {
+        if (OnContexts)
         {
-            view.Filter = "";
+            ShowCluster();
         }
         else
         {
@@ -241,100 +268,41 @@ internal sealed class Shell : IActionHost
         }
     }
 
-    private void OpenPrompt(PromptMode mode, string? label = null, string initial = "")
+    private void Escape()
     {
-        _mode = mode;
-        _prompt.Text = mode == PromptMode.Filter ? Current?.Filter ?? "" : initial;
-        _promptRow = PromptRow(label ?? (mode == PromptMode.Command ? ":" : "/"));
-        _footer.Content = _promptRow;
-        _prompt.HasFocus = true;
+        if (Status.Message is { Level: StatusLevel.Error or StatusLevel.Warning })
+        {
+            Status.Dismiss();
+        }
+        else if (Current is { MarkCount: > 0 } marked)
+        {
+            marked.ClearMarks();
+        }
+        else if (Current is { Filter.Length: > 0 } filtered)
+        {
+            filtered.Filter = "";
+        }
+        else
+        {
+            Back();
+        }
     }
 
-    private Widget PromptRow(string label)
+    private void Group(string? column)
     {
-        _promptLabel.Content = StyledText.Of(label).Bold().Fg(Theme.Current.Accent);
-        return new Stack(Direction.Horizontal)
-            .Add(_promptLabel, Constraint.Length(_promptLabel.Content.Width))
-            .Add(_prompt, Constraint.Fill());
-    }
-
-    private void ClosePrompt()
-    {
-        _mode = PromptMode.None;
-        _askSubmit = null;
-        _prompt.HasFocus = false;
-        UpdateStatus();
-    }
-
-    private void OpenPalette()
-    {
-        if (_app.TopOverlay is not null)
+        if (Current is not { Columns.Count: > 0 } page)
         {
             return;
         }
-
-        var commands = Actions
-            .Where(action => action.Group != Movement)
-            .DistinctBy(action => action.Title)
-            .Select(action => new Command(action.Title, () => action.Run(null), action.Hint))
-            .Concat(_store.Contexts.Select(context =>
-                new Command($"Switch to context {context.Name}", () => Connect(context), context.Endpoint)))
-            .Concat(_viewCatalog.Views.Where(view => view != _view).Select(view =>
-                new Command($"Use view {view.Name}", () => SwitchView(view.Name), Patterns(view.Definition!))))
-            .Concat(_view.IsNone ? [] : [new Command("Show every application (no view)", () => SwitchView(null), ":view")]);
-
-        var palette = new CommandPalette(commands);
-        var overlay = new Overlay(palette)
+        if (!page.GroupBy(column))
         {
-            Placement = OverlayPlacement.Top,
-            WidthPercent = 60,
-            Height = 14,
-            Margin = 3,
-            Modal = true,
-            ScrimOpacity = 0.4,
-        };
-        palette.OnAfterRun = () => _app.RemoveOverlay(overlay);
-        palette.OnCancel = () => _app.RemoveOverlay(overlay);
-        _app.PushOverlay(overlay);
+            Warn($"no column '{column}'; columns: {string.Join(", ", page.Columns)}");
+        }
     }
 
-    private void ShowHelp()
-    {
-        if (_app.TopOverlay is not null)
-        {
-            return;
-        }
-
-        var actions = Actions.DistinctBy(action => action.Title).ToList();
-        var hintWidth = actions.Max(action => action.Hint.Length) + 2;
-        var text = StyledText.Empty();
-        var lines = 0;
-        foreach (var group in actions.GroupBy(action => action.Group))
-        {
-            text.Append((lines > 0 ? "\n\n" : "") + group.Key).Bold().Fg(Theme.Current.Accent);
-            lines += lines > 0 ? 2 : 1;
-            foreach (var action in group)
-            {
-                text.Append("\n  " + action.Hint.PadRight(hintWidth)).Fg(Theme.Current.Warning)
-                    .Append(action.Title).Fg(Theme.Current.Foreground);
-                lines++;
-            }
-        }
-
-        var overlay = new Overlay(new Panel(new Padding(new Label(text) { Wrap = true }, new Thickness(1, 0)), " keys · esc to close ")
-        {
-            BorderStyle = BorderStyle.Rounded,
-            Background = Theme.Current.Background,
-        })
-        {
-            WidthPercent = 70,
-            Height = Math.Min(lines + 2, Math.Max(5, _app.Size.Height - 2)),
-            Modal = true,
-            DismissOnEscape = true,
-            ScrimOpacity = 0.4,
-        };
-        _app.PushOverlay(overlay);
-    }
+    private void OpenPalette() =>
+        _keymap.ShowPalette(_app,
+            _store.Contexts.Select(context => new Command($"Switch to context {context.Name}", () => Connect(context), context.Endpoint)));
 
     private void SwitchContext(string? name)
     {
@@ -348,173 +316,277 @@ internal sealed class Shell : IActionHost
         }
         else
         {
-            _notice = $"no context named '{name}'";
-            UpdateStatus();
+            Warn($"no context named '{name}'");
         }
     }
-
-    /// <summary><c>:view payments</c> shows only that view's applications and what belongs to them; <c>:view</c> shows everything.</summary>
-    private void SwitchView(string? name)
-    {
-        if (name is not null && _viewCatalog.Find(name) is null)
-        {
-            _notice = _viewCatalog.Views.Count == 0
-                ? $"no views in {_viewCatalog.ConfigPath}; add a [views.<name>] table with apps or exclude patterns"
-                : $"no view named '{name}'; views: {string.Join(", ", _viewCatalog.Views.Select(view => view.Name))}";
-            UpdateStatus();
-            return;
-        }
-
-        _view = name is null ? ViewFilter.None : _viewCatalog.Find(name)!;
-        _notice = _view.IsNone ? "showing every application" : $"view {_view.Name}: {Patterns(_view.Definition!)}";
-        Refresh();
-    }
-
-    /// <summary>"fabric:/payments/*, not fabric:/payments/legacy", for the status line and palette.</summary>
-    private static string Patterns(ViewDefinition view) =>
-        string.Join(", ", view.Apps.Concat(view.Exclude.Select(pattern => "not " + pattern)));
 
     private void TogglePower()
     {
         if (_session.Context.ReadOnly)
         {
-            _notice = $"{_session.Context.Name} is read-only";
-        }
-        else
-        {
-            _power = !_power;
-            _notice = _power ? "power actions unlocked; :power locks them again" : "power actions locked";
-        }
-        UpdateStatus();
-    }
-
-    public void Run(Operation operation)
-    {
-        if (_session.Context.ReadOnly)
-        {
-            _notice = $"{_session.Context.Name} is read-only";
-            UpdateStatus();
+            Warn($"{_session.Context.Name} is read-only");
             return;
         }
 
+        _power = !_power;
+        Info(_power ? "power actions unlocked; :power locks them again" : "power actions locked");
+        UpdateStatus();
+    }
+
+    public bool Allows(ActionRisk risk, bool power) =>
+        (risk == ActionRisk.None || !_session.Context.ReadOnly) && (!power || _power);
+
+    public void Run(Operation operation)
+    {
+        if (_batch is not null)
+        {
+            _batch.Add(operation);
+            return;
+        }
+
+        if (_session.Context.ReadOnly)
+        {
+            Warn($"{_session.Context.Name} is read-only");
+            return;
+        }
+
+        Confirm(operation, back: null);
+    }
+
+    /// <summary>Asks before anything that changes the cluster; <paramref name="back"/> runs when the answer is no.</summary>
+    private void Confirm(Operation operation, Action? back)
+    {
         if (operation.Risk == ActionRisk.None)
         {
             Execute(operation, new HashSet<char>());
             return;
         }
 
-        Overlay? overlay = null;
-        var dialog = new ConfirmDialog(
-            operation,
-            options =>
-            {
-                _app.RemoveOverlay(overlay!);
-                Execute(operation, options);
-            },
-            () => _app.RemoveOverlay(overlay!));
-        var width = Math.Max(40, _app.Size.Width * 60 / 100);
-        overlay = new Overlay(dialog)
+        ConfirmDialog.Show(_app, Confirmations.For(operation), result =>
         {
-            Width = width,
-            Height = Math.Min(dialog.Height(width), Math.Max(6, _app.Size.Height - 2)),
-            Modal = true,
-            DismissOnEscape = false,
-            ScrimOpacity = 0.5,
-        };
-        _app.PushOverlay(overlay);
+            if (result.Confirmed)
+            {
+                Execute(operation, Confirmations.Chosen(result));
+            }
+            else
+            {
+                back?.Invoke();
+            }
+        }, DialogWidth(60));
     }
 
-    /// <summary>Runs the operation off the UI thread; the outcome goes to the status line and the action log.</summary>
+    private int DialogWidth(int percent) => Math.Max(44, _app.Size.Width * percent / 100);
+
+    public void Batch(string title, Action queue, string? note = null, Action? started = null)
+    {
+        if (_session.Context.ReadOnly)
+        {
+            Warn($"{_session.Context.Name} is read-only");
+            return;
+        }
+
+        List<Operation> operations = [];
+        _batch = operations;
+        _batchRefused = false;
+        try
+        {
+            queue();
+        }
+        finally
+        {
+            _batch = null;
+        }
+
+        if (_batchRefused || operations.Count == 0)
+        {
+            Warn("that action works on one row at a time; esc clears the marks");
+            return;
+        }
+
+        ConfirmDialog.Show(_app, Confirmations.ForBatch(title, operations, note), result =>
+        {
+            if (result.Confirmed)
+            {
+                started?.Invoke();
+                ExecuteAll(title, operations, Confirmations.Chosen(result));
+            }
+        }, DialogWidth(60));
+    }
+
+    /// <summary>
+    /// Runs the operation off the UI thread, as a task in the activity strip; the outcome goes to the action log.
+    /// Once the cluster has accepted it, a change it carries out over time is followed until it's done.
+    /// </summary>
     private void Execute(Operation operation, IReadOnlySet<char> options)
     {
         var session = _session;
-        var title = operation.Title + string.Concat(operation.Options?.Where(o => options.Contains(o.Key)).Select(o => $" ({o.Label})") ?? []);
-        _error = null;
-        _notice = title + "…";
-        UpdateStatus();
-
-        var tracked = _activity.Start(session.Context.Name, title);
+        var title = Titled(operation, options);
+        var task = _activity.Start(session.Context.Name, title);
         _ = Task.Run(async () =>
         {
-            string outcome;
+            var requested = DateTimeOffset.UtcNow;
             try
             {
                 await operation.Run(CancellationToken.None, options);
-                outcome = "ok";
-                Post(() =>
-                {
-                    _notice = "done: " + title;
-                    Refresh();
-                });
             }
             catch (Exception ex)
             {
-                outcome = "failed: " + ex.GetBaseException().Message;
-                Post(() =>
-                {
-                    _notice = null;
-                    _error = $"{title}: {ex.GetBaseException().Message}";
-                    UpdateStatus();
-                });
+                var message = ex.GetBaseException().Message;
+                Log(session, title, "failed: " + message, task);
+                task.Fail(message);
+                Post(() => Error($"{title}: {message}"));
+                return;
             }
 
-            ActionLogEntry? logged = null;
+            Log(session, title, "ok", task);
+            Post(() => RefreshIf(session));
+            if (operation.Track is null)
+            {
+                task.Succeed();
+                return;
+            }
+
+            task.Report(null, "requested");
+            await TrackAsync(operation, task, requested, session);
+        });
+    }
+
+    /// <summary>Asks the cluster where the change has got to every few seconds, until it's done or the time is up.</summary>
+    private async Task TrackAsync(Operation operation, ActivityTask task, DateTimeOffset requested, ClusterSession session)
+    {
+        var detail = "requested";
+        while (DateTimeOffset.UtcNow - requested < operation.TrackFor)
+        {
+            await Task.Delay(TrackEvery);
+            OperationState state;
             try
             {
-                logged = _log.Append(session.Context.Name, session.Endpoint.ToString(), title, outcome);
+                state = await operation.Track!(DateTimeOffset.UtcNow - requested, CancellationToken.None);
             }
-            catch (IOException)
+            catch (Exception ex)
             {
+                // The cluster may not answer while a node restarts; keep asking.
+                task.Report(null, detail = "can't tell yet: " + ex.GetBaseException().Message);
+                continue;
             }
-            _activity.Finish(tracked, outcome == "ok", outcome == "ok" ? "" : outcome["failed: ".Length..], logged);
+
+            detail = state.Detail;
+            task.Report(state.Fraction, detail);
+            if (state.Done)
+            {
+                if (state.Failed)
+                {
+                    task.Fail(detail);
+                }
+                else
+                {
+                    task.Succeed(detail);
+                }
+                Post(() => RefreshIf(session));
+                return;
+            }
+        }
+
+        task.Cancel($"stopped following it after {RefreshInterval.Format(operation.TrackFor)}: {detail}");
+    }
+
+    /// <summary>Runs operations one after another as one task, and stops at the first that fails.</summary>
+    private void ExecuteAll(string title, IReadOnlyList<Operation> operations, IReadOnlySet<char> options)
+    {
+        var session = _session;
+        var task = _activity.Start(session.Context.Name, title);
+        _ = Task.Run(async () =>
+        {
+            for (var i = 0; i < operations.Count; i++)
+            {
+                var operation = operations[i];
+                var each = Titled(operation, options);
+                task.Report((double)i / operations.Count, $"{i} of {operations.Count} done; {each}");
+                try
+                {
+                    await operation.Run(CancellationToken.None, options);
+                    Log(session, each, "ok", null);
+                }
+                catch (Exception ex)
+                {
+                    var message = ex.GetBaseException().Message;
+                    Log(session, each, "failed: " + message, null);
+                    task.Fail($"{each}: {message} ({i} of {operations.Count} done)");
+                    Post(() =>
+                    {
+                        Error($"{each}: {message}");
+                        RefreshIf(session);
+                    });
+                    return;
+                }
+            }
+
+            task.Succeed($"{operations.Count} of {operations.Count} done");
+            Post(() => RefreshIf(session));
         });
+    }
+
+    private static string Titled(Operation operation, IReadOnlySet<char> options) =>
+        operation.Title + string.Concat(operation.Options?.Where(o => options.Contains(o.Key)).Select(o => $" ({o.Label})") ?? []);
+
+    private void Log(ClusterSession session, string title, string outcome, ActivityTask? task)
+    {
+        try
+        {
+            var entry = _log.Append(session.Context.Name, session.Endpoint.ToString(), title, outcome);
+            if (task is not null)
+            {
+                _activity.Logged(task, entry);
+            }
+        }
+        catch (IOException)
+        {
+        }
     }
 
     public void Pick(string title, Func<CancellationToken, Task<IReadOnlyList<Choice>>> load)
     {
-        _notice = title;
-        UpdateStatus();
+        if (_batch is not null)
+        {
+            _batchRefused = true;
+            return;
+        }
+
+        // The question stays in the footer while the list loads and while it's open.
+        var question = StyledText.Of(title);
+        Status.Show(question, StatusLevel.Info, Timeout.InfiniteTimeSpan);
+        void Done()
+        {
+            if (ReferenceEquals(Status.Message?.Text, question))
+            {
+                Status.Dismiss();
+            }
+        }
+
         _ = Task.Run(async () =>
         {
             try
             {
                 var choices = await load(CancellationToken.None);
-                Post(() => ShowPick(title, choices));
+                Post(() =>
+                {
+                    if (_app.TopOverlay is not null)
+                    {
+                        Done();
+                        return;
+                    }
+                    ShowPick(choices, Done);
+                });
             }
             catch (Exception ex)
             {
-                Post(() =>
-                {
-                    _notice = null;
-                    _error = ex.GetBaseException().Message;
-                    UpdateStatus();
-                });
+                Post(() => Error(ex.GetBaseException().Message));
             }
         });
     }
 
-    private void ShowPick(string title, IReadOnlyList<Choice> choices)
+    private void ShowPick(IReadOnlyList<Choice> choices, Action done)
     {
-        if (_app.TopOverlay is not null)
-        {
-            _notice = null;
-            UpdateStatus();
-            return;
-        }
-
-        // The question stays in the footer while the list is open.
-        _notice = title;
-        UpdateStatus();
-        void Close(Overlay overlay)
-        {
-            _app.RemoveOverlay(overlay);
-            if (_notice == title)
-            {
-                _notice = null;
-                UpdateStatus();
-            }
-        }
-
         var palette = new CommandPalette(choices.Select(choice => new Command(choice.Title, choice.Pick, choice.Subtitle ?? "")));
         var overlay = new Overlay(palette)
         {
@@ -526,18 +598,84 @@ internal sealed class Shell : IActionHost
             ScrimOpacity = 0.4,
         };
         // Runs after the choice, which may have opened a confirmation; only this list is closed.
-        palette.OnAfterRun = () => Close(overlay);
-        palette.OnCancel = () => Close(overlay);
+        void Close()
+        {
+            _app.RemoveOverlay(overlay);
+            done();
+        }
+        palette.OnAfterRun = Close;
+        palette.OnCancel = Close;
         _app.PushOverlay(overlay);
     }
 
-    public void Ask(string label, string initial, Action<string> submit)
+    public void Ask(string label, string initial, Func<string, string?>? validate, Action<string> submit)
     {
-        OpenPrompt(PromptMode.Ask, label + " ", initial);
-        _askSubmit = submit;
+        if (_batch is not null)
+        {
+            _batchRefused = true;
+            return;
+        }
+
+        _line.Ask(label, initial, validate, text => submit(text.Trim()));
     }
 
-    // OSC 52: the terminal puts it on the clipboard, which also works over SSH.
+    public void Edit(string title, Func<CancellationToken, Task<IReadOnlyList<FormField>>> load, Func<IReadOnlyList<FormField>, Operation> review)
+    {
+        if (_batch is not null)
+        {
+            _batchRefused = true;
+            return;
+        }
+
+        if (_session.Context.ReadOnly)
+        {
+            Warn($"{_session.Context.Name} is read-only");
+            return;
+        }
+
+        var loading = StyledText.Of(title + "…");
+        Status.Show(loading, StatusLevel.Info, Timeout.InfiniteTimeSpan);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var fields = await load(CancellationToken.None);
+                Post(() =>
+                {
+                    if (ReferenceEquals(Status.Message?.Text, loading))
+                    {
+                        Status.Dismiss();
+                    }
+                    if (_app.TopOverlay is null)
+                    {
+                        ShowForm(title, fields, review);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Post(() => Error($"{title}: {ex.GetBaseException().Message}"));
+            }
+        });
+    }
+
+    /// <summary>The form, then its review: the confirmation lists what changed, and no goes back to the form.</summary>
+    private void ShowForm(string title, IReadOnlyList<FormField> fields, Func<IReadOnlyList<FormField>, Operation> review) =>
+        FormDialog.Show(_app, $" {title} ", fields, _ =>
+        {
+            Operation operation;
+            try
+            {
+                operation = review(fields);
+            }
+            catch (Exception ex) when (ex is FormatException or InvalidOperationException or ArgumentException)
+            {
+                Error($"{title}: {ex.Message}");
+                return;
+            }
+            Confirm(operation, back: () => ShowForm(title, fields, review));
+        }, width: Math.Min(_app.Size.Width - 4, Math.Max(60, _app.Size.Width * 60 / 100)));
+
     private void Copy()
     {
         if (Current?.CopyText is not { Length: > 0 } text)
@@ -545,22 +683,37 @@ internal sealed class Shell : IActionHost
             return;
         }
 
-        _terminal.Write(Clipboard.SetClipboardSequence(text));
-        _notice = text.Contains('\n') ? $"copied {text.Count(c => c == '\n') + 1} lines" : $"copied {text}";
-        UpdateStatus();
+        // OSC 52: the terminal puts it on the clipboard, which also works over SSH.
+        _app.CopyToClipboard(text);
+        Info(text.Contains('\n') ? $"copied {text.Count(c => c == '\n') + 1} lines" : $"copied {text}");
     }
 
     private void ShowContexts()
     {
-        if (Current is { Crumb: "contexts" })
+        if (!OnContexts)
         {
-            return;
+            _main.Show(ContextsPage);
+            if (_contexts.Table.Rows.FirstOrDefault(c => c.Context.Name == _session.Context.Name) is { } current)
+            {
+                _contexts.Table.SelectRow(current);
+            }
+            Refresh();
         }
-        Push(Views.Contexts(_store, _session.Context.Name, Connect));
+    }
+
+    private void ShowCluster()
+    {
+        if (OnContexts)
+        {
+            _main.Show(ClusterPage);
+            _loadedAt = null;
+            Refresh();
+        }
     }
 
     private void ShowRoot(IResourceView view)
     {
+        _main.Show(ClusterPage);
         _pages.Clear();
         Register(view);
         _navigator.Reset(new Page($"{_session.Context.Name} · {view.Crumb}", view.Widget));
@@ -587,8 +740,6 @@ internal sealed class Shell : IActionHost
             _pages.Remove(widget);
         }
 
-        _statusRow = BuildStatusRow();
-        _error = null;
         _loadedAt = null;
         Refresh();
     }
@@ -599,8 +750,8 @@ internal sealed class Shell : IActionHost
         var context = _store.Resolve(saved).Context;
         _connecting?.Cancel();
         var connecting = _connecting = new CancellationTokenSource();
-        _notice = $"connecting to {context.Name}…";
-        UpdateStatus();
+        var message = StyledText.Of($"connecting to {context.Name}…");
+        Status.Show(message, StatusLevel.Info, Timeout.InfiniteTimeSpan);
 
         _ = Task.Run(async () =>
         {
@@ -614,14 +765,15 @@ internal sealed class Shell : IActionHost
                         return;
                     }
                     _connecting = null;
+                    if (ReferenceEquals(Status.Message?.Text, message))
+                    {
+                        Status.Dismiss();
+                    }
                     _session = session;
                     _power = session.Context.Power;
-                    _views = new Views(session.Queries, this, () => _view);
-                    // Each context opens with its own view.
-                    _view = _viewCatalog.DefaultFor(context, out var warning);
+                    _views = new Views(session.Queries, this);
                     _store.Active = context.Name;
                     _store.Save();
-                    _notice = warning;
                     ShowRoot(_views.Nodes());
                 });
             }
@@ -635,13 +787,19 @@ internal sealed class Shell : IActionHost
                     if (_connecting == connecting)
                     {
                         _connecting = null;
-                        _notice = null;
-                        _error = $"{context.Name}: {ex.GetBaseException().Message}";
-                        UpdateStatus();
+                        Error($"{context.Name}: {ex.GetBaseException().Message}");
                     }
                 });
             }
         });
+    }
+
+    private void RefreshIf(ClusterSession session)
+    {
+        if (session == _session)
+        {
+            Refresh();
+        }
     }
 
     private void Refresh()
@@ -669,7 +827,12 @@ internal sealed class Shell : IActionHost
                     _loading = null;
                     show();
                     _loadedAt = DateTime.Now;
-                    _error = null;
+                    // A failed load's error goes once a load works again; other errors stay until dismissed.
+                    if (_loadError is not null && ReferenceEquals(Status.Message?.Text, _loadError))
+                    {
+                        Status.Dismiss();
+                    }
+                    _loadError = null;
                     UpdateStatus();
                 });
             }
@@ -683,7 +846,7 @@ internal sealed class Shell : IActionHost
                     if (_loading == loading)
                     {
                         _loading = null;
-                        _error = ex.GetBaseException().Message;
+                        _loadError = Error(ex.GetBaseException().Message);
                         UpdateStatus();
                     }
                 });
@@ -703,8 +866,7 @@ internal sealed class Shell : IActionHost
         }
         else
         {
-            _notice = $"events takes how far back to look, like 30m, 6h or 48h, not '{window}'";
-            UpdateStatus();
+            Warn($"events takes how far back to look, like 30m, 6h or 48h, not '{window}'");
         }
     }
 
@@ -719,13 +881,12 @@ internal sealed class Shell : IActionHost
 
         if (!RefreshInterval.TryParse(argument, out var interval))
         {
-            _notice = $"refresh takes an interval like 5s, 1m or off (at least {RefreshInterval.Format(RefreshInterval.Minimum)}), not '{argument}'";
-            UpdateStatus();
+            Warn($"refresh takes an interval like 5s, 1m or off (at least {RefreshInterval.Format(RefreshInterval.Minimum)}), not '{argument}'");
             return;
         }
 
         SetRefreshInterval(interval);
-        _notice = interval > TimeSpan.Zero ? $"refreshing every {RefreshInterval.Format(interval)}" : "auto-refresh off; r refreshes";
+        Info(interval > TimeSpan.Zero ? $"refreshing every {RefreshInterval.Format(interval)}" : "auto-refresh off; r refreshes");
         UpdateStatus();
     }
 
@@ -764,79 +925,89 @@ internal sealed class Shell : IActionHost
 
     private void Post(Action action) => _app.Post(action);
 
+    private void Info(string text) => Status.Show(StyledText.Of(text), StatusLevel.Info);
+
+    private void Warn(string text) => Status.Show(StyledText.Of(text), StatusLevel.Warning);
+
+    private StyledText Error(string text)
+    {
+        var message = StyledText.Of(text);
+        Status.ShowError(message);
+        return message;
+    }
+
+    /// <summary>The context, its folder's label and the mode; then loading, or when it was updated.</summary>
     private void UpdateStatus()
     {
+        var name = StyledText.Of($" {_session.Context.Name} ").Bold().Fg(Theme.Current.Accent);
         var context = StyledText.Of($" {_session.Context.Name} ").Bold().Fg(Theme.Current.Accent);
         if (_store.Resolve(_session.Context) is { Label: { } label } folder)
         {
             context.Append(label + " ").Bold().Fg(Styles.FolderColor(folder.Color));
         }
-        if (!_view.IsNone)
-        {
-            context.Append($"view {_view.Name} ").Fg(Theme.Current.Info);
-        }
         if (_session.Context.ReadOnly)
         {
-            context.Append("read-only ").Fg(Theme.Current.Info);
+            context.Append("read-only").Fg(Theme.Current.Info);
         }
         else if (_power)
         {
-            context.Append("POWER ").Bold().Fg(Theme.Current.Error);
+            context.Append("POWER").Bold().Fg(Theme.Current.Error);
         }
-        var every = _refreshInterval > TimeSpan.Zero ? $" · every {RefreshInterval.Format(_refreshInterval)}" : " · auto-refresh off";
-        _status.Content = (_error, _notice, _loading, _loadedAt) switch
-        {
-            ({ } error, _, _, _) => StyledText.Of(" " + error).Fg(Theme.Current.Error),
-            (_, { } notice, _, _) => StyledText.Of(" " + notice).Fg(Theme.Current.Warning),
-            (_, _, not null, _) => context.Append("loading…").Fg(Theme.Current.Muted),
-            (_, _, _, { } at) => context.Append($"updated {at:HH:mm:ss}{every}").Fg(Theme.Current.Muted),
-            _ => context,
-        };
+        _contextItem.Text = context;
+        _contextItem.ShortText = name;
 
-        if (_mode == PromptMode.None)
+        _loadingItem.Active = _loading is not null;
+        _updatedItem.Visible = _loading is null && _loadedAt is not null;
+        if (_loadedAt is { } at)
         {
-            // Errors and notices need the full width; the shortcuts come back once they're gone.
-            _footer.Content = _error is null && _notice is null ? _statusRow : _status;
+            var every = _refreshInterval > TimeSpan.Zero ? $" · every {RefreshInterval.Format(_refreshInterval)}" : " · auto-refresh off";
+            _updatedItem.Text = Styles.Muted($"updated {at:HH:mm:ss}{every}");
+            _updatedItem.ShortText = Styles.Muted($"{at:HH:mm:ss}");
         }
     }
 
-    /// <summary>The status on the left, and a clickable shortcut for every action with a footer label.</summary>
-    private Widget BuildStatusRow()
+    /// <summary>
+    /// The command line (the status line while no prompt is open), and on its right the activity strip, as wide as
+    /// what it has to show: running changes, and ones that just finished.
+    /// </summary>
+    private sealed class Footer(Prompt line, ActivityStrip strip, Activity activity) : Widget
     {
-        var shortcuts = new Stack(Direction.Horizontal);
-        var width = 0;
-        foreach (var action in Actions.Where(action => action.Footer is not null && action.Keys is { Count: > 0 }))
+        private readonly List<ActivitySnapshot> _tasks = [];
+
+        public override bool OnEvent(InputEvent e) => strip.OnEvent(e) || line.OnEvent(e);
+
+        public override void Render(Surface surface, Rect area)
         {
-            var content = StyledText.Of($" {action.Keys![0].Short}").Bold().Fg(Theme.Current.Accent)
-                .Append($" {action.Footer} ").Fg(Theme.Current.Muted);
-            var button = new Button(action.Footer!, () => action.Run(null))
+            var width = Math.Min(StripWidth(), area.Width / 2);
+            line.Render(surface, new Rect(area.X, area.Y, area.Width - width, area.Height));
+            strip.Render(surface, width == 0 ? Rect.Empty : new Rect(area.Right - width + 1, area.Y, width - 1, area.Height));
+        }
+
+        protected override void VisitChildren(Action<Widget> visit)
+        {
+            visit(line);
+            visit(strip);
+        }
+
+        // What the strip draws (glyph, title, percent, why it failed, " · " between), plus a column before it.
+        private int StripWidth()
+        {
+            activity.CopyTo(_tasks);
+            var now = activity.Clock.GetUtcNow();
+            var width = 0;
+            foreach (var task in _tasks)
             {
-                Content = content,
-                Style = new Style(Theme.Current.Muted, Color.Default),
-                HoverStyle = new Style(Theme.Current.Foreground, Theme.Current.StripeBackground),
-            };
-            shortcuts.Add(button, Constraint.Length(content.Width));
-            width += content.Width;
+                var shown = task.IsRunning
+                    || task.Ended is { } ended && ended + (task.State == ActivityState.Failed ? strip.ShowFailedFor : strip.ShowFinishedFor) > now;
+                if (!shown)
+                {
+                    continue;
+                }
+                width += (width > 0 ? 3 : 1) + 2 + Unicode.StringWidth(task.Title)
+                    + (task.IsRunning && task.Progress is not null ? 5 : 0)
+                    + (task.State == ActivityState.Failed && task.Message is { } message ? 2 + Unicode.StringWidth(message) : 0);
+            }
+            return width;
         }
-
-        return new Stack(Direction.Horizontal)
-            .Add(_status, Constraint.Fill())
-            .Add(shortcuts, Constraint.Length(width));
-    }
-
-    /// <summary>Shows one of several widgets in the same place.</summary>
-    private sealed class Slot(Widget content) : Widget
-    {
-        public Widget Content { get; set; } = content;
-
-        public override bool HasFocus
-        {
-            get => Content.HasFocus;
-            set => Content.HasFocus = value;
-        }
-
-        public override bool OnEvent(InputEvent e) => Content.OnEvent(e);
-
-        public override void Render(Surface surface, Rect area) => Content.Render(surface, area);
     }
 }

@@ -7,7 +7,7 @@ using Sfx.Core;
 
 namespace Sfx.Tui;
 
-/// <summary>Formats entity details as lines for a <see cref="TextView"/>.</summary>
+/// <summary>Formats entity details as lines for a <see cref="Cellar.Widgets.TextViewer"/>.</summary>
 public static class Lines
 {
     private const string Indent = "  ";
@@ -21,10 +21,44 @@ public static class Lines
         }
 
         var (pretty, format) = Inspect.TryPretty(text);
-        return Highlight.Lines(pretty, format);
+        return Highlighted(pretty, format);
     }
 
-    public static IReadOnlyList<StyledText> Json(object? value) => Highlight.Lines(Inspect.Json(value), Inspect.Format.Json);
+    public static IReadOnlyList<StyledText> Json(object? value) => Highlighted(Inspect.Json(value), Inspect.Format.Json);
+
+    /// <summary>
+    /// Pretty-printed JSON or XML, colored a line at a time by Cellar's highlighters. An XML comment can span lines
+    /// (manifests have them), so the lines inside one are dimmed here as a whole.
+    /// </summary>
+    public static IReadOnlyList<StyledText> Highlighted(string text, Inspect.Format format, string indent = "")
+    {
+        var lines = text.Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
+        var inComment = false;
+        return lines.Select(line => format switch
+        {
+            Inspect.Format.Json => TextHighlighters.Json(indent + line),
+            Inspect.Format.Xml => Xml(indent + line, ref inComment),
+            _ => new StyledText(indent + line, Theme.Current.TextStyle),
+        }).ToList();
+    }
+
+    private static StyledText Xml(string line, ref bool inComment)
+    {
+        var start = 0;
+        var text = StyledText.Empty();
+        if (inComment)
+        {
+            var close = line.IndexOf("-->", StringComparison.Ordinal);
+            start = close < 0 ? line.Length : close + 3;
+            text.Append(line[..start], new Style(Theme.Current.Muted, Color.Default).Italic);
+            inComment = close < 0;
+        }
+
+        var rest = line[start..];
+        var open = rest.LastIndexOf("<!--", StringComparison.Ordinal);
+        inComment |= open >= 0 && rest.IndexOf("-->", open + 4, StringComparison.Ordinal) < 0;
+        return rest.Length == 0 ? text : text.Append(TextHighlighters.Xml(rest));
+    }
 
     public static IReadOnlyList<StyledText> Error(Exception error) =>
         [StyledText.Of(error.GetBaseException().Message).Fg(Theme.Current.Error)];
@@ -57,7 +91,7 @@ public static class Lines
         }
 
         yield return name;
-        foreach (var line in Highlight.Lines(pretty, format, indent))
+        foreach (var line in Highlighted(pretty, format, indent))
         {
             yield return line;
         }

@@ -223,10 +223,6 @@ Sidebar
 232px wide, full height, sticky; hairline right border, --surface-1.
 Top to bottom: "sfx" in Cascadia Code's cursive italic (the one flourish); the context block (folder path in 11px secondary, the context name in 500 with its folder label pill; links to the Contexts page, also "c"); the pages, each an 18px Tabler icon and a 13px label, 34px tall, the current one with the ghost background and 500; at the bottom, after a hairline, the power toggle (amber pair while on, or a Read-only row), the theme button, and the version in muted 11px.
 A running-operations count sits on Activity as a small accent badge.
-Under the context block, only when ~/.sfx/config.toml defines views: the view picker, a sidebar row ("All applications" with ti-filter-off, or "View: payments" in --text-accent with ti-filter) over an invisible native select, so keyboard, touch and screen readers get the platform's own list. The choice is per tab, in the address bar as ?view=; a context switch goes back to that context's default view.
-
-View note
-While a view is on, every list page (Overview, Applications, Replicas, Upgrades, Events) shows one line under its header, in a hairline --border-accent box: "Through view payments: 3 of 17 applications." plus, in --text-warning, "2 unhealthy applications outside it." and a "Show all" button. Cluster health and counts stay cluster-wide; a view is a lens, so what it hides is never silent. A node's page says how many of its replicas the view leaves out.
 Under 1100px the sidebar collapses to 60px of icons with tooltips; under 640px it becomes a scrolling strip across the top.
 
 Page

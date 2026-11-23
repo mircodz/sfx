@@ -25,9 +25,6 @@ public static class SfxHost
         CommandLineOptions options;
         ContextStore store;
         ClusterContext context;
-        ViewCatalog views;
-        ViewFilter view;
-        string? viewWarning;
         bool ui;
         try
         {
@@ -49,10 +46,6 @@ public static class SfxHost
             {
                 return ContextCommand.Run(options.Arguments.Skip(1).ToList(), options, store, connector);
             }
-            if (options.Arguments is ["view", ..])
-            {
-                return ViewCommand.Run(options.Arguments.Skip(1).ToList(), store);
-            }
 
             ui = options.Arguments is ["ui", ..];
             if (ui)
@@ -62,22 +55,10 @@ public static class SfxHost
 
             context = SelectContext(options, store);
             connector.Resolve(context);
-            views = ViewCatalog.From(store);
-            view = SelectView(options, context, views, out viewWarning);
         }
         catch (Exception ex) when (ex is UsageException or AuthConfigurationException)
         {
             return UsageError(ex.Message, connector.Providers);
-        }
-        catch (ViewConfigurationException ex)
-        {
-            Console.Error.WriteLine($"sfx: {ex.Message}");
-            return 2;
-        }
-
-        if (viewWarning is not null)
-        {
-            Console.Error.WriteLine($"sfx: {viewWarning}");
         }
 
         // Auth messages (e.g. device codes) go to the console until the UI is up, then to its status line.
@@ -107,12 +88,12 @@ public static class SfxHost
         {
             var log = new ActionLog(ActionLogPath(store));
             var web = new WebOptions(options.Port, !options.NoBrowser, Environment.GetEnvironmentVariable("SFX_UI_TOKEN"));
-            return await WebServer.RunAsync(new UiHost(session, store, connector, log, Version, views, view.Name), web, CancellationToken.None);
+            return await WebServer.RunAsync(new UiHost(session, store, connector, log, Version), web, CancellationToken.None);
         }
 
         using var terminal = new AnsiTerminal();
         using var app = new App(terminal);
-        var shell = new Shell(app, terminal, session, connector, store, options.RefreshInterval, views, view, viewWarning);
+        var shell = new Shell(app, session, connector, store, options.RefreshInterval);
         notify = shell.NotifyAsync;
         await app.RunAsync(CancellationToken.None);
         return 0;
@@ -157,15 +138,6 @@ public static class SfxHost
         }
     }
 
-    /// <summary><c>--view</c>, which must be defined, else the context's view, which falls back to none with a warning.</summary>
-    internal static ViewFilter SelectView(CommandLineOptions options, ClusterContext context, ViewCatalog views, out string? warning)
-    {
-        warning = null;
-        return options.View is { } name
-            ? views.Find(name) ?? throw new UsageException(views.Unknown(name))
-            : views.DefaultFor(context, out warning);
-    }
-
     private static int UsageError(string message, IEnumerable<IClusterAuthProvider> providers)
     {
         Console.Error.WriteLine($"sfx: {message}");
@@ -180,7 +152,6 @@ public static class SfxHost
         text.AppendLine("usage: sfx [-c <context>]                           open a saved context (default: the active one)");
         text.AppendLine("       sfx <endpoint> [--auth <methods>] [options]  open a cluster directly");
         text.AppendLine("       sfx context <command>                        manage saved contexts");
-        text.AppendLine("       sfx view list                                list the views in the config");
         text.AppendLine("       sfx ui [<endpoint> | -c <context>]           open the cluster in the browser instead");
         text.AppendLine();
         text.AppendLine("  <endpoint>              host, host:port or URL (default port 19080)");
@@ -188,19 +159,12 @@ public static class SfxHost
         text.AppendLine("  --refresh <interval>    auto-refresh interval: 5s, 1m, or off (default: 5s)");
         text.AppendLine("  --readonly              hide every action that changes the cluster");
         text.AppendLine("  --power                 unlock the riskiest actions (also :power in the UI)");
-        text.AppendLine("  --view <name>           show only the applications a view lets through (default: the context's view)");
         text.AppendLine("  --version               print the version");
         text.AppendLine("  --port <n>              sfx ui: port to listen on, on 127.0.0.1 (default: any free one)");
         text.AppendLine("  --no-browser            sfx ui: print the link instead of opening it");
         text.AppendLine();
         text.AppendLine("contexts:");
         foreach (var line in ContextCommand.Usage.Split('\n'))
-        {
-            text.AppendLine("  " + line.TrimEnd());
-        }
-        text.AppendLine();
-        text.AppendLine("views:");
-        foreach (var line in ViewCommand.Usage.Split('\n'))
         {
             text.AppendLine("  " + line.TrimEnd());
         }

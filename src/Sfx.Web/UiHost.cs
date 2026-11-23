@@ -7,10 +7,8 @@ public sealed record ConnectingDto(string Context, IReadOnlyList<string> Message
 
 /// <param name="ReadOnly">After folder rules: a read-only folder makes every context in it read-only.</param>
 /// <param name="Label">From the nearest folder that sets one.</param>
-/// <param name="View">The view it opens with; null for none, or when the one it names isn't defined.</param>
 public sealed record ContextDto(
-    string Name, string Endpoint, IReadOnlyList<string> Auth, bool ReadOnly, bool Power, bool Saved, string? Folder, string? Label, string? Color,
-    string? View);
+    string Name, string Endpoint, IReadOnlyList<string> Auth, bool ReadOnly, bool Power, bool Saved, string? Folder, string? Label, string? Color);
 
 public sealed record FolderDto(string Path, string? Label, string? Color, bool ReadOnly);
 
@@ -21,17 +19,10 @@ public sealed record ContextsDto(string Current, IReadOnlyList<ContextDto> Conte
 /// What `sfx ui` is connected to, and switching it. Connecting runs in the background so sign-in (e.g. a device
 /// code) can be shown in the browser; the current cluster stays in use until the new one is ready, and stays if it fails.
 /// </summary>
-/// <param name="views">The views in the config, read when sfx started; none when null.</param>
-/// <param name="initialView">The first cluster's default view: <c>--view</c>, else its context's.</param>
-public sealed class UiHost(
-    ClusterSession initial, ContextStore store, ClusterConnector connector, ActionLog log, string version,
-    ViewCatalog? views = null, string? initialView = null)
+public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterConnector connector, ActionLog log, string version)
 {
     private readonly Lock _lock = new();
-    private readonly ViewCatalog _views = views ?? ViewCatalog.Empty;
-    private UiSession _current = new(
-        initial, log, version, Labelled(store, initial.Context), views ?? ViewCatalog.Empty,
-        initialView ?? (views ?? ViewCatalog.Empty).DefaultFor(initial.Context, out _).Name);
+    private UiSession _current = new(initial, log, version, Labelled(store, initial.Context));
     private Connecting? _connecting;
 
     private sealed class Connecting(string context)
@@ -69,7 +60,7 @@ public sealed class UiHost(
                 saved,
                 store.Folders.Select(f => new FolderDto(f.Path, f.Label, f.Color, f.ReadOnly)).ToList(),
                 connecting is null ? null : new ConnectingDto(connecting.Context, [.. connecting.Messages], connecting.Error),
-                store.DisplayPath);
+                Home(store.Path));
         }
     }
 
@@ -106,8 +97,7 @@ public sealed class UiHost(
 
                 lock (_lock)
                 {
-                    // A new context starts with its own view, not the one given on the command line for the first.
-                    _current = new UiSession(session, log, version, resolved, _views, _views.DefaultFor(context, out _).Name);
+                    _current = new UiSession(session, log, version, resolved);
                     connecting.Done = true;
                 }
             }
@@ -133,11 +123,18 @@ public sealed class UiHost(
         }
     }
 
-    private ContextDto Dto(ResolvedContext r, bool saved)
+    /// <summary>The config path with the home directory as ~, as people write it.</summary>
+    private static string Home(string path)
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var full = Path.GetFullPath(path);
+        return home.Length > 0 && full.StartsWith(home, StringComparison.Ordinal) ? "~" + full[home.Length..] : full;
+    }
+
+    private static ContextDto Dto(ResolvedContext r, bool saved)
     {
         var c = r.Context;
-        return new(c.Name, c.Endpoint, c.Auth.Count > 0 ? c.Auth : ["none"], c.ReadOnly, c.Power, saved, c.Folder, r.Label, r.Color,
-            _views.Find(c.View)?.Name);
+        return new(c.Name, c.Endpoint, c.Auth.Count > 0 ? c.Auth : ["none"], c.ReadOnly, c.Power, saved, c.Folder, r.Label, r.Color);
     }
 
     /// <summary>The context's folder label and color, if it's saved; one given on the command line has none.</summary>

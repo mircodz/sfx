@@ -16,7 +16,6 @@ import { LinkRow } from "../ui/Row";
 import { Empty, GroupHeading, Section } from "../ui/Section";
 import { SearchBox, Toolbar } from "../ui/Toolbar";
 import { roleIcon } from "./PartitionDetail";
-import { ViewNote } from "../ui/ViewNote";
 
 const views = ["Replicas", "Partitions"] as const;
 type View = (typeof views)[number];
@@ -93,7 +92,6 @@ export function Replicas() {
                                 )
                             }
                         />
-                        <ViewNote />
                         <Metrics>
                             <MetricCard label="Replicas" value={scoped.length.toLocaleString()} />
                             <MetricCard label="Primaries" value={count(scoped, (r) => r.role === "Primary").toLocaleString()} />

@@ -7,12 +7,10 @@ namespace Sfx.Core;
 
 /// <summary>
 /// Saved cluster contexts in a TOML file: <c>$SFX_CONFIG</c>, or <c>~/.sfx/config.toml</c>.
-/// Besides <c>endpoint</c>, <c>auth</c>, <c>readonly</c>, <c>power</c>, <c>folder</c> and <c>view</c>, a context's keys are the
-/// options of its auth methods. <c>[folders.&lt;path&gt;]</c> tables set a <c>label</c>, <c>color</c> and <c>readonly</c> for the
-/// contexts in a folder and its subfolders. <c>[views.&lt;name&gt;]</c> tables filter applications by <c>apps</c> and
-/// <c>exclude</c> patterns, on any cluster.
+/// Besides <c>endpoint</c>, <c>auth</c>, <c>readonly</c>, <c>power</c> and <c>folder</c>, a context's keys are the options of its auth methods.
+/// <c>[folders.&lt;path&gt;]</c> tables set a <c>label</c>, <c>color</c> and <c>readonly</c> for the contexts in a folder and its subfolders.
 /// </summary>
-public sealed class ContextStore
+public sealed partial class ContextStore
 {
     private const string ActiveKey = "context";
     private const string ContextsKey = "contexts";
@@ -24,10 +22,6 @@ public sealed class ContextStore
     private const string FoldersKey = "folders";
     private const string LabelKey = "label";
     private const string ColorKey = "color";
-    private const string ViewKey = "view";
-    private const string ViewsKey = "views";
-    private const string AppsKey = "apps";
-    private const string ExcludeKey = "exclude";
 
     private readonly TomlTable _root;
 
@@ -43,17 +37,6 @@ public sealed class ContextStore
         Environment.GetEnvironmentVariable("SFX_CONFIG") is { Length: > 0 } path
             ? path
             : System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".sfx", "config.toml");
-
-    /// <summary>The path as people write it, with the home directory as <c>~</c>.</summary>
-    public string DisplayPath
-    {
-        get
-        {
-            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            var full = System.IO.Path.GetFullPath(Path);
-            return home.Length > 0 && full.StartsWith(home, StringComparison.Ordinal) ? "~" + full[home.Length..] : full;
-        }
-    }
 
     public static ContextStore Load(string? path = null)
     {
@@ -104,21 +87,6 @@ public sealed class ContextStore
             .ToList();
 
     /// <summary>
-    /// The <c>[views.&lt;name&gt;]</c> tables, by name: <c>apps</c> and <c>exclude</c>, each a pattern or a list of them.
-    /// Unknown keys are ignored. The patterns aren't checked here; <see cref="ViewCatalog"/> checks and compiles them.
-    /// </summary>
-    /// <exception cref="ViewConfigurationException">A view's <c>apps</c> or <c>exclude</c> isn't text or a list of text.</exception>
-    public IReadOnlyList<ViewDefinition> Views =>
-        (_root.TryGetValue(ViewsKey, out var value) && value is TomlTable table ? table : new TomlTable())
-            .Where(entry => entry.Value is TomlTable)
-            .Select(entry => new ViewDefinition(
-                entry.Key,
-                Patterns(entry.Key, (TomlTable)entry.Value, AppsKey),
-                Patterns(entry.Key, (TomlTable)entry.Value, ExcludeKey)))
-            .OrderBy(view => view.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-    /// <summary>
     /// Applies the rules of the context's folders: label and color come from the nearest folder that sets them, and a
     /// read-only folder makes the context read-only (and not power), whatever the context says.
     /// </summary>
@@ -166,10 +134,6 @@ public sealed class ContextStore
         {
             table[FolderKey] = folder;
         }
-        if (context.View?.Trim() is { Length: > 0 } view)
-        {
-            table[ViewKey] = view;
-        }
 
         foreach (var key in context.Options.Keys)
         {
@@ -177,8 +141,21 @@ public sealed class ContextStore
             table[key] = values.Count == 1 ? values[0] : ToArray(values);
         }
 
-        RemoveTable(context.Name);
-        ContextsTable()[context.Name] = table;
+        // In place, so changing one context doesn't move it to the end of the file.
+        var contexts = ContextsTable();
+        var existing = contexts.Keys.FirstOrDefault(k => k.Equals(context.Name, StringComparison.OrdinalIgnoreCase) && contexts[k] is TomlTable);
+        if (existing is null)
+        {
+            contexts[context.Name] = table;
+            return;
+        }
+
+        var entries = contexts.ToList();
+        contexts.Clear();
+        foreach (var (key, value) in entries)
+        {
+            contexts[key == existing ? context.Name : key] = key == existing ? table : value;
+        }
     }
 
     /// <summary>Removes the context; if it was active, no context is active afterwards.</summary>
@@ -199,8 +176,15 @@ public sealed class ContextStore
     public void Save()
     {
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(Path))!);
-        File.WriteAllText(Path, Toml.FromModel(_root));
+        File.WriteAllText(Path, Spaced(Toml.FromModel(_root)));
     }
+
+    /// <summary>A blank line before every table header, as people write it, including tables added since the load.</summary>
+    internal static string Spaced(string toml) =>
+        TableHeader().Replace(toml, "\n\n$1");
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?<=[^\n])\n(\[[^\[\]\n]+\][ \t]*(?:\r?\n|$))")]
+    private static partial System.Text.RegularExpressions.Regex TableHeader();
 
     private TomlTable ContextsTable()
     {
@@ -235,7 +219,7 @@ public sealed class ContextStore
         var options = new AuthOptions();
         foreach (var (key, option) in table)
         {
-            if (key is not (EndpointKey or AuthKey or ReadOnlyKey or PowerKey or FolderKey or ViewKey))
+            if (key is not (EndpointKey or AuthKey or ReadOnlyKey or PowerKey or FolderKey))
             {
                 foreach (var text in Strings(option))
                 {
@@ -251,8 +235,7 @@ public sealed class ContextStore
             options,
             table.TryGetValue(ReadOnlyKey, out var readOnly) && readOnly is true,
             table.TryGetValue(PowerKey, out var power) && power is true,
-            FolderPath.Normalize(table.TryGetValue(FolderKey, out var folder) ? folder as string : null),
-            table.TryGetValue(ViewKey, out var view) && view is string v && v.Trim() is { Length: > 0 } viewName ? viewName : null);
+            FolderPath.Normalize(table.TryGetValue(FolderKey, out var folder) ? folder as string : null));
     }
 
     private static IEnumerable<FolderSettings> ReadFolders(TomlTable table, string parent)
@@ -276,19 +259,6 @@ public sealed class ContextStore
                 yield return child;
             }
         }
-    }
-
-    private List<string> Patterns(string view, TomlTable table, string key)
-    {
-        if (!table.TryGetValue(key, out var value))
-        {
-            return [];
-        }
-
-        var items = value is TomlArray array ? array.ToList() : [value];
-        return items.All(item => item is string)
-            ? items.Cast<string>().Select(pattern => pattern.Trim()).Where(pattern => pattern.Length > 0).ToList()
-            : throw new ViewConfigurationException($"View '{view}' in {DisplayPath}: {key} must be a pattern or a list of patterns, like [\"fabric:/payments/*\"].");
     }
 
     private static List<string> Strings(object? value) => value switch

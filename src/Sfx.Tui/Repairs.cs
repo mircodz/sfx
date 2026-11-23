@@ -14,7 +14,8 @@ public sealed partial class Views
     private RepairQueries RepairQueries => _repairs ??= new RepairQueries(queries);
 
     public IResourceView Repairs() =>
-        new ResourceView<RepairTaskRow>("repair tasks", "repairs", RepairQueries.GetRepairTasksAsync, t => t.Id)
+        new ResourceView<RepairTaskRow>("repair tasks", "repairs", RepairQueries.GetRepairTasksAsync, t => t.Id) { Empty = "no repair tasks" }
+            .HighlightingChanges()
             .Describing(DescribeRepairTask)
             .Column("ID", Constraint.Fill(3), t => Plain(t.Id), t => t.Id)
             .Column("STATE", Constraint.Length(10), t => RepairState(t.State), t => t.IsActive ? 0 : 1)

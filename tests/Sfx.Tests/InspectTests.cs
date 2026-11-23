@@ -1,8 +1,10 @@
+using System.Text;
 using System.Text.Json.Nodes;
 using Cellar.Primitives;
 using Cellar.Rendering;
 using Cellar.Terminal;
 using Cellar.Text;
+using Cellar.Widgets;
 using Microsoft.ServiceFabric.Common;
 using Sfx.Core;
 using Sfx.Tui;
@@ -83,65 +85,94 @@ public class InspectTests
     }
 }
 
-public class TextViewTests
+public class DescribeViewTests
 {
-    private static TextView View(params string[] lines)
+    private static async Task<DescribeView> Loaded(params string[][] tabs)
     {
-        var view = new TextView();
-        view.SetLines(lines.Select(line => StyledText.Of(line)).ToList());
-        view.Render(new Surface(40, 3), new Rect(0, 0, 40, 3));
+        var view = new DescribeView("node", "_Node_1",
+            tabs.Select((lines, i) => new DescribeTab($"Tab {i}",
+                _ => Task.FromResult<IReadOnlyList<StyledText>>(lines.Select(line => StyledText.Of(line)).ToList()))).ToList());
+        (await view.LoadAsync(CancellationToken.None))();
+        view.Widget.Render(new Surface(40, 6), new Rect(0, 0, 40, 6));
         return view;
     }
 
-    // Leaves out the last column, where the scrollbar is.
-    private static string Row(Surface surface, int y) =>
-        string.Concat(Enumerable.Range(0, surface.Width - 1).Select(x => surface.Get(x, y).Grapheme ?? " ")).TrimEnd();
+    private static string Title(DescribeView view) => ((Panel)view.Widget).Title!;
+
+    private static KeyEvent Char(char c) => new(Key.Char, new Rune(c), KeyModifiers.None);
 
     [Fact]
-    public void Find_counts_matches_and_steps_through_them_wrapping_around()
+    public async Task Searching_counts_the_matches_in_the_title_and_n_steps_through_them_wrapping_around()
     {
-        var view = View("alpha beta", "gamma", "Beta delta beta");
+        var view = await Loaded(["alpha beta", "gamma", "Beta delta beta"]);
+        var next = view.Actions.Single(a => a.Id == "reading.next-match");
+        var previous = view.Actions.Single(a => a.Id == "reading.previous-match");
 
-        view.Find("beta");
-        Assert.Equal(3, view.MatchCount);
-        Assert.Equal(1, view.CurrentMatch);
+        view.Filter = "beta";
+        Assert.Equal(" node _Node_1 /beta (1/3) ", Title(view));
 
-        view.NextMatch(1);
-        view.NextMatch(1);
-        Assert.Equal(3, view.CurrentMatch);
-        view.NextMatch(1);
-        Assert.Equal(1, view.CurrentMatch);
-        view.NextMatch(-1);
-        Assert.Equal(3, view.CurrentMatch);
+        next.Run(null);
+        next.Run(null);
+        Assert.Contains("(3/3)", Title(view));
+        next.Run(null);
+        Assert.Contains("(1/3)", Title(view));
+        previous.Run(null);
+        Assert.Contains("(3/3)", Title(view));
 
-        view.Find("");
-        Assert.Equal(0, view.MatchCount);
+        view.Filter = "nothing";
+        Assert.Contains("/nothing (no match)", Title(view));
+        view.Filter = "";
+        Assert.Equal(" node _Node_1 ", Title(view));
     }
 
     [Fact]
-    public void Scrolls_with_keys_and_jumps_to_a_match_out_of_view()
+    public async Task The_search_follows_to_the_next_tab()
     {
-        var view = View(Enumerable.Range(0, 20).Select(i => $"line {i}").ToArray());
-        var surface = new Surface(40, 3);
+        var view = await Loaded(["beta"], ["no", "beta beta"]);
+        view.Filter = "beta";
 
-        view.OnEvent(new KeyEvent(Key.Down, default, KeyModifiers.None));
-        view.Render(surface, new Rect(0, 0, 40, 3));
-        Assert.Equal("line 1", Row(surface, 0));
+        view.Actions.Single(a => a.Id == "reading.next-tab").Run(null);
+        (await view.LoadAsync(CancellationToken.None))();
 
-        view.Find("line 15");
-        surface.Clear(Style.Default);
-        view.Render(surface, new Rect(0, 0, 40, 3));
-        Assert.Contains("line 15", Enumerable.Range(0, 3).Select(y => Row(surface, y)));
-
-        view.OnEvent(new KeyEvent(Key.Home, default, KeyModifiers.None));
-        surface.Clear(Style.Default);
-        view.Render(surface, new Rect(0, 0, 40, 3));
-        Assert.Equal("line 0", Row(surface, 0));
+        Assert.Equal(2, view.Active.MatchCount);
+        Assert.Contains("(1/2)", Title(view));
     }
 
     [Fact]
-    public void Text_joins_the_plain_lines_for_copying()
+    public async Task Reading_keys_scroll_but_back_open_copy_and_escape_are_left_to_the_shell()
     {
-        Assert.Equal("a\nb", View("a", "b").Text);
+        var view = await Loaded(Enumerable.Range(0, 20).Select(i => $"line {i}").ToArray());
+
+        Assert.True(view.Widget.OnEvent(Char('j')));
+        Assert.Equal(1, view.Active.TopLine);
+        foreach (var c in "hly")
+        {
+            Assert.False(view.Widget.OnEvent(Char(c)));
+        }
+        Assert.False(view.Widget.OnEvent(new KeyEvent(Key.Escape, default, KeyModifiers.None)));
+    }
+
+    [Fact]
+    public async Task A_refresh_keeps_the_place_being_read()
+    {
+        var view = await Loaded(Enumerable.Range(0, 20).Select(i => $"line {i}").ToArray());
+        view.Active.ScrollToLine(7);
+
+        (await view.LoadAsync(CancellationToken.None))();
+
+        Assert.Equal(7, view.Active.TopLine);
+    }
+
+    [Fact]
+    public async Task Line_numbers_and_wrapping_toggle_and_copy_takes_the_plain_text()
+    {
+        var view = await Loaded(["a", "b"]);
+
+        view.Actions.Single(a => a.Id == "reading.line-numbers").Run(null);
+        view.Actions.Single(a => a.Id == "reading.wrap").Run(null);
+
+        Assert.True(view.Active.ShowLineNumbers);
+        Assert.True(view.Active.Wrap);
+        Assert.Equal("a\nb", view.CopyText);
     }
 }

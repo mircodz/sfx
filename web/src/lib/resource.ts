@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { useView } from "./view";
 
 /** Bumped after every change (an action, power on or off) so every view on screen loads again. */
 export const RefreshContext = createContext({ generation: 0, bump: () => {} });
@@ -13,11 +12,8 @@ const refreshMs = 10_000;
  * while the browser tab is visible (and at once when it becomes visible again after missing a refresh), after every
  * change, and whenever `key` changes. Keeps showing the last data while it reloads.
  */
-export function useResource<T>(name: string, load: () => Promise<T>, poll = true): Resource<T> {
+export function useResource<T>(key: string, load: () => Promise<T>, poll = true): Resource<T> {
     const { generation } = useContext(RefreshContext);
-    // Another view is other data: never show one view's list under another while it loads.
-    const view = useView();
-    const key = `${name}|${view ?? ""}`;
     const [state, setState] = useState<{ key: string; data?: T; error?: string; loading: boolean; at?: Date }>({ key, loading: true });
     const [tick, setTick] = useState(0);
     const loadRef = useRef(load);

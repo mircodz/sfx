@@ -27,16 +27,11 @@ public sealed partial class Views
         [
             Tab("Overview", async ct => Lines.Fields(Inspect.Fields(await _inspect.GetNodeAsync(node.Name, ct)))),
             Tab("Health", async ct => Lines.Health(await _inspect.GetNodeHealthAsync(node.Name, ct))),
-            Tab("Deployed apps", async ct =>
-            {
-                var view = View();
-                var apps = await _deployed.GetApplicationsAsync(node.Name, ct);
-                var shown = apps.Where(a => view.Includes(a.Name)).ToList();
-                var table = Lines.Table(
-                    ["NAME", "TYPE", "STATUS", "HEALTH"],
-                    shown.Select(a => (IReadOnlyList<string>)[a.Name, a.TypeName, a.Status, a.Health.ToString()]).ToList());
-                return shown.Count == apps.Count ? table : [.. table, Styles.Muted(""), Styles.Muted($"{apps.Count - shown.Count} hidden by the view")];
-            }),
+            Tab("Deployed apps", async ct => Lines.Table(
+                ["NAME", "TYPE", "STATUS", "HEALTH"],
+                (await _deployed.GetApplicationsAsync(node.Name, ct))
+                    .Select(a => (IReadOnlyList<string>)[a.Name, a.TypeName, a.Status, a.Health.ToString()])
+                    .ToList())),
             Tab("Load", async ct => Lines.NodeLoad(await _inspect.GetNodeLoadAsync(node.Name, ct))),
             Tab("Raw", async ct => Lines.Json(await _inspect.GetNodeAsync(node.Name, ct))),
         ], actions: Bind(NodeActions(), node, "Node"));

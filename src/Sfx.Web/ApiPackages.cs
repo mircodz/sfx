@@ -24,13 +24,12 @@ public sealed record CodePackageDto(
     long ActivationFailures,
     IReadOnlyList<ActionDto> Actions);
 
-/// <summary>GET /api/nodes/{name}/packages: the service and code packages deployed on a node, of the applications in <c>?view=</c>.</summary>
+/// <summary>GET /api/nodes/{name}/packages: the service and code packages deployed on a node.</summary>
 internal static class ApiPackages
 {
     public static void Map(RouteGroupBuilder api) =>
-        api.MapGet("/nodes/{name}/packages", async (UiSession s, string name, string? view, CancellationToken ct) =>
+        api.MapGet("/nodes/{name}/packages", async (UiSession s, string name, CancellationToken ct) =>
         {
-            var filter = s.View(view);
             var status = (await s.Inspector.GetNodeAsync(name, ct)).NodeStatus?.ToString() ?? "";
             if (!ClusterQueries.MayHostReplicas(status))
             {
@@ -38,7 +37,7 @@ internal static class ApiPackages
             }
             try
             {
-                return await LoadAsync(s, name, filter, ct);
+                return await LoadAsync(s, name, ct);
             }
             // A disabled or disabling node still hosts packages but may not answer for them; show none rather than fail.
             catch (Exception) when (status != nameof(NodeStatus.Up) && !ct.IsCancellationRequested)
@@ -47,9 +46,9 @@ internal static class ApiPackages
             }
         });
 
-    private static async Task<IReadOnlyList<DeployedPackageDto>> LoadAsync(UiSession s, string node, ViewFilter view, CancellationToken ct)
+    private static async Task<IReadOnlyList<DeployedPackageDto>> LoadAsync(UiSession s, string node, CancellationToken ct)
     {
-        var apps = (await s.Deployed.GetApplicationsAsync(node, ct)).Where(a => view.Includes(a.Name)).ToList();
+        var apps = await s.Deployed.GetApplicationsAsync(node, ct);
         var packages = (await Bounded.SelectAsync(apps, async a => (await s.Deployed.GetServicePackagesAsync(node, a.Id, ct)).Select(p => (App: a, Package: p))))
             .SelectMany(p => p)
             .ToList();

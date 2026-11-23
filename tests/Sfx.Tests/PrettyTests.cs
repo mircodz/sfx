@@ -45,7 +45,7 @@ public class PrettyTests
     [InlineData("}")]
     public void Coloring_json_keeps_the_text(string line)
     {
-        Assert.Equal(line, Highlight.Json(line).PlainText);
+        Assert.Equal(line, Assert.Single(Lines.Highlighted(line, Inspect.Format.Json)).PlainText);
     }
 
     [Theory]
@@ -56,20 +56,20 @@ public class PrettyTests
     [InlineData("<?xml version=\"1.0\"?>")]
     public void Coloring_xml_keeps_the_text(string line)
     {
-        var inComment = false;
-        Assert.Equal(line, Highlight.Xml(line, ref inComment).PlainText);
-        Assert.False(inComment);
+        Assert.Equal(line, Assert.Single(Lines.Highlighted(line, Inspect.Format.Xml)).PlainText);
     }
 
     [Fact]
     public void Carries_an_xml_comment_over_lines()
     {
-        var inComment = false;
+        var lines = Lines.Highlighted("<!-- starts\n  still in it\n  ends --> <A/>\n<B/>", Inspect.Format.Xml);
+        var comment = lines[0].Spans[0].Style;
 
-        Highlight.Xml("<!-- starts", ref inComment);
-        Assert.True(inComment);
-        Assert.Equal("  ends --> <A/>", Highlight.Xml("  ends --> <A/>", ref inComment).PlainText);
-        Assert.False(inComment);
+        Assert.Equal(["<!-- starts", "  still in it", "  ends --> <A/>", "<B/>"], lines.Select(l => l.PlainText));
+        Assert.Equal(comment, Assert.Single(lines[1].Spans).Style);
+        Assert.Equal("  ends -->", lines[2].Spans[0].Text);
+        Assert.Equal(comment, lines[2].Spans[0].Style);
+        Assert.DoesNotContain(lines[3].Spans, span => span.Style == comment);
     }
 
     [Fact]

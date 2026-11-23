@@ -8,7 +8,6 @@ namespace Sfx.Core;
 /// <param name="ReadOnly">Hide every action that changes the cluster.</param>
 /// <param name="Power">Start with the riskiest actions (recover, remove node state, delete…) unlocked.</param>
 /// <param name="Folder">Where a saved context is filed, e.g. <c>prod/europe</c>; null at the top level.</param>
-/// <param name="View">The view it opens with, by name; null for none.</param>
 public sealed record ClusterContext(
     string Name,
     string Endpoint,
@@ -16,8 +15,7 @@ public sealed record ClusterContext(
     AuthOptions Options,
     bool ReadOnly = false,
     bool Power = false,
-    string? Folder = null,
-    string? View = null);
+    string? Folder = null);
 
 public sealed record ClusterSession(ClusterContext Context, Uri Endpoint, ClusterQueries Queries);
 
