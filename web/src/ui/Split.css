@@ -1,12 +1,17 @@
-/* By the page's own width, so a collapsed sidebar or a narrow window decides alike. */
+/* By the page's own width (named, so rules inside the aside don't measure the aside instead). */
 .split-wrap {
-    container-type: inline-size;
+    container: split / inline-size;
 }
 
-@container (min-width: 960px) {
+.split-resize {
+    display: none;
+}
+
+@container split (min-width: 960px) {
     .split {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 320px;
+        /* About 40% until dragged; Split sets --aside-width then. */
+        grid-template-columns: minmax(0, 1fr) var(--aside-width, clamp(320px, 40%, 720px));
         column-gap: var(--space-6);
         align-items: start;
     }
@@ -17,12 +22,58 @@
     }
 
     .split-aside {
+        position: relative;
         grid-column: 2;
         grid-row: 1;
+        align-self: stretch;
+        container: aside / inline-size;
     }
 
-    /* Facts in the narrow column: one per line, not two squeezed side by side. */
+    /* The aside's left edge, centered in the gap: a line shows on hover, drag or keyboard focus. */
+    .split-resize {
+        display: block;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: calc(var(--space-6) / -2 - 5px);
+        z-index: 1;
+        width: 10px;
+        cursor: col-resize;
+        touch-action: none;
+    }
+
+    .split-resize::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 4px;
+        width: 2px;
+        border-radius: 1px;
+        background: transparent;
+    }
+
+    .split-resize:hover::after,
+    .split-resize:active::after,
+    .split-resize:focus-visible::after {
+        background: var(--border-accent);
+    }
+
+    .split-resize:focus-visible {
+        outline: none;
+        box-shadow: none;
+    }
+}
+
+/* Facts in the column: one per line, then two once it's dragged wide enough for them. */
+@container aside (max-width: 599px) {
     .split-aside .fields {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@container aside (min-width: 600px) {
+    .split-aside .fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }

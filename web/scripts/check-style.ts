@@ -20,7 +20,7 @@ const rules: Rule[] = [
         name: "No inline styles except data-driven sizes",
         files: "src/**/*.tsx",
         test: (line) => line.includes("style={{"),
-        allow: ["src/ui/Meter.tsx", "src/ui/Overlay.tsx", "src/ui/HealthBar.tsx"],
+        allow: ["src/ui/Meter.tsx", "src/ui/Overlay.tsx", "src/ui/HealthBar.tsx", "src/ui/Split.tsx"],
     },
     {
         name: "Messages say what happened, without an 'Error:' prefix",
