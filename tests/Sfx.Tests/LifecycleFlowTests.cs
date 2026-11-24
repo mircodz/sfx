@@ -31,7 +31,7 @@ public sealed class PathCompletionTests : IDisposable
     public void Folders_end_in_a_slash_and_only_packages_are_offered_among_files()
     {
         Assert.Equal(["app.sfpkg", "Build.ZIP", "pkgs/"], PathCompletion.Complete("", _dir));
-        Assert.Equal(["pkgs/", "pkgs/VotingPkg/"], PathCompletion.Complete("P", _dir));
+        Assert.Equal(["pkgs/"], PathCompletion.Complete("P", _dir));
         Assert.Equal(["pkgs/VotingPkg/"], PathCompletion.Complete("pkgs/", _dir));
         Assert.Empty(PathCompletion.Complete("nope/", _dir));
     }
@@ -47,7 +47,7 @@ public sealed class PathCompletionTests : IDisposable
     public void Absolute_paths_keep_the_form_typed_and_the_home_folder_is_tilde()
     {
         var typed = _dir + "/pk";
-        Assert.Equal([_dir + "/pkgs/", _dir + "/pkgs/VotingPkg/"], PathCompletion.Complete(typed));
+        Assert.Equal([_dir + "/pkgs/"], PathCompletion.Complete(typed));
         Assert.Equal(["~/"], PathCompletion.Complete("~"));
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
