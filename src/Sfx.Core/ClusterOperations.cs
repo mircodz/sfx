@@ -7,8 +7,6 @@ namespace Sfx.Core;
 /// <summary>Everything that changes the cluster. One method per operation, so the TUI and a CLI run the same code.</summary>
 public sealed class ClusterOperations(IServiceFabricClient client)
 {
-    // Replicas
-
     public Task RestartReplicaAsync(string node, PartitionId partition, string replica, CancellationToken cancellationToken) =>
         client.Replicas.RestartReplicaAsync(new NodeName(node), partition, ReplicaId.Parse(replica), cancellationToken: cancellationToken);
 
@@ -41,8 +39,6 @@ public sealed class ClusterOperations(IServiceFabricClient client)
 
     public static bool CanMove(string role) =>
         role is "Primary" or "ActiveSecondary" or "IdleSecondary" or "ActiveAuxiliary" or "IdleAuxiliary" or "PrimaryAuxiliary" or "Instance";
-
-    // Nodes
 
     public Task ActivateNodeAsync(string node, CancellationToken cancellationToken) =>
         client.Nodes.EnableNodeAsync(new NodeName(node), cancellationToken: cancellationToken);
@@ -89,8 +85,6 @@ public sealed class ClusterOperations(IServiceFabricClient client)
             cancellationToken: cancellationToken);
     }
 
-    // Partitions
-
     /// <summary>Restarts the partition's replicas; needs the Fault Analysis Service.</summary>
     public Task RestartPartitionAsync(string serviceId, PartitionId partition, RestartPartitionMode mode, CancellationToken cancellationToken) =>
         client.Faults.StartPartitionRestartAsync(serviceId, partition, Guid.NewGuid(), mode, cancellationToken: cancellationToken);
@@ -100,8 +94,6 @@ public sealed class ClusterOperations(IServiceFabricClient client)
 
     public Task ResetPartitionLoadAsync(PartitionId partition, CancellationToken cancellationToken) =>
         client.Partitions.ResetPartitionLoadAsync(partition, cancellationToken: cancellationToken);
-
-    // Services, applications, cluster
 
     public Task RecoverServicePartitionsAsync(string serviceId, CancellationToken cancellationToken) =>
         client.Partitions.RecoverServicePartitionsAsync(serviceId, cancellationToken: cancellationToken);
@@ -297,8 +289,6 @@ public sealed class ClusterOperations(IServiceFabricClient client)
 
     public Task RecoverSystemPartitionsAsync(CancellationToken cancellationToken) =>
         client.Partitions.RecoverSystemPartitionsAsync(cancellationToken: cancellationToken);
-
-    // Deployed code packages
 
     public Task RestartCodePackageAsync(string node, string applicationId, DeployedCodePackageRow codePackage, CancellationToken cancellationToken) =>
         RestartCodePackageAsync(

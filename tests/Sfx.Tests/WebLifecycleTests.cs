@@ -37,8 +37,6 @@ public sealed class WebLifecycleTests : IDisposable
     private static Task<ActionResult> Run(UiSession session, ActionDto action, Dictionary<string, string>? inputs = null, string? confirm = null) =>
         WebActions.RunAsync(session, action.Id, new ActionRequest(new(action.Target), inputs, confirm, action.Signature), default);
 
-    // Application types
-
     private static ApplicationTypeRow Type(string status = "Available") =>
         new("ShopType", "1.0.0", status, new Dictionary<string, string> { ["Port"] = "8080", ["Count"] = "3" });
 
@@ -94,8 +92,6 @@ public sealed class WebLifecycleTests : IDisposable
         Assert.Equal("fabric:/shop", description.Name.ToString());
         Assert.Equal(new Dictionary<string, string> { ["Count"] = "5" }, description.Parameters);
     }
-
-    // Creating a service
 
     private static Dictionary<string, string> Application(string serviceTypes) => new()
     {
@@ -169,8 +165,6 @@ public sealed class WebLifecycleTests : IDisposable
 
         Assert.Equal(new NewService("fabric:/shop/Counter", "CounterType", false, -1, 2, true), service);
     }
-
-    // Service settings
 
     private static StatefulServiceDescription Counter() => new(
         new ServiceName("fabric:/shop/Counter"),
@@ -249,8 +243,6 @@ public sealed class WebLifecycleTests : IDisposable
         Assert.Contains("High", setting.Choices!);
     }
 
-    // Upgrade plans
-
     private static UpgradeRow Upgrade(string state, string mode = "Monitored", string onFailure = "Manual", string kind = "application") =>
         new(
             kind == "cluster" ? "cluster" : "fabric:/shop",
@@ -320,8 +312,6 @@ public sealed class WebLifecycleTests : IDisposable
             Assert.Equal(["upgrade.resume", "upgrade.rollback", "change-upgrade-plan"], ids);
         }
     }
-
-    // Search
 
     private static readonly NodeRow Node = new("_Node_1", "10.0.0.4", "FrontEnd", "Up", HealthState.Ok, "UD1", "fd:/1", false, "10.1", null);
     private static readonly ApplicationRow Shop = new("shop~orders", "fabric:/shop/orders", "OrdersType", "1.0.0", "Ready", HealthState.Ok);
@@ -414,8 +404,6 @@ public sealed class WebLifecycleTests : IDisposable
                 default)).Count);
     }
 
-    // Image store
-
     private static readonly ImageStoreListing Root = new(
         "",
         [new ImageStoreFolder("Logs", "Logs", 2), new ImageStoreFolder("ShopType_2.0.0", "ShopType_2.0.0", 4), new ImageStoreFolder("Store", "Store", 10)],
@@ -490,8 +478,6 @@ public sealed class WebLifecycleTests : IDisposable
         Assert.True(await Session(native).ImageStoreBrowsableAsync(default));
         Assert.True(await Session(failing).ImageStoreBrowsableAsync(default));
     }
-
-    // Uploads
 
     [Theory]
     [InlineData("MyAppPkg/ApplicationManifest.xml", "MyAppPkg/ApplicationManifest.xml")]
@@ -656,8 +642,6 @@ public sealed class WebLifecycleTests : IDisposable
         Assert.NotNull(done.Finished);
         Assert.Contains(session.ReadLog(10), e => e.Action == "Upload MyAppType 1.2.0" && e.Outcome == "done");
     }
-
-    // Settling
 
     [Fact]
     public void A_provisioned_type_settles_when_available_and_fails_with_the_clusters_reason()

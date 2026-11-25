@@ -108,8 +108,6 @@ public sealed class ImageStore(IServiceFabricClient client)
         _ => ImageStoreKind.Unknown,
     };
 
-    // Browsing
-
     /// <summary>What a folder holds; the root when <paramref name="path"/> is null or empty.</summary>
     /// <param name="folderSizes">Also ask each folder's size (a call per folder).</param>
     public async Task<ImageStoreListing> GetContentAsync(string? path, CancellationToken cancellationToken, bool folderSizes = false)
@@ -236,8 +234,6 @@ public sealed class ImageStore(IServiceFabricClient client)
         }
     }
 
-    // What's in it
-
     /// <summary>
     /// The top-level folders that hold an application package, each matched to a provisioned type version by its name
     /// where it can be. A folder per package is listed, so this is a call per top-level folder.
@@ -355,8 +351,6 @@ public sealed class ImageStore(IServiceFabricClient client)
         return false;
     }
 
-    // Changing it
-
     /// <summary>
     /// Deletes a file or folder. Refuses the root, the cluster's reserved folders, and a package an application type
     /// is still being provisioned from.
@@ -393,8 +387,7 @@ public sealed class ImageStore(IServiceFabricClient client)
     }
 
     /// <summary>
-    /// Uploads a local folder, everything in it, to <paramref name="storePath"/>, reporting progress as files and
-    /// chunks of large files arrive. Overwrites what's there. Large files go in chunks; each request is tried twice.
+    /// Uploads everything under the folder, overwriting what's there. Large files go in chunks; each request is tried twice.
     /// </summary>
     public async Task UploadFolderAsync(string localFolder, string storePath, IProgress<UploadProgress>? progress, CancellationToken cancellationToken)
     {
@@ -539,9 +532,6 @@ public sealed class ImageStore(IServiceFabricClient client)
         public void Report() => progress?.Report(new UploadProgress(0, files, 0, bytes));
     }
 
-    // Paths
-
-    /// <summary>Whether a path is in one of the cluster's <see cref="ReservedFolders"/>.</summary>
     public static bool IsReserved(string path) =>
         ReservedFolders.Contains(TopOf(Normalize(path)), StringComparer.OrdinalIgnoreCase);
 

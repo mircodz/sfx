@@ -49,7 +49,7 @@ public sealed class ClusterQueries(IServiceFabricClient client)
         return rows;
     }
 
-    /// <summary>One application's row; null when there's no such application. The system application works too.</summary>
+    /// <summary>Null when there's no such application; the system application works too.</summary>
     public async Task<ApplicationRow?> GetApplicationAsync(string applicationId, CancellationToken cancellationToken)
     {
         if (applicationId == SystemApplicationId)
@@ -99,7 +99,7 @@ public sealed class ClusterQueries(IServiceFabricClient client)
         return services.Select(Row).ToList();
     }
 
-    /// <summary>One service's row; null when there's no such service.</summary>
+    /// <summary>Null when there's no such service.</summary>
     public async Task<ServiceRow?> GetServiceAsync(string applicationId, string serviceId, CancellationToken cancellationToken)
     {
         var service = await OrNullAsync(() => client.Services.GetServiceInfoAsync(applicationId, serviceId, cancellationToken: cancellationToken));
@@ -119,7 +119,7 @@ public sealed class ClusterQueries(IServiceFabricClient client)
         return partitions.Select(Row).ToList();
     }
 
-    /// <summary>One partition's row; null when there's no such partition.</summary>
+    /// <summary>Null when there's no such partition.</summary>
     public async Task<PartitionRow?> GetPartitionAsync(PartitionId partitionId, CancellationToken cancellationToken)
     {
         var partition = await OrNullAsync(() => client.Partitions.GetPartitionInfoAsync(partitionId, cancellationToken: cancellationToken));
@@ -183,7 +183,6 @@ public sealed class ClusterQueries(IServiceFabricClient client)
             .ToList();
     }
 
-    /// <summary>The service types one version of an application type provides.</summary>
     public async Task<IReadOnlyList<ServiceTypeRow>> GetServiceTypesAsync(string typeName, string typeVersion, CancellationToken cancellationToken)
     {
         var types = await client.ServiceTypes.GetServiceTypeInfoListAsync(typeName, typeVersion, cancellationToken: cancellationToken);

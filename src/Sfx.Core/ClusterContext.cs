@@ -4,7 +4,6 @@ namespace Sfx.Core;
 
 /// <summary>A saved (or ad-hoc) way to reach a cluster: where it is and how to authenticate.</summary>
 /// <param name="Auth">Auth method names, applied in order; empty means none.</param>
-/// <param name="Options">Options for those auth methods, keyed by option name.</param>
 /// <param name="ReadOnly">Hide every action that changes the cluster.</param>
 /// <param name="Power">Start with the riskiest actions (recover, remove node state, delete…) unlocked.</param>
 /// <param name="Folder">Where a saved context is filed, e.g. <c>prod/europe</c>; null at the top level.</param>

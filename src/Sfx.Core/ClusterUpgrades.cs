@@ -132,7 +132,7 @@ public sealed class ClusterUpgrades(IServiceFabricClient client)
         var (code, config) = Versions(codeVersion, configVersion);
         policy?.Require(plan.Monitored, cluster: true);
 
-        // Checked again rather than trusting whatever offered the upgrade, which may have been on screen for a while.
+        // Checked again: whatever offered the upgrade may have been on screen for a while.
         if (await IsAzureManagedAsync(cancellationToken))
         {
             throw new RefusedException(AzureManagedNote, conflict: true);

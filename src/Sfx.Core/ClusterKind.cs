@@ -3,7 +3,6 @@ using System.Xml.Linq;
 
 namespace Sfx.Core;
 
-/// <summary>What kind of cluster a cluster manifest describes.</summary>
 public static class ClusterKind
 {
     /// <summary>

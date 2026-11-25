@@ -3,7 +3,6 @@ using Microsoft.ServiceFabric.Common;
 
 namespace Sfx.Core;
 
-/// <summary>One event from the cluster's event store.</summary>
 /// <param name="Kind">The event type without its "Event" suffix, e.g. "NodeDown".</param>
 /// <param name="Entity">What it's about: a node, application, service or partition, or "cluster".</param>
 /// <param name="EntityKind">What kind of entity that is: "cluster", "node", "application", "service", "partition" or "replica".</param>
