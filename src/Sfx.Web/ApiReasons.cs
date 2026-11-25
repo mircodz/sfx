@@ -36,7 +36,12 @@ internal static class ApiReasons
     });
 
     private static async Task<IReadOnlyList<T>> WithReasonsAsync<T>(
-        UiSession s, string kind, IReadOnlyList<T> rows, Func<T, string> id, Func<T, string> health, Func<T, string, T> withReason,
+        UiSession s,
+        string kind,
+        IReadOnlyList<T> rows,
+        Func<T, string> id,
+        Func<T, string> health,
+        Func<T, string, T> withReason,
         CancellationToken cancellationToken)
     {
         var unhealthy = rows.Where(r => health(r) is "Warning" or "Error").Select(r => (id(r), health(r))).ToList();

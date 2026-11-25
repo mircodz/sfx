@@ -8,8 +8,19 @@ public class UpgradeViewTests
 {
     private static UpgradeRow Row(string state, string started = "2026-11-19T10:00:00.000Z", params string[] domains) =>
         new("fabric:/orders", "application", "orders", "1.0.0", new UpgradeReport(
-            state, "Monitored", "1.1.0", "", started, TimeSpan.FromMinutes(5), "", "", "",
-            domains.Select((d, i) => new UpgradeDomainRow(i.ToString(), d)).ToList(), "", [], []));
+            state,
+            "Monitored",
+            "1.1.0",
+            "",
+            started,
+            TimeSpan.FromMinutes(5),
+            "",
+            "",
+            "",
+            domains.Select((d, i) => new UpgradeDomainRow(i.ToString(), d)).ToList(),
+            "",
+            [],
+            []));
 
     [Fact]
     public void Running_upgrades_sort_before_waiting_failed_and_done_ones()

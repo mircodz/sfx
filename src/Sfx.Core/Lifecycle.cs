@@ -57,7 +57,8 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
         return path.Length == 0
             ? throw new RefusedException("Give the image store path of the application package to provision.")
             : client.ApplicationTypes.ProvisionApplicationTypeAsync(
-                new ProvisionApplicationTypeDescription(path, async: true), cancellationToken: cancellationToken);
+                new ProvisionApplicationTypeDescription(path, async: true),
+                cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -67,7 +68,10 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
     /// <param name="storePath">Where to put it in the image store; "{type}_{version}" when null.</param>
     /// <param name="progress">Told how far the upload is, after each file and each chunk of a large one.</param>
     public async Task<ApplicationPackage> UploadAndProvisionAsync(
-        string localPath, string? storePath, IProgress<UploadProgress>? progress, CancellationToken cancellationToken)
+        string localPath,
+        string? storePath,
+        IProgress<UploadProgress>? progress,
+        CancellationToken cancellationToken)
     {
         using var package = LocalPackage.Open(localPath);
         var existing = await _inspector.GetApplicationTypeVersionsAsync(package.TypeName, cancellationToken);
@@ -99,7 +103,9 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
                 conflict: true);
         }
         await client.ApplicationTypes.UnprovisionApplicationTypeAsync(
-            typeName, new UnprovisionApplicationTypeDescriptionInfo(typeVersion, async: true), cancellationToken: cancellationToken);
+            typeName,
+            new UnprovisionApplicationTypeDescriptionInfo(typeVersion, async: true),
+            cancellationToken: cancellationToken);
     }
 
     // Applications
@@ -110,7 +116,11 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
     /// </summary>
     /// <param name="name">Its name, with or without "fabric:/".</param>
     public async Task CreateApplicationAsync(
-        string name, string typeName, string typeVersion, IReadOnlyDictionary<string, string> parameters, CancellationToken cancellationToken)
+        string name,
+        string typeName,
+        string typeVersion,
+        IReadOnlyDictionary<string, string> parameters,
+        CancellationToken cancellationToken)
     {
         var applicationName = FullName(name);
         if (applicationName.Length <= "fabric:/".Length)
@@ -123,7 +133,8 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
             throw new RefusedException($"{typeName} {typeVersion} has no parameter '{unknown}'.");
         }
         await client.Applications.CreateApplicationAsync(
-            new ApplicationDescription(new ApplicationName(applicationName), typeName, typeVersion, parameters), cancellationToken: cancellationToken);
+            new ApplicationDescription(new ApplicationName(applicationName), typeName, typeVersion, parameters),
+            cancellationToken: cancellationToken);
     }
 
     /// <summary>The parameters the application sets; the others take its version's defaults.</summary>
@@ -176,7 +187,8 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
             {
                 throw new RefusedException(
                     $"{use.Parameter} sets how {use.Service} is partitioned ({use.Setting}), which can't change once the service exists. " +
-                    "Repartitioning means creating the service again.", conflict: true);
+                    "Repartitioning means creating the service again.",
+                    conflict: true);
             }
             if (!(enabled ??= await DefaultServicesUpgradeEnabledAsync(cancellationToken)))
             {
@@ -193,14 +205,23 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
         try
         {
             await _operations.UpgradeApplicationAsync(
-                applicationId, name, version, parameters, request.Plan.Mode, request.Plan.OnFailure, request.Policy, targetManifest, cancellationToken);
+                applicationId,
+                name,
+                version,
+                parameters,
+                request.Plan.Mode,
+                request.Plan.OnFailure,
+                request.Policy,
+                targetManifest,
+                cancellationToken);
         }
         catch (Exception ex) when (DefaultServices.IsRefusal(ex))
         {
             throw new RefusedException(
                 $"The cluster refused: version {version} changes a default service, and this cluster doesn't let upgrades " +
                 "change default services (ClusterManager/EnableDefaultServicesUpgrade is off, see aka.ms/upgrade-defaultservices).",
-                conflict: true, ex);
+                conflict: true,
+                ex);
         }
     }
 
@@ -309,12 +330,19 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
             : new UniformInt64RangePartitionSchemeDescription(service.Partitions, long.MinValue.ToString(), long.MaxValue.ToString());
         return service.Stateful
             ? new StatefulServiceDescription(
-                new ServiceName(name), service.TypeName, partitions,
-                targetReplicaSetSize: service.Count, minReplicaSetSize: service.MinReplicas, hasPersistedState: service.Persisted,
+                new ServiceName(name),
+                service.TypeName,
+                partitions,
+                targetReplicaSetSize: service.Count,
+                minReplicaSetSize: service.MinReplicas,
+                hasPersistedState: service.Persisted,
                 applicationName: new ApplicationName(applicationName))
             : new StatelessServiceDescription(
-                new ServiceName(name), service.TypeName, partitions,
-                instanceCount: service.Count, applicationName: new ApplicationName(applicationName));
+                new ServiceName(name),
+                service.TypeName,
+                partitions,
+                instanceCount: service.Count,
+                applicationName: new ApplicationName(applicationName));
     }
 
     private static void Check(NewService service)

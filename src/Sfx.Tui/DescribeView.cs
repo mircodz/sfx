@@ -58,12 +58,10 @@ public sealed class DescribeView : IResourceView
             new AppAction("reading.previous-tab", "Previous tab", () => SwitchTab(-1)) { Group = Reading, Keys = ["["] },
             new AppAction("reading.line-numbers", "Line numbers on or off", () => Active.ShowLineNumbers = !Active.ShowLineNumbers)
             {
-                Group = Reading, Keys = ["#"],
+                Group = Reading,
+                Keys = ["#"],
             },
-            new AppAction("reading.wrap", "Wrap long lines, or scroll them sideways", () => Active.Wrap = !Active.Wrap)
-            {
-                Group = Reading, Keys = ["w"],
-            },
+            new AppAction("reading.wrap", "Wrap long lines, or scroll them sideways", () => Active.Wrap = !Active.Wrap) { Group = Reading, Keys = ["w"] },
             .. actions ?? [],
         ];
         UpdateTitle();

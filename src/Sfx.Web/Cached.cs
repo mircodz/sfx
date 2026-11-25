@@ -52,8 +52,7 @@ internal sealed class Cached<T>(TimeSpan lifetime, Func<CancellationToken, Task<
 /// the previous value (the next caller tries again). Only the very first load is waited for.
 /// </summary>
 /// <param name="timeout">Bounds a refresh nobody waits for, so a hung one can't stop the next; defaults to 10 minutes.</param>
-internal sealed class StaleCache<T>(
-    TimeSpan lifetime, Func<CancellationToken, Task<T>> load, TimeSpan? timeout = null, TimeProvider? time = null)
+internal sealed class StaleCache<T>(TimeSpan lifetime, Func<CancellationToken, Task<T>> load, TimeSpan? timeout = null, TimeProvider? time = null)
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private readonly Lock _lock = new();

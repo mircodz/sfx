@@ -49,14 +49,16 @@ internal static class ApiPackages
     private static async Task<IReadOnlyList<DeployedPackageDto>> LoadAsync(UiSession s, string node, CancellationToken ct)
     {
         var apps = await s.Deployed.GetApplicationsAsync(node, ct);
-        var packages = (await Bounded.SelectAsync(apps, async a => (await s.Deployed.GetServicePackagesAsync(node, a.Id, ct)).Select(p => (App: a, Package: p))))
+        var packages = (await Bounded.SelectAsync(
+            apps,
+            async a => (await s.Deployed.GetServicePackagesAsync(node, a.Id, ct)).Select(p => (App: a, Package: p))))
             .SelectMany(p => p)
             .ToList();
 
         // One query per manifest returns its code packages for every activation of it; split them by activation below.
         var codePackages = (await Bounded.SelectAsync(
-                packages.Select(p => (p.App, p.Package.Name)).Distinct(),
-                async p => (Key: (p.App.Id, p.Name), Code: await s.Deployed.GetCodePackagesAsync(node, p.App.Id, p.Name, ct))))
+            packages.Select(p => (p.App, p.Package.Name)).Distinct(),
+            async p => (Key: (p.App.Id, p.Name), Code: await s.Deployed.GetCodePackagesAsync(node, p.App.Id, p.Name, ct))))
             .ToDictionary(p => p.Key, p => p.Code);
         var activations = packages.CountBy(p => (p.App.Id, p.Package.Name)).ToDictionary();
 
@@ -72,11 +74,23 @@ internal static class ApiPackages
                     .Where(c => activations[(p.App.Id, p.Package.Name)] == 1 || c.ActivationId == p.Package.ActivationId)
                     .OrderBy(c => c.Name, StringComparer.Ordinal)
                     .Select(c => new CodePackageDto(
-                        c.Name, c.Version, c.Status, c.HostType, c.ProcessId, c.LastExitCode, c.Activations, c.ActivationFailures,
+                        c.Name,
+                        c.Version,
+                        c.Status,
+                        c.HostType,
+                        c.ProcessId,
+                        c.LastExitCode,
+                        c.Activations,
+                        c.ActivationFailures,
                         WebActions.For(s, "codepackage", new Dictionary<string, string>
                         {
-                            ["node"] = node, ["applicationId"] = p.App.Id, ["application"] = p.App.Name, ["servicePackage"] = p.Package.Name,
-                            ["codePackage"] = c.Name, ["instanceId"] = c.InstanceId, ["activationId"] = c.ActivationId,
+                            ["node"] = node,
+                            ["applicationId"] = p.App.Id,
+                            ["application"] = p.App.Name,
+                            ["servicePackage"] = p.Package.Name,
+                            ["codePackage"] = c.Name,
+                            ["instanceId"] = c.InstanceId,
+                            ["activationId"] = c.ActivationId,
                         })))
                     .ToList()))
             .OrderBy(p => p.Application, StringComparer.Ordinal)

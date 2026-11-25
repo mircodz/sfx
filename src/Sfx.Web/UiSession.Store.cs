@@ -20,7 +20,8 @@ public sealed partial class UiSession
     /// <summary>The top-level folders holding a package (a call per top-level folder), asked at most every 30 seconds.</summary>
     internal Task<IReadOnlyList<ImageStorePackage>> GetStorePackagesAsync(CancellationToken cancellationToken) =>
         LazyInitializer.EnsureInitialized(ref _storePackages, () => new Cached<IReadOnlyList<ImageStorePackage>>(
-                TimeSpan.FromSeconds(30), ct => ImageStore.GetPackagesAsync(ct)))
+            TimeSpan.FromSeconds(30),
+            ct => ImageStore.GetPackagesAsync(ct)))
             .GetAsync(cancellationToken);
 
     private readonly Lock _sizesLock = new();
@@ -125,6 +126,8 @@ public sealed partial class UiSession
     /// <summary>Every node, application and service to search; refreshed in the background after 30 seconds.</summary>
     internal Task<IReadOnlyList<SearchHit>> GetSearchIndexAsync(CancellationToken cancellationToken) =>
         LazyInitializer.EnsureInitialized(ref _searchIndex, () => new StaleCache<IReadOnlyList<SearchHit>>(
-                TimeSpan.FromSeconds(30), ct => Overview.GetSearchIndexAsync(ct), TimeSpan.FromMinutes(2)))
+            TimeSpan.FromSeconds(30),
+            ct => Overview.GetSearchIndexAsync(ct),
+            TimeSpan.FromMinutes(2)))
             .GetAsync(cancellationToken);
 }

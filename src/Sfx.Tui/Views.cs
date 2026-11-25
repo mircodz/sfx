@@ -73,10 +73,7 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host)
             .Column("HEALTH", Constraint.Length(8), p => Health(p.Health), p => p.Health);
 
     public IResourceView Replicas(ServiceRow service, PartitionRow partition) =>
-        new ResourceView<ReplicaRow>("replicas", partition.Id.ToString(), ct => queries.GetReplicasAsync(partition.Id, ct), r => r.Id)
-            {
-                Empty = "no replicas",
-            }
+        new ResourceView<ReplicaRow>("replicas", partition.Id.ToString(), ct => queries.GetReplicasAsync(partition.Id, ct), r => r.Id) { Empty = "no replicas" }
             .HighlightingChanges()
             .Describing(replica => DescribeReplica(service, partition, replica))
             .Acting(ReplicaActions(service, partition), host)
@@ -102,7 +99,11 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host)
             .Column("HEALTH", Constraint.Length(8), a => Health(a.Health), a => a.Health);
 
     public IResourceView ServicePackages(string node, DeployedApplicationRow app) =>
-        new ResourceView<DeployedServicePackageRow>("service packages", app.Name, ct => _deployed.GetServicePackagesAsync(node, app.Id, ct), p => p.Name + p.ActivationId)
+        new ResourceView<DeployedServicePackageRow>(
+            "service packages",
+            app.Name,
+            ct => _deployed.GetServicePackagesAsync(node, app.Id, ct),
+            p => p.Name + p.ActivationId)
             {
                 OnOpen = package => CodePackages(node, app, package),
                 Empty = "no service packages",
@@ -115,11 +116,13 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host)
             .Column("ACTIVATION", Constraint.Fill(1), p => Plain(p.ActivationId), p => p.ActivationId);
 
     public IResourceView CodePackages(string node, DeployedApplicationRow app, DeployedServicePackageRow package) =>
-        new ResourceView<DeployedCodePackageRow>("code packages", package.Name,
-                async ct => (await _deployed.GetCodePackagesAsync(node, app.Id, package.Name, ct))
-                    .Where(c => c.ActivationId == package.ActivationId)
-                    .ToList(),
-                c => c.Name)
+        new ResourceView<DeployedCodePackageRow>(
+            "code packages",
+            package.Name,
+            async ct => (await _deployed.GetCodePackagesAsync(node, app.Id, package.Name, ct))
+                .Where(c => c.ActivationId == package.ActivationId)
+                .ToList(),
+            c => c.Name)
             {
                 Empty = "no code packages",
             }
@@ -133,14 +136,23 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host)
             .Column("PID", Constraint.Length(8), c => Plain(c.ProcessId), c => long.TryParse(c.ProcessId, out var pid) ? pid : null, Justify.Right)
             .Column("LAST EXIT", Constraint.Length(9), c => Plain(c.LastExitCode), c => c.LastExitCode, Justify.Right)
             .Column("STARTS", Constraint.Length(7), c => Plain(c.Activations.ToString()), c => c.Activations, Justify.Right)
-            .Column("FAILED", Constraint.Length(7), c => c.ActivationFailures > 0 ? Colored(c.ActivationFailures.ToString(), Theme.Current.Error) : Muted("0"), c => c.ActivationFailures, Justify.Right);
+            .Column(
+                "FAILED",
+                Constraint.Length(7),
+                c => c.ActivationFailures > 0 ? Colored(c.ActivationFailures.ToString(), Theme.Current.Error) : Muted("0"),
+                c => c.ActivationFailures,
+                Justify.Right);
 
     /// <summary>
     /// The saved contexts, grouped by folder (each folder's label and mode after its name), with the mode their
     /// folders give them; opening one calls <paramref name="use"/> instead of navigating.
     /// </summary>
     public static ResourceView<ResolvedContext> Contexts(ContextStore store, Func<string> current, Action<ClusterContext> use) =>
-        new ResourceView<ResolvedContext>("contexts", "contexts", _ => Task.FromResult<IReadOnlyList<ResolvedContext>>(store.Contexts.Select(store.Resolve).ToList()), c => c.Context.Name)
+        new ResourceView<ResolvedContext>(
+            "contexts",
+            "contexts",
+            _ => Task.FromResult<IReadOnlyList<ResolvedContext>>(store.Contexts.Select(store.Resolve).ToList()),
+            c => c.Context.Name)
             {
                 OnOpen = context =>
                 {
@@ -149,7 +161,11 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host)
                 },
                 Empty = $"no contexts; sfx context add <name> <endpoint> saves one",
             }
-            .Column("NAME", Constraint.Fill(1), c => c.Context.Name == current() ? Colored(c.Context.Name + " *", Theme.Current.Accent) : Plain(c.Context.Name), c => c.Context.Name)
+            .Column(
+                "NAME",
+                Constraint.Fill(1),
+                c => c.Context.Name == current() ? Colored(c.Context.Name + " *", Theme.Current.Accent) : Plain(c.Context.Name),
+                c => c.Context.Name)
             .Column("FOLDER", Constraint.Fill(1), Folder, c => new FolderOrder(c.Context.Folder, c.Context.Name))
             .Column("AUTH", Constraint.Length(14), c => Plain(c.Context.Auth.Count > 0 ? string.Join(",", c.Context.Auth) : "none"))
             .Column("MODE", Constraint.Length(9), c => Plain(ContextCommand.Mode(c.Context)))

@@ -42,8 +42,11 @@ public sealed class ClusterInspector(IServiceFabricClient client)
 
     public async Task<HealthReport> GetApplicationHealthAsync(string applicationId, CancellationToken cancellationToken) =>
         HealthReport.From(await client.Applications.GetApplicationHealthAsync(
-            applicationId, deployedApplicationsHealthStateFilter: HealthFilter.None, servicesHealthStateFilter: HealthFilter.None,
-            excludeHealthStatistics: true, cancellationToken: cancellationToken));
+            applicationId,
+            deployedApplicationsHealthStateFilter: HealthFilter.None,
+            servicesHealthStateFilter: HealthFilter.None,
+            excludeHealthStatistics: true,
+            cancellationToken: cancellationToken));
 
     public async Task<string> GetApplicationManifestAsync(string typeName, string typeVersion, CancellationToken cancellationToken)
     {
@@ -56,7 +59,9 @@ public sealed class ClusterInspector(IServiceFabricClient client)
     {
         RequireUserApplication(typeName);
         return await ClusterQueries.PageAsync(token => client.ApplicationTypes.GetApplicationTypeInfoListByNameAsync(
-            typeName, continuationToken: token, cancellationToken: cancellationToken));
+            typeName,
+            continuationToken: token,
+            cancellationToken: cancellationToken));
     }
 
     public Task<ApplicationUpgradeProgressInfo> GetApplicationUpgradeAsync(string applicationId, CancellationToken cancellationToken) =>
@@ -74,17 +79,29 @@ public sealed class ClusterInspector(IServiceFabricClient client)
 
     public async Task<HealthReport> GetServiceHealthAsync(string serviceId, CancellationToken cancellationToken) =>
         HealthReport.From(await client.Services.GetServiceHealthAsync(
-            serviceId, partitionsHealthStateFilter: HealthFilter.None, excludeHealthStatistics: true, cancellationToken: cancellationToken));
+            serviceId,
+            partitionsHealthStateFilter: HealthFilter.None,
+            excludeHealthStatistics: true,
+            cancellationToken: cancellationToken));
 
     /// <summary>The manifest of the service package that provides <paramref name="serviceTypeName"/>.</summary>
     public async Task<string> GetServiceManifestAsync(
-        string applicationTypeName, string applicationTypeVersion, string serviceTypeName, CancellationToken cancellationToken)
+        string applicationTypeName,
+        string applicationTypeVersion,
+        string serviceTypeName,
+        CancellationToken cancellationToken)
     {
         RequireUserApplication(applicationTypeName);
         var serviceType = await client.ServiceTypes.GetServiceTypeInfoByNameAsync(
-            applicationTypeName, applicationTypeVersion, serviceTypeName, cancellationToken: cancellationToken);
+            applicationTypeName,
+            applicationTypeVersion,
+            serviceTypeName,
+            cancellationToken: cancellationToken);
         var manifest = await client.ServiceTypes.GetServiceManifestAsync(
-            applicationTypeName, applicationTypeVersion, serviceType.ServiceManifestName, cancellationToken: cancellationToken);
+            applicationTypeName,
+            applicationTypeVersion,
+            serviceType.ServiceManifestName,
+            cancellationToken: cancellationToken);
         return manifest.Manifest;
     }
 
@@ -105,7 +122,10 @@ public sealed class ClusterInspector(IServiceFabricClient client)
 
     public async Task<HealthReport> GetPartitionHealthAsync(PartitionId partitionId, CancellationToken cancellationToken) =>
         HealthReport.From(await client.Partitions.GetPartitionHealthAsync(
-            partitionId, replicasHealthStateFilter: HealthFilter.None, excludeHealthStatistics: true, cancellationToken: cancellationToken));
+            partitionId,
+            replicasHealthStateFilter: HealthFilter.None,
+            excludeHealthStatistics: true,
+            cancellationToken: cancellationToken));
 
     public Task<PartitionLoadInformation> GetPartitionLoadAsync(PartitionId partitionId, CancellationToken cancellationToken) =>
         client.Partitions.GetPartitionLoadInformationAsync(partitionId, cancellationToken: cancellationToken);
@@ -124,8 +144,10 @@ public sealed class ClusterInspector(IServiceFabricClient client)
     /// <summary>The cluster's own events and evaluations, without every node's and application's state.</summary>
     public async Task<HealthReport> GetClusterHealthAsync(CancellationToken cancellationToken) =>
         HealthReport.From(await client.Cluster.GetClusterHealthAsync(
-            nodesHealthStateFilter: HealthFilter.None, applicationsHealthStateFilter: HealthFilter.None,
-            excludeHealthStatistics: true, cancellationToken: cancellationToken));
+            nodesHealthStateFilter: HealthFilter.None,
+            applicationsHealthStateFilter: HealthFilter.None,
+            excludeHealthStatistics: true,
+            cancellationToken: cancellationToken));
 
     /// <summary>
     /// The cluster's evaluations and unhealthy events, with how many nodes, applications, services, partitions and replicas

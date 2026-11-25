@@ -40,7 +40,12 @@ public sealed record ImageStoreUse(long? Bytes, long? Files);
 
 /// <summary>The image store's disk and what uses it (metadata, staging, copies, registered packages).</summary>
 public sealed record ImageStoreUsage(
-    long? DiskCapacity, long? DiskAvailable, ImageStoreUse? Metadata, ImageStoreUse? Staging, ImageStoreUse? Copy, ImageStoreUse? Register);
+    long? DiskCapacity,
+    long? DiskAvailable,
+    ImageStoreUse? Metadata,
+    ImageStoreUse? Staging,
+    ImageStoreUse? Copy,
+    ImageStoreUse? Register);
 
 /// <summary>How far an upload is; reported after each file and each chunk of a large one.</summary>
 public sealed record UploadProgress(int FilesDone, int FilesTotal, long BytesDone, long BytesTotal)
@@ -116,7 +121,12 @@ public sealed class ImageStore(IServiceFabricClient client)
             .OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         var files = (content?.StoreFiles ?? [])
-            .Select(f => new ImageStoreFile(f.StoreRelativePath ?? "", NameOf(f.StoreRelativePath), Long(f.FileSize), f.FileVersion?.VersionNumber ?? "", f.ModifiedDate))
+            .Select(f => new ImageStoreFile(
+                f.StoreRelativePath ?? "",
+                NameOf(f.StoreRelativePath),
+                Long(f.FileSize),
+                f.FileVersion?.VersionNumber ?? "",
+                f.ModifiedDate))
             .OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         if (folderSizes)
@@ -164,7 +174,8 @@ public sealed class ImageStore(IServiceFabricClient client)
         {
             throw new RefusedException(
                 $"This cluster keeps packages in {Describe(kind)}, which can't be browsed through the cluster; only the native image store (fabric:ImageStore) can.",
-                conflict: true, failure);
+                conflict: true,
+                failure);
         }
     }
 
@@ -212,8 +223,12 @@ public sealed class ImageStore(IServiceFabricClient client)
             return info is null
                 ? null
                 : new ImageStoreUsage(
-                    Long(info.DiskInfo?.Capacity), Long(info.DiskInfo?.AvailableSpace),
-                    Use(info.UsedByMetadata), Use(info.UsedByStaging), Use(info.UsedByCopy), Use(info.UsedByRegister));
+                    Long(info.DiskInfo?.Capacity),
+                    Long(info.DiskInfo?.AvailableSpace),
+                    Use(info.UsedByMetadata),
+                    Use(info.UsedByStaging),
+                    Use(info.UsedByCopy),
+                    Use(info.UsedByRegister));
         }
         catch (Exception ex) when (ex is ServiceFabricException or ServiceFabricRequestException && !cancellationToken.IsCancellationRequested)
         {
@@ -325,7 +340,9 @@ public sealed class ImageStore(IServiceFabricClient client)
         {
             return false;
         }
-        for (var at = text.IndexOf(version, StringComparison.OrdinalIgnoreCase); at >= 0; at = text.IndexOf(version, at + 1, StringComparison.OrdinalIgnoreCase))
+        for (var at = text.IndexOf(
+            version,
+            StringComparison.OrdinalIgnoreCase); at >= 0; at = text.IndexOf(version, at + 1, StringComparison.OrdinalIgnoreCase))
         {
             var end = at + version.Length;
             var before = at == 0 || !(char.IsDigit(text[at - 1]) || (text[at - 1] == '.' && at > 1 && char.IsDigit(text[at - 2])));
@@ -354,14 +371,16 @@ public sealed class ImageStore(IServiceFabricClient client)
         if (IsReserved(target))
         {
             throw new RefusedException(
-                $"{TopOf(target)} is the cluster's own copy of what's provisioned; deleting from it breaks provisioning. Unprovision instead.", conflict: true);
+                $"{TopOf(target)} is the cluster's own copy of what's provisioned; deleting from it breaks provisioning. Unprovision instead.",
+                conflict: true);
         }
 
         var types = await new ClusterQueries(client).GetApplicationTypesAsync(cancellationToken);
         if (MatchPackage(TopOf(target), types).Provisioned is { Status: nameof(ApplicationTypeStatus.Provisioning) } provisioning)
         {
             throw new RefusedException(
-                $"{provisioning.Name} {provisioning.Version} is still being provisioned from {TopOf(target)}; wait for it to finish.", conflict: true);
+                $"{provisioning.Name} {provisioning.Version} is still being provisioned from {TopOf(target)}; wait for it to finish.",
+                conflict: true);
         }
         try
         {
@@ -408,7 +427,8 @@ public sealed class ImageStore(IServiceFabricClient client)
             folders,
             new ParallelOptions { MaxDegreeOfParallelism = Parallelism, CancellationToken = cancellationToken },
             async (folder, ct) => await TwiceAsync(
-                () => client.ImageStore.UploadFileAsync([], StorePathOf(root, target, folder) + "/" + DirectoryMarker, cancellationToken: ct), ct));
+                () => client.ImageStore.UploadFileAsync([], StorePathOf(root, target, folder) + "/" + DirectoryMarker, cancellationToken: ct),
+                ct));
     }
 
     private async Task UploadFileAsync(FileInfo file, string path, Tracker tracker, CancellationToken cancellationToken)
@@ -457,7 +477,12 @@ public sealed class ImageStore(IServiceFabricClient client)
 
     /// <summary>A file share image store is written to directly, as the Service Fabric client does, when this machine reaches it.</summary>
     private static async Task CopyToShareAsync(
-        string connection, string root, string target, IReadOnlyList<FileInfo> files, Tracker tracker, CancellationToken cancellationToken)
+        string connection,
+        string root,
+        string target,
+        IReadOnlyList<FileInfo> files,
+        Tracker tracker,
+        CancellationToken cancellationToken)
     {
         string share;
         try

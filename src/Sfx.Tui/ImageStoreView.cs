@@ -39,14 +39,16 @@ public sealed partial class Views
         var folder = ImageStore.Normalize(path);
         string? note = null;
         ResourceView<StoreEntry>? view = null;
-        view = new ResourceView<StoreEntry>("image store" + (folder.Length > 0 ? " › " + folder : ""), folder.Length == 0 ? "store" : ImageStore.NameOf(folder),
-                async ct =>
-                {
-                    var (entries, usage) = await StoreEntriesAsync(folder, ct);
-                    note = usage;
-                    return entries;
-                },
-                e => e.Path)
+        view = new ResourceView<StoreEntry>(
+            "image store" + (folder.Length > 0 ? " › " + folder : ""),
+            folder.Length == 0 ? "store" : ImageStore.NameOf(folder),
+            async ct =>
+            {
+                var (entries, usage) = await StoreEntriesAsync(folder, ct);
+                note = usage;
+                return entries;
+            },
+            e => e.Path)
             {
                 OnOpen = e => e.Folder ? ImageStoreFolder(e.Path) : null,
                 Empty = folder.Length == 0 ? "the image store is empty; u uploads a folder or package" : "empty folder",
@@ -55,31 +57,43 @@ public sealed partial class Views
             .HighlightingChanges()
             .Acting(StoreEntryActions(folder), host)
             .Offering(
-            [
-                new AppAction(UploadActionId, "Upload a folder or package from this machine here", (string? local) =>
-                {
-                    if (string.IsNullOrWhiteSpace(local))
+                [
+                    new AppAction(UploadActionId, "Upload a folder or package from this machine here", (string? local) =>
                     {
-                        host.Command("upload ");
-                    }
-                    else
+                        if (string.IsNullOrWhiteSpace(local))
+                        {
+                            host.Command("upload ");
+                        }
+                        else
+                        {
+                            UploadToStore(local, folder);
+                        }
+                    })
                     {
-                        UploadToStore(local, folder);
-                    }
-                })
-                {
-                    Group = "Image store",
-                    Keys = [Upload],
-                    Commands = ["upload"],
-                    ArgumentHint = "<path>",
-                    When = () => host.Allows(ActionRisk.Confirm, power: false) && !ImageStore.IsReserved(folder),
-                },
-            ])
-            .Column("NAME", Constraint.Fill(2), e => e.Folder ? Colored(e.Name + "/", Theme.Current.Accent) : Plain(e.Name), e => (e.Folder ? "0" : "1") + e.Name)
+                        Group = "Image store",
+                        Keys = [Upload],
+                        Commands = ["upload"],
+                        ArgumentHint = "<path>",
+                        When = () => host.Allows(ActionRisk.Confirm, power: false) && !ImageStore.IsReserved(folder),
+                    },
+                ])
+            .Column(
+                "NAME",
+                Constraint.Fill(2),
+                e => e.Folder ? Colored(e.Name + "/", Theme.Current.Accent) : Plain(e.Name),
+                e => (e.Folder ? "0" : "1") + e.Name)
             .Column("SIZE", Constraint.Length(9), e => e.Size is null ? Muted(e.Folder ? "…" : "-") : Plain(Bytes(e.Size)), e => e.Size, Justify.Right)
-            .Column("FILES", Constraint.Length(6), e => e.FileCount is { } n ? Plain(n.ToString(CultureInfo.InvariantCulture)) : Muted("-"), e => e.FileCount, Justify.Right)
+            .Column(
+                "FILES",
+                Constraint.Length(6),
+                e => e.FileCount is { } n ? Plain(n.ToString(CultureInfo.InvariantCulture)) : Muted("-"),
+                e => e.FileCount,
+                Justify.Right)
             .Column("PACKAGE", Constraint.Fill(2), e => PackageText(e.Package), e => e.Package?.TypeName)
-            .Column("MODIFIED", Constraint.Length(16), e => e.Modified is { } at ? Plain(at.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)) : Muted("-"),
+            .Column(
+                "MODIFIED",
+                Constraint.Length(16),
+                e => e.Modified is { } at ? Plain(at.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)) : Muted("-"),
                 e => e.Modified);
         return view;
     }
@@ -134,8 +148,13 @@ public sealed partial class Views
         }
 
         var entries = listing.Folders
-            .Select(f => new StoreEntry(f.Path, f.Name, true,
-                sizes[f.Path].IsCompletedSuccessfully ? sizes[f.Path].Result : null, f.FileCount, null,
+            .Select(f => new StoreEntry(
+                f.Path,
+                f.Name,
+                true,
+                sizes[f.Path].IsCompletedSuccessfully ? sizes[f.Path].Result : null,
+                f.FileCount,
+                null,
                 byPath.GetValueOrDefault(ImageStore.Normalize(f.Path))))
             .Concat(listing.Files.Select(f => new StoreEntry(f.Path, f.Name, false, f.Size, null, f.Modified, null)))
             .ToList();
@@ -196,11 +215,21 @@ public sealed partial class Views
 
     private IReadOnlyList<EntityAction<StoreEntry>> StoreEntryActions(string folder) =>
     [
-        new("Provision the package in this folder", ActionRisk.Confirm, e => ProvisionStored(e.Path), [Provision], ["provision-folder"],
+        new(
+            "Provision the package in this folder",
+            ActionRisk.Confirm,
+            e => ProvisionStored(e.Path),
+            [Provision],
+            ["provision-folder"],
             AppliesTo: e => e.Folder && !ImageStore.IsReserved(e.Path) && e.Package?.Provisioned is null),
 
-        new("Delete from the image store", ActionRisk.Destructive,
-            e => host.Run(new Operation($"Delete {e.Path} from the image store", e.Name, ActionRisk.Destructive,
+        new(
+            "Delete from the image store",
+            ActionRisk.Destructive,
+            e => host.Run(new Operation(
+                $"Delete {e.Path} from the image store",
+                e.Name,
+                ActionRisk.Destructive,
                 async (ct, _) =>
                 {
                     await Store.DeleteAsync(e.Path, ct);
@@ -215,7 +244,9 @@ public sealed partial class Views
                         .Any(path => ImageStore.Normalize(path) == ImageStore.Normalize(e.Path)));
                 },
             }),
-            [Delete], ["delete"], Power: true,
+            [Delete],
+            ["delete"],
+            Power: true,
             AppliesTo: e => !ImageStore.IsReserved(e.Path)),
     ];
 
@@ -252,7 +283,10 @@ public sealed partial class Views
     internal Operation UploadOperation(string local, string target, Func<string> open, Action close)
     {
         var progress = new OperationProgress();
-        return new Operation($"Upload {Path.GetFileName(Path.TrimEndingDirectorySeparator(local))} to the image store", target, ActionRisk.Confirm,
+        return new Operation(
+            $"Upload {Path.GetFileName(Path.TrimEndingDirectorySeparator(local))} to the image store",
+            target,
+            ActionRisk.Confirm,
             async (ct, _) =>
             {
                 try

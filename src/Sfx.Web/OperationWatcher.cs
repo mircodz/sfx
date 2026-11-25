@@ -19,7 +19,10 @@ internal static class OperationWatcher
         {
             var replicas = await s.Queries.GetReplicasAsync(target.Partition("partitionId"), ct);
             return SettleChecks.ReplicaMove(
-                target["role"], target["replicaId"], target["node"], inputs.Optional("node"),
+                target["role"],
+                target["replicaId"],
+                target["node"],
+                inputs.Optional("node"),
                 replicas.Select(r => (r.Id, r.NodeName, r.Role)).ToList());
         },
 
@@ -81,7 +84,9 @@ internal static class OperationWatcher
         {
             var serviceId = ClusterInspector.IdOf(LifecycleActions.ServiceName(target["name"], inputs["name"]));
             return SettleChecks.EntityStatus(
-                (await s.Queries.GetServiceAsync(target["applicationId"], serviceId, ct))?.Status, nameof(ServiceStatus.Active), "service");
+                (await s.Queries.GetServiceAsync(target["applicationId"], serviceId, ct))?.Status,
+                nameof(ServiceStatus.Active),
+                "service");
         },
 
         "unprovision-type" => async ct => SettleChecks.TypeUnprovisioned(
@@ -130,8 +135,12 @@ internal static class OperationWatcher
 
     private static (string State, string? Detail) Forward(UpgradeReport report) =>
         SettleChecks.UpgradeOutcome(
-            report.State, report.FailureReason, report.CurrentDomain, report.NextDomain,
-            report.Domains.Count(d => d.State == nameof(UpgradeDomainState.Completed)), report.Domains.Count);
+            report.State,
+            report.FailureReason,
+            report.CurrentDomain,
+            report.NextDomain,
+            report.Domains.Count(d => d.State == nameof(UpgradeDomainState.Completed)),
+            report.Domains.Count);
 
     private static DateTime? Started(UpgradeReport report) => new UpgradeRow("", "", null, "", report).StartedUtc;
 }

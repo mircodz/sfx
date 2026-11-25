@@ -16,7 +16,11 @@ internal static class SettleChecks
     /// <summary>A replica or instance moved off <paramref name="fromNode"/> (to <paramref name="toNode"/>, if one was asked for).</summary>
     /// <param name="replicas">The partition's replicas now: id, node and role.</param>
     public static (string State, string? Detail) ReplicaMove(
-        string role, string replicaId, string fromNode, string? toNode, IReadOnlyList<(string Id, string Node, string Role)> replicas)
+        string role,
+        string replicaId,
+        string fromNode,
+        string? toNode,
+        IReadOnlyList<(string Id, string Node, string Role)> replicas)
     {
         // Moving a primary swaps roles with a secondary, so its replica id may change: follow the role instead.
         if (role == "Primary")
@@ -77,7 +81,12 @@ internal static class SettleChecks
 
     /// <summary>An upgrade going forward: done when it completes, failed when it rolls back or fails.</summary>
     public static (string State, string? Detail) UpgradeOutcome(
-        string state, string failureReason, string currentDomain, string nextDomain, int domainsDone, int domains) => state switch
+        string state,
+        string failureReason,
+        string currentDomain,
+        string nextDomain,
+        int domainsDone,
+        int domains) => state switch
     {
         "RollingForwardCompleted" => (Done, "Upgrade completed."),
         "RollingBackCompleted" => (Failed, Reason("Rolled back", failureReason)),
@@ -111,7 +120,11 @@ internal static class SettleChecks
     };
 
     /// <summary>A type version provisioned: Available. <paramref name="row"/> is null while the cluster doesn't list it.</summary>
-    public static (string State, string? Detail) TypeProvisioned(Sfx.Core.ApplicationTypeRow? row, string name, string version, TimeSpan elapsed) => row?.Status switch
+    public static (string State, string? Detail) TypeProvisioned(
+        Sfx.Core.ApplicationTypeRow? row,
+        string name,
+        string version,
+        TimeSpan elapsed) => row?.Status switch
     {
         "Available" => (Done, $"{name} {version} is available."),
         "Failed" => (Failed, row.StatusDetails is { Length: > 0 } details ? $"Provisioning failed: {details.TrimEnd('.')}." : "Provisioning failed."),
@@ -126,7 +139,9 @@ internal static class SettleChecks
     /// lists now that it didn't before.
     /// </summary>
     public static (string State, string? Detail) NewTypeProvisioned(
-        IReadOnlySet<(string Name, string Version)> before, IReadOnlyList<Sfx.Core.ApplicationTypeRow> now, TimeSpan elapsed)
+        IReadOnlySet<(string Name, string Version)> before,
+        IReadOnlyList<Sfx.Core.ApplicationTypeRow> now,
+        TimeSpan elapsed)
     {
         var added = now.Where(t => !before.Contains((t.Name, t.Version))).ToList();
         if (added.FirstOrDefault(t => t.Status == "Provisioning") is { } provisioning)

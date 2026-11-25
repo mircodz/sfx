@@ -54,7 +54,10 @@ public sealed class ClusterOverview(ClusterQueries queries)
         var counts = statistics?.HealthStateCountList ?? [];
         return CountedKinds
             .SelectMany(kind => counts.Where(c => c.EntityKind == kind).Take(1).Select(c => new HealthCount(
-                kind.ToString(), c.HealthStateCount?.OkCount ?? 0, c.HealthStateCount?.WarningCount ?? 0, c.HealthStateCount?.ErrorCount ?? 0)))
+                kind.ToString(),
+                c.HealthStateCount?.OkCount ?? 0,
+                c.HealthStateCount?.WarningCount ?? 0,
+                c.HealthStateCount?.ErrorCount ?? 0)))
             .ToList();
     }
 
@@ -89,8 +92,12 @@ public sealed class ClusterOverview(ClusterQueries queries)
             try
             {
                 appHealth = await client.Applications.GetApplicationHealthAsync(
-                    id, eventsHealthStateFilter: HealthFilter.WarningOrError, deployedApplicationsHealthStateFilter: HealthFilter.None,
-                    servicesHealthStateFilter: HealthFilter.WarningOrError, excludeHealthStatistics: true, cancellationToken: cancellationToken);
+                    id,
+                    eventsHealthStateFilter: HealthFilter.WarningOrError,
+                    deployedApplicationsHealthStateFilter: HealthFilter.None,
+                    servicesHealthStateFilter: HealthFilter.WarningOrError,
+                    excludeHealthStatistics: true,
+                    cancellationToken: cancellationToken);
             }
             catch (Exception ex) when (IsQueryFailure(ex, cancellationToken))
             {
@@ -108,7 +115,12 @@ public sealed class ClusterOverview(ClusterQueries queries)
                 });
             return (IReadOnlyList<UnhealthyEntity>)
             [
-                new UnhealthyEntity("application", name, id, appHealth.AggregatedHealthState ?? a.AggregatedHealthState ?? HealthState.Unknown, HealthReasons.From(appHealth)),
+                new UnhealthyEntity(
+                    "application",
+                    name,
+                    id,
+                    appHealth.AggregatedHealthState ?? a.AggregatedHealthState ?? HealthState.Unknown,
+                    HealthReasons.From(appHealth)),
                 .. services,
             ];
         });

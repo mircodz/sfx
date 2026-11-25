@@ -14,7 +14,21 @@ namespace Sfx.Tests;
 public class InspectTests
 {
     private static HealthEvent Event(string source, string property, HealthState state, string description) =>
-        new(source, property, state, null, description, "1", false, null, false, null, new DateTime(2026, 11, 19, 12, 0, 0, DateTimeKind.Utc), null, null, null);
+        new(
+            source,
+            property,
+            state,
+            null,
+            description,
+            "1",
+            false,
+            null,
+            false,
+            null,
+            new DateTime(2026, 11, 19, 12, 0, 0, DateTimeKind.Utc),
+            null,
+            null,
+            null);
 
     private static NodeHealth UnhealthyNode()
     {
@@ -38,9 +52,7 @@ public class InspectTests
 
         Assert.Equal(HealthState.Error, report.State);
         Assert.Equal(2, report.Events.Count);
-        Assert.Equal(
-            [(0, "Nodes"), (1, "Node"), (2, "Event")],
-            report.Evaluations.Select(e => (e.Depth, e.Kind)));
+        Assert.Equal([(0, "Nodes"), (1, "Node"), (2, "Event")], report.Evaluations.Select(e => (e.Depth, e.Kind)));
     }
 
     [Fact]
@@ -89,8 +101,11 @@ public class DescribeViewTests
 {
     private static async Task<DescribeView> Loaded(params string[][] tabs)
     {
-        var view = new DescribeView("node", "_Node_1",
-            tabs.Select((lines, i) => new DescribeTab($"Tab {i}",
+        var view = new DescribeView(
+            "node",
+            "_Node_1",
+            tabs.Select((lines, i) => new DescribeTab(
+                $"Tab {i}",
                 _ => Task.FromResult<IReadOnlyList<StyledText>>(lines.Select(line => StyledText.Of(line)).ToList()))).ToList());
         (await view.LoadAsync(CancellationToken.None))();
         view.Widget.Render(new Surface(40, 6), new Rect(0, 0, 40, 6));

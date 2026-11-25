@@ -26,7 +26,11 @@ internal static class LifecycleActions
     [
         // Application types: target typeName, version, status, inUse ("true" or "false"), and "default:{name}" per parameter
 
-        new("create-application", "type", "Create application", Risk.Confirm,
+        new(
+            "create-application",
+            "type",
+            "Create application",
+            Risk.Confirm,
             (t, i) => $"Create {ApplicationName(i["name"])} ({t["typeName"]} {t["version"]})"
                 + (Parameters(t, i) is { Count: > 0 } set ? $", setting {string.Join(", ", set.Keys)}" : ""),
             (s, t, i, ct) => s.Lifecycle.CreateApplicationAsync(i["name"], t["typeName"], t["version"], Parameters(t, i), ct),
@@ -49,7 +53,11 @@ internal static class LifecycleActions
 
         // Applications: the target of WebActions' application actions, plus serviceTypes ("{name}={Stateful|Stateless}" per line)
 
-        new("create-service", "application", "Create service", Risk.Confirm,
+        new(
+            "create-service",
+            "application",
+            "Create service",
+            Risk.Confirm,
             (t, i) => DescribeService(t, i),
             (s, t, i, ct) => s.Lifecycle.CreateServiceAsync(t["applicationId"], NewService(t, i), ct),
             Applies: t => t["applicationId"] != ClusterQueries.SystemApplicationId && t.Optional("serviceTypes") is not null,
@@ -60,7 +68,10 @@ internal static class LifecycleActions
                 return
                 [
                     new("name", "Name", "text", Default: t["name"] + "/"),
-                    new("type", "Service type", "choice",
+                    new(
+                        "type",
+                        "Service type",
+                        "choice",
                         types.Select(x => new ActionChoice(x.Name, x.Name, x.Stateful ? "Stateful" : "Stateless")).ToList(),
                         types.FirstOrDefault().Name),
                     new("kind", "Kind", "choice", ServiceKinds, stateful ? nameof(ServiceKind.Stateful) : nameof(ServiceKind.Stateless)),
@@ -73,7 +84,11 @@ internal static class LifecycleActions
 
         // Services: the target of WebActions' service actions
 
-        new("edit-service-settings", "service", "Edit settings", Risk.Confirm,
+        new(
+            "edit-service-settings",
+            "service",
+            "Edit settings",
+            Risk.Confirm,
             (t, _) => $"Change the settings of {t["name"]}",
             (s, t, i, ct) => s.ServiceSettings.UpdateAsync(t["serviceId"], i.Values, ct),
             "Takes effect right away; changing counts adds or removes replicas.",
@@ -91,7 +106,11 @@ internal static class LifecycleActions
 
         // Upgrades: the target of WebActions' upgrade actions, plus plan (the id of the plan it follows; empty when unknown)
 
-        new("change-upgrade-plan", "upgrade", "Change plan", Risk.Confirm,
+        new(
+            "change-upgrade-plan",
+            "upgrade",
+            "Change plan",
+            Risk.Confirm,
             (t, i) => t.Optional("plan") == i["plan"]
                 ? throw new ActionException($"The upgrade of {t["name"]} already runs {UpgradePlan.Find(i["plan"]).Title.ToLowerInvariant()}.")
                 : $"Switch the upgrade of {t["name"]} to {UpgradePlan.Find(i["plan"]).Title.ToLowerInvariant()}",
@@ -104,14 +123,22 @@ internal static class LifecycleActions
 
         // Image store entries: target path, name, entry ("folder" or "file"), provision ("true" for a package folder not provisioned)
 
-        new("delete-store-content", "store", "Delete", Risk.Destructive,
+        new(
+            "delete-store-content",
+            "store",
+            "Delete",
+            Risk.Destructive,
             (t, _) => $"Delete {ImageStore.Normalize(t["path"])} from the image store",
             (s, t, _, ct) => s.ImageStore.DeleteAsync(t["path"], ct),
             "Types already provisioned from it keep working; it can't be provisioned again without uploading it.",
             Applies: t => ImageStore.Normalize(t["path"]).Length > 0 && !ImageStore.IsReserved(t["path"]),
             ConfirmText: t => t["name"]),
 
-        new("provision-package", "store", "Provision", Risk.Confirm,
+        new(
+            "provision-package",
+            "store",
+            "Provision",
+            Risk.Confirm,
             (t, _) => $"Provision the package in {ImageStore.Normalize(t["path"])}",
             null,
             "Registers the application type in it, so applications can be created from it.",
@@ -121,8 +148,7 @@ internal static class LifecycleActions
                 var before = (await s.Queries.GetApplicationTypesAsync(ct)).Select(x => (x.Name, x.Version)).ToHashSet();
                 await s.Lifecycle.ProvisionAsync(t["path"], ct);
                 var started = DateTime.UtcNow;
-                return async probeCt => SettleChecks.NewTypeProvisioned(
-                    before, await s.Queries.GetApplicationTypesAsync(probeCt), DateTime.UtcNow - started);
+                return async probeCt => SettleChecks.NewTypeProvisioned(before, await s.Queries.GetApplicationTypesAsync(probeCt), DateTime.UtcNow - started);
             }),
     ];
 

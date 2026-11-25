@@ -60,7 +60,10 @@ public class WebActionTests
         var action = WebActions.For(session, "node", UpNode).Single(a => a.Id == "node.deactivate");
 
         var ex = await Assert.ThrowsAsync<ActionException>(() =>
-            WebActions.RunAsync(session, action.Id, new ActionRequest(new(action.Target), new() { ["intent"] = "RemoveData" }, null, action.Signature), default));
+            WebActions.RunAsync(session, action.Id, new ActionRequest(new(action.Target), new()
+            {
+                ["intent"] = "RemoveData",
+            }, null, action.Signature), default));
         Assert.Equal(400, ex.Status);
     }
 

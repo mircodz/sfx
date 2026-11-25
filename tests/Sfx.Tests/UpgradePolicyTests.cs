@@ -29,8 +29,12 @@ public class UpgradePolicyTests
     {
         var policy = UpgradePolicy.Parse(
             Inputs(
-                ("healthCheckWait", "30"), ("healthCheckStable", "120"), ("healthCheckRetry", "600"),
-                ("upgradeDomainTimeout", "3600"), ("upgradeTimeout", "0"), ("replicaSetCheckTimeout", "4294967295")),
+                ("healthCheckWait", "30"),
+                ("healthCheckStable", "120"),
+                ("healthCheckRetry", "600"),
+                ("upgradeDomainTimeout", "3600"),
+                ("upgradeTimeout", "0"),
+                ("replicaSetCheckTimeout", "4294967295")),
             monitored: true);
 
         Assert.Equal(
@@ -57,14 +61,18 @@ public class UpgradePolicyTests
     {
         var policy = UpgradePolicy.Parse(
             Inputs(
-                ("maxPercentUnhealthyDeployedApplications", "0"), ("maxPercentUnhealthyServices", "10"),
-                ("maxPercentUnhealthyPartitionsPerService", "20"), ("maxPercentUnhealthyReplicasPerPartition", "100")),
+                ("maxPercentUnhealthyDeployedApplications", "0"),
+                ("maxPercentUnhealthyServices", "10"),
+                ("maxPercentUnhealthyPartitionsPerService", "20"),
+                ("maxPercentUnhealthyReplicasPerPartition", "100")),
             monitored: true);
 
         Assert.Equal(
             new UpgradePolicy(
-                MaxPercentUnhealthyDeployedApplications: 0, MaxPercentUnhealthyServices: 10,
-                MaxPercentUnhealthyPartitionsPerService: 20, MaxPercentUnhealthyReplicasPerPartition: 100),
+                MaxPercentUnhealthyDeployedApplications: 0,
+                MaxPercentUnhealthyServices: 10,
+                MaxPercentUnhealthyPartitionsPerService: 20,
+                MaxPercentUnhealthyReplicasPerPartition: 100),
             policy);
         Assert.True(policy!.HasHealthPolicy);
         Assert.True(policy.HasServiceTypeHealthPolicy);
@@ -126,13 +134,13 @@ public class UpgradePolicyTests
         var session = new UiSession(cluster, new ActionLog(Path.Combine(Path.GetTempPath(), $"sfx-test-{Guid.NewGuid():N}.log")), "0.0.0");
         var target = new Dictionary<string, string>
         {
-            ["applicationId"] = "orders", ["name"] = "fabric:/orders", ["typeName"] = "OrdersType", ["version"] = "1.0.0",
+            ["applicationId"] = "orders",
+            ["name"] = "fabric:/orders",
+            ["typeName"] = "OrdersType",
+            ["version"] = "1.0.0",
         };
         var action = WebActions.For(session, "application", target).Single(a => a.Id == "application.upgrade");
-        var inputs = new Dictionary<string, string>
-        {
-            ["version"] = "1.0.0", ["mode"] = "unmonitored-auto", ["policy.upgradeTimeout"] = "3600",
-        };
+        var inputs = new Dictionary<string, string> { ["version"] = "1.0.0", ["mode"] = "unmonitored-auto", ["policy.upgradeTimeout"] = "3600" };
 
         var ex = await Assert.ThrowsAsync<ActionException>(() =>
             WebActions.RunAsync(session, action.Id, new ActionRequest(new(action.Target), inputs, null, action.Signature), default));

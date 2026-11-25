@@ -43,7 +43,10 @@ internal static class Api
             var health = s.Inspector.GetClusterHealthAsync(ct);
             var target = new Dictionary<string, string> { ["name"] = s.Context.Name, ["azureManaged"] = await s.AzureManagedTargetAsync(ct) };
             return new ClusterDto(
-                s.Context.Name, s.Cluster.Endpoint.ToString(), (await version).Version ?? "", Dto.Health(await health),
+                s.Context.Name,
+                s.Cluster.Endpoint.ToString(),
+                (await version).Version ?? "",
+                Dto.Health(await health),
                 WebActions.For(s, "cluster", target));
         });
 
@@ -65,7 +68,10 @@ internal static class Api
             var declared = await capacities;
             var metrics = ((await load).NodeLoadMetricInformation ?? [])
                 .Where(m => m.Name is { } n && !n.StartsWith("__", StringComparison.Ordinal))
-                .Select(m => new MetricDto(m.Name ?? "", m.CurrentNodeLoad ?? Number(m.NodeLoad), Capacity(m.NodeCapacity, declared.Declares(node.NodeType, m.Name!))))
+                .Select(m => new MetricDto(
+                    m.Name ?? "",
+                    m.CurrentNodeLoad ?? Number(m.NodeLoad),
+                    Capacity(m.NodeCapacity, declared.Declares(node.NodeType, m.Name!))))
                 .OrderBy(m => m.Capacity is null)
                 .ThenBy(m => m.Name)
                 .ToList();
@@ -83,7 +89,13 @@ internal static class Api
                 var system = (await s.Queries.GetApplicationsAsync(ct)).First(a => a.Id == appId);
                 return new ApplicationDetailDto(
                     Dto.Application(system) with { Health = Dto.Health((await health).State) },
-                    Dto.Health(await health), [], [], null, (await services).Select(Dto.Service).ToList(), [], new DefaultServicesDto(false, []),
+                    Dto.Health(await health),
+                    [],
+                    [],
+                    null,
+                    (await services).Select(Dto.Service).ToList(),
+                    [],
+                    new DefaultServicesDto(false, []),
                     UpgradeDefaultsDto.For("<ApplicationManifest />"));
             }
 
@@ -104,16 +116,28 @@ internal static class Api
             var parameters = current.Keys.Union(defaults.Keys)
                 .Order(StringComparer.OrdinalIgnoreCase)
                 .Select(k => new ParameterDto(
-                    k, current.TryGetValue(k, out var v) ? v : defaults[k], defaults.TryGetValue(k, out var d) ? d : null, current.ContainsKey(k)))
+                    k,
+                    current.TryGetValue(k, out var v) ? v : defaults[k],
+                    defaults.TryGetValue(k, out var d) ? d : null,
+                    current.ContainsKey(k)))
                 .ToList();
 
-            var row = new ApplicationRow(info.Id, info.Name.ToString(), info.TypeName, info.TypeVersion, info.Status?.ToString() ?? "", info.HealthState ?? HealthState.Unknown);
+            var row = new ApplicationRow(
+                info.Id,
+                info.Name.ToString(),
+                info.TypeName,
+                info.TypeVersion,
+                info.Status?.ToString() ?? "",
+                info.HealthState ?? HealthState.Unknown);
             var report = UpgradeReport.From(await upgrade);
             var upgradeRow = new UpgradeRow(row.Name, "application", row.Id, report.Target != row.TypeVersion ? row.TypeVersion : "", report);
 
             var target = new Dictionary<string, string>
             {
-                ["applicationId"] = row.Id, ["name"] = row.Name, ["typeName"] = row.TypeName, ["version"] = row.TypeVersion,
+                ["applicationId"] = row.Id,
+                ["name"] = row.Name,
+                ["typeName"] = row.TypeName,
+                ["version"] = row.TypeVersion,
                 ["serviceTypes"] = await serviceTypes,
             };
             return new ApplicationDetailDto(
@@ -147,7 +171,10 @@ internal static class Api
 
             var d = await description;
             return new ServiceDetailDto(
-                service, appId, Dto.Health(await health), Describe(d),
+                service,
+                appId,
+                Dto.Health(await health),
+                Describe(d),
                 (await partitions).Select(Dto.Partition).ToList(),
                 WebActions.For(s, "service", ServiceTarget(service, appId, d)));
         });
@@ -161,7 +188,8 @@ internal static class Api
             return Text(await s.Inspector.GetServiceManifestAsync(a.TypeName, a.TypeVersion, (await service).TypeName, ct));
         });
 
-        api.MapGet("/applications/{appId}/services/{serviceId}/partitions/{partitionId}",
+        api.MapGet(
+            "/applications/{appId}/services/{serviceId}/partitions/{partitionId}",
             async (UiSession s, string appId, string serviceId, string partitionId, CancellationToken ct) =>
             {
                 var id = new PartitionId(Guid.TryParse(partitionId, out var guid) ? guid : throw new ActionException("Not a partition id."));
@@ -178,16 +206,30 @@ internal static class Api
                     .ToList();
 
                 var replicaDtos = (await replicas).Select(r => new ReplicaDto(
-                    r.Id, r.NodeName, r.Role, r.Status, Dto.Health(r.Health), r.Address,
+                    r.Id,
+                    r.NodeName,
+                    r.Role,
+                    r.Status,
+                    Dto.Health(r.Health),
+                    r.Address,
                     WebActions.For(s, "replica", new Dictionary<string, string>
                     {
-                        ["partitionId"] = partition.Id.ToString(), ["replicaId"] = r.Id, ["node"] = r.NodeName, ["role"] = r.Role,
-                        ["serviceId"] = svc.Id, ["serviceKind"] = svc.Kind,
+                        ["partitionId"] = partition.Id.ToString(),
+                        ["replicaId"] = r.Id,
+                        ["node"] = r.NodeName,
+                        ["role"] = r.Role,
+                        ["serviceId"] = svc.Id,
+                        ["serviceKind"] = svc.Kind,
                     }))).ToList();
 
                 var target = new Dictionary<string, string> { ["partitionId"] = partition.Id.ToString(), ["serviceId"] = svc.Id };
                 return new PartitionDetailDto(
-                    Dto.Partition(partition), svc, Dto.Health(await health), metrics, replicaDtos, WebActions.For(s, "partition", target));
+                    Dto.Partition(partition),
+                    svc,
+                    Dto.Health(await health),
+                    metrics,
+                    replicaDtos,
+                    WebActions.For(s, "partition", target));
             });
 
         api.MapGet("/replicas", (UiSession s, CancellationToken ct) => s.GetClusterReplicasAsync(ct));
@@ -222,16 +264,21 @@ internal static class Api
 
         // The entity as the cluster describes it, for the Details tab.
         api.MapGet("/nodes/{name}/raw", async (UiSession s, string name, CancellationToken ct) => Raw(await s.Inspector.GetNodeAsync(name, ct)));
-        api.MapGet("/applications/{appId}/raw", async (UiSession s, string appId, CancellationToken ct) => Raw(await s.Inspector.GetApplicationAsync(appId, ct)));
+        api.MapGet(
+            "/applications/{appId}/raw",
+            async (UiSession s, string appId, CancellationToken ct) => Raw(await s.Inspector.GetApplicationAsync(appId, ct)));
         api.MapGet("/applications/{appId}/services/{serviceId}/raw", async (UiSession s, string appId, string serviceId, CancellationToken ct) =>
         {
             var info = s.Inspector.GetServiceAsync(appId, serviceId, ct);
             var description = s.Inspector.GetServiceDescriptionAsync(serviceId, ct);
             return Raw(new { Info = await info, Description = await description });
         });
-        api.MapGet("/applications/{appId}/services/{serviceId}/partitions/{partitionId}/raw",
+        api.MapGet(
+            "/applications/{appId}/services/{serviceId}/partitions/{partitionId}/raw",
             async (UiSession s, string appId, string serviceId, string partitionId, CancellationToken ct) =>
-                Raw(await s.Inspector.GetPartitionAsync(new PartitionId(Guid.TryParse(partitionId, out var g) ? g : throw new ActionException("Not a partition id.")), ct)));
+                Raw(await s.Inspector.GetPartitionAsync(
+                    new PartitionId(Guid.TryParse(partitionId, out var g) ? g : throw new ActionException("Not a partition id.")),
+                    ct)));
 
         api.MapGet("/activity", (UiSession s) => s.ReadLog(200)
             .Reverse()
@@ -257,8 +304,19 @@ internal static class Api
     {
         var imageStore = s.ImageStoreBrowsableAsync(ct);
         var services = await s.GetSystemServicesAsync(ct);
-        return new(s.Context.Name, s.Cluster.Endpoint.ToString(), s.ReadOnly, s.Power, s.Version, services.EventStore, s.Context.Folder, s.Label, s.Color,
-            services.RepairManager, services.FaultAnalysis, await imageStore);
+        return new(
+            s.Context.Name,
+            s.Cluster.Endpoint.ToString(),
+            s.ReadOnly,
+            s.Power,
+            s.Version,
+            services.EventStore,
+            s.Context.Folder,
+            s.Label,
+            s.Color,
+            services.RepairManager,
+            services.FaultAnalysis,
+            await imageStore);
     }
 
     /// <summary>
@@ -274,7 +332,11 @@ internal static class Api
         try
         {
             var system = new DeployedApplicationRow(
-                ClusterQueries.SystemApplicationId, ClusterQueries.SystemApplicationName, "System", "", HealthState.Unknown);
+                ClusterQueries.SystemApplicationId,
+                ClusterQueries.SystemApplicationName,
+                "System",
+                "",
+                HealthState.Unknown);
             var apps = (await s.Deployed.GetApplicationsAsync(node.Name, ct)).Where(a => a.Id != system.Id).Prepend(system);
             var perApp = await ForEachLimited(apps, async a =>
             {
@@ -298,18 +360,35 @@ internal static class Api
     }
 
     private static NodeDto Node(UiSession s, NodeRow n) => new(
-        n.Name, n.Address, n.NodeType, n.Status, Dto.Health(n.Health), n.UpgradeDomain, n.FaultDomain, n.IsSeed, n.CodeVersion,
+        n.Name,
+        n.Address,
+        n.NodeType,
+        n.Status,
+        Dto.Health(n.Health),
+        n.UpgradeDomain,
+        n.FaultDomain,
+        n.IsSeed,
+        n.CodeVersion,
         n.Uptime is { } up ? (long)up.TotalSeconds : null,
         WebActions.For(s, "node", new Dictionary<string, string> { ["node"] = n.Name, ["status"] = n.Status }));
 
     internal static ServiceDto Service(ServiceInfo s) => new(
-        s.Id, s.Name.ToString(), s.TypeName ?? "", s.ServiceKind.ToString() ?? "", s.ServiceStatus?.ToString() ?? "", Dto.Health(s.HealthState));
+        s.Id,
+        s.Name.ToString(),
+        s.TypeName ?? "",
+        s.ServiceKind.ToString() ?? "",
+        s.ServiceStatus?.ToString() ?? "",
+        Dto.Health(s.HealthState));
 
     internal static IReadOnlyList<ActionDto> UpgradeActions(UiSession s, UpgradeRow u) =>
         WebActions.For(s, "upgrade", new Dictionary<string, string>
         {
-            ["kind"] = u.Kind, ["applicationId"] = u.ApplicationId ?? "", ["name"] = u.Name, ["state"] = u.Report.State,
-            ["nextDomain"] = u.Report.NextDomain, ["plan"] = LifecycleActions.PlanOf(u.Report)?.Id ?? "",
+            ["kind"] = u.Kind,
+            ["applicationId"] = u.ApplicationId ?? "",
+            ["name"] = u.Name,
+            ["state"] = u.Report.State,
+            ["nextDomain"] = u.Report.NextDomain,
+            ["plan"] = LifecycleActions.PlanOf(u.Report)?.Id ?? "",
         });
 
     /// <summary>The target of a service's actions, with its counts from its description.</summary>
@@ -323,8 +402,12 @@ internal static class Api
         };
         return new Dictionary<string, string>
         {
-            ["serviceId"] = service.Id, ["applicationId"] = appId, ["name"] = service.Name, ["kind"] = service.Kind,
-            ["count"] = count ?? "", ["min"] = min ?? "",
+            ["serviceId"] = service.Id,
+            ["applicationId"] = appId,
+            ["name"] = service.Name,
+            ["kind"] = service.Kind,
+            ["count"] = count ?? "",
+            ["min"] = min ?? "",
         };
     }
 

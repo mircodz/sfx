@@ -13,13 +13,22 @@ internal static class ApiOverview
         var o = await s.GetOverviewAsync(ct);
         // Actions depend on the session's power and read-only setting, so they're added per request rather than cached.
         return new OverviewDto(
-            s.Context.Name, s.Cluster.Endpoint.ToString(), o.CodeVersion, o.Health, o.Counts, o.Load,
+            s.Context.Name,
+            s.Cluster.Endpoint.ToString(),
+            o.CodeVersion,
+            o.Health,
+            o.Counts,
+            o.Load,
             o.RunningUpgrades.Select(u => Dto.Upgrade(u, Api.UpgradeActions(s, u))).ToList());
     });
 
     /// <summary>What the overview shows, before actions are added.</summary>
     internal sealed record Overview(
-        string CodeVersion, HealthDto Health, IReadOnlyList<HealthCountDto> Counts, IReadOnlyList<LoadSummaryDto> Load, IReadOnlyList<UpgradeRow> RunningUpgrades);
+        string CodeVersion,
+        HealthDto Health,
+        IReadOnlyList<HealthCountDto> Counts,
+        IReadOnlyList<LoadSummaryDto> Load,
+        IReadOnlyList<UpgradeRow> RunningUpgrades);
 
     public static async Task<Overview> LoadAsync(UiSession s, CancellationToken ct)
     {

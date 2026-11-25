@@ -9,7 +9,13 @@ namespace Sfx.Web;
 /// <param name="ApplicationId">The application's id (e.g. "orders" or "shop~orders"), for an application, service or partition.</param>
 /// <param name="ServiceId">The service's id (e.g. "orders~Counter"), for a service or partition.</param>
 public sealed record SearchHitDto(
-    string Kind, string Title, string? Sub, string? Node = null, string? ApplicationId = null, string? ServiceId = null, string? PartitionId = null);
+    string Kind,
+    string Title,
+    string? Sub,
+    string? Node = null,
+    string? ApplicationId = null,
+    string? ServiceId = null,
+    string? PartitionId = null);
 
 /// <summary>GET /api/search?q=: nodes, applications and services by name, type or address; a partition by its id.</summary>
 internal static class ApiSearch
@@ -18,7 +24,10 @@ internal static class ApiSearch
 
     public static void Map(RouteGroupBuilder api) =>
         api.MapGet("/search", (UiSession s, string? q, CancellationToken ct) => SearchAsync(
-            q, ct => s.GetSearchIndexAsync(ct), (id, ct) => s.Overview.FindPartitionAsync(id, ct), ct));
+            q,
+            ct => s.GetSearchIndexAsync(ct),
+            (id, ct) => s.Overview.FindPartitionAsync(id, ct),
+            ct));
 
     /// <summary>A partition id is looked up directly (one hit or none); other text searches the index, best first.</summary>
     internal static async Task<IReadOnlyList<SearchHitDto>> SearchAsync(
@@ -43,10 +52,19 @@ internal static class ApiSearch
     {
         "node" => new(hit.Kind, hit.Title, Join(hit.Node?.NodeType, hit.Node?.Address), Node: hit.Node?.Name ?? hit.Title),
         "application" => new(hit.Kind, hit.Title, Join(hit.Application?.TypeName, hit.Application?.TypeVersion, " "), ApplicationId: hit.Application?.Id),
-        "service" => new(hit.Kind, hit.Title, hit.Service?.TypeName is { Length: > 0 } type ? type : null,
-            ApplicationId: hit.Application?.Id, ServiceId: hit.Service?.Id),
-        _ => new(hit.Kind, hit.Title, hit.Service?.Name,
-            ApplicationId: hit.Application?.Id, ServiceId: hit.Service?.Id, PartitionId: hit.Partition?.Id.ToString() ?? hit.Title),
+        "service" => new(
+            hit.Kind,
+            hit.Title,
+            hit.Service?.TypeName is { Length: > 0 } type ? type : null,
+            ApplicationId: hit.Application?.Id,
+            ServiceId: hit.Service?.Id),
+        _ => new(
+            hit.Kind,
+            hit.Title,
+            hit.Service?.Name,
+            ApplicationId: hit.Application?.Id,
+            ServiceId: hit.Service?.Id,
+            PartitionId: hit.Partition?.Id.ToString() ?? hit.Title),
     };
 
     private static string? Join(string? a, string? b, string separator = ", ")

@@ -11,14 +11,7 @@ namespace Sfx.Tui;
 /// <param name="Result">"running", "ok", "failed" or "canceled".</param>
 /// <param name="Detail">Where a running change has got to, or why it failed.</param>
 /// <param name="Took">How long it ran; only known for this session's operations.</param>
-public sealed record ActivityRow(
-    DateTimeOffset Time,
-    string Context,
-    string Action,
-    string Result,
-    string Detail,
-    TimeSpan? Took,
-    string User);
+public sealed record ActivityRow(DateTimeOffset Time, string Context, string Action, string Result, string Detail, TimeSpan? Took, string User);
 
 /// <summary>
 /// The changes of this session, running ones included, as Cellar <see cref="Cellar.Widgets.Activity"/> tasks (the

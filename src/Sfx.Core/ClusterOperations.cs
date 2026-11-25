@@ -17,7 +17,12 @@ public sealed class ClusterOperations(IServiceFabricClient client)
 
     /// <param name="target">The node to move to, or null to let the cluster pick one.</param>
     public Task MoveReplicaAsync(
-        string role, string serviceId, PartitionId partition, string currentNode, string? target, bool ignoreConstraints,
+        string role,
+        string serviceId,
+        PartitionId partition,
+        string currentNode,
+        string? target,
+        bool ignoreConstraints,
         CancellationToken cancellationToken)
     {
         var current = new NodeName(currentNode);
@@ -49,7 +54,10 @@ public sealed class ClusterOperations(IServiceFabricClient client)
     {
         // The instance id makes the restart a no-op if the node already restarted in the meantime.
         var info = await client.Nodes.GetNodeInfoAsync(new NodeName(node), cancellationToken: cancellationToken);
-        await client.Nodes.RestartNodeAsync(new NodeName(node), new RestartNodeDescription(info.InstanceId, CreateFabricDump.False), cancellationToken: cancellationToken);
+        await client.Nodes.RestartNodeAsync(
+            new NodeName(node),
+            new RestartNodeDescription(info.InstanceId, CreateFabricDump.False),
+            cancellationToken: cancellationToken);
     }
 
     public Task RemoveNodeStateAsync(string node, CancellationToken cancellationToken) =>
@@ -60,7 +68,12 @@ public sealed class ClusterOperations(IServiceFabricClient client)
     {
         var info = await client.Nodes.GetNodeInfoAsync(new NodeName(node), cancellationToken: cancellationToken);
         await client.Faults.StartNodeTransitionAsync(
-            new NodeName(node), Guid.NewGuid(), NodeTransitionType.Stop, info.InstanceId, (int)duration.TotalSeconds, cancellationToken: cancellationToken);
+            new NodeName(node),
+            Guid.NewGuid(),
+            NodeTransitionType.Stop,
+            info.InstanceId,
+            (int)duration.TotalSeconds,
+            cancellationToken: cancellationToken);
     }
 
     /// <summary>Starts a node stopped with <see cref="StopNodeAsync"/>; needs the Fault Analysis Service.</summary>
@@ -68,7 +81,12 @@ public sealed class ClusterOperations(IServiceFabricClient client)
     {
         var info = await client.Nodes.GetNodeInfoAsync(new NodeName(node), cancellationToken: cancellationToken);
         await client.Faults.StartNodeTransitionAsync(
-            new NodeName(node), Guid.NewGuid(), NodeTransitionType.Start, info.InstanceId, 0, cancellationToken: cancellationToken);
+            new NodeName(node),
+            Guid.NewGuid(),
+            NodeTransitionType.Start,
+            info.InstanceId,
+            0,
+            cancellationToken: cancellationToken);
     }
 
     // Partitions
@@ -104,8 +122,15 @@ public sealed class ClusterOperations(IServiceFabricClient client)
     /// The target version's manifest, whose health policy fills in what <paramref name="policy"/> leaves out.
     /// </param>
     public Task UpgradeApplicationAsync(
-        string applicationId, string applicationName, string targetVersion, IReadOnlyDictionary<string, string> parameters,
-        UpgradeMode mode, FailureAction? failureAction, UpgradePolicy? policy, string? applicationManifest, CancellationToken cancellationToken) =>
+        string applicationId,
+        string applicationName,
+        string targetVersion,
+        IReadOnlyDictionary<string, string> parameters,
+        UpgradeMode mode,
+        FailureAction? failureAction,
+        UpgradePolicy? policy,
+        string? applicationManifest,
+        CancellationToken cancellationToken) =>
         client.Applications.StartApplicationUpgradeAsync(
             applicationId,
             new ApplicationUpgradeDescription(
@@ -148,7 +173,10 @@ public sealed class ClusterOperations(IServiceFabricClient client)
 
     /// <summary>Moves a manual upgrade on into <paramref name="upgradeDomain"/>.</summary>
     public Task ResumeApplicationUpgradeAsync(string applicationId, string upgradeDomain, CancellationToken cancellationToken) =>
-        client.Applications.ResumeApplicationUpgradeAsync(applicationId, new ResumeApplicationUpgradeDescription(upgradeDomain), cancellationToken: cancellationToken);
+        client.Applications.ResumeApplicationUpgradeAsync(
+            applicationId,
+            new ResumeApplicationUpgradeDescription(upgradeDomain),
+            cancellationToken: cancellationToken);
 
     public Task RollbackApplicationUpgradeAsync(string applicationId, CancellationToken cancellationToken) =>
         client.Applications.RollbackApplicationUpgradeAsync(applicationId, cancellationToken: cancellationToken);
@@ -164,13 +192,16 @@ public sealed class ClusterOperations(IServiceFabricClient client)
         client.Applications.UpdateApplicationUpgradeAsync(
             applicationId,
             new ApplicationUpgradeUpdateDescription(
-                new ApplicationName(ClusterInspector.NameOf(applicationId)), UpgradeKind.Rolling, updateDescription: plan.UpdateDescription()),
+                new ApplicationName(ClusterInspector.NameOf(applicationId)),
+                UpgradeKind.Rolling,
+                updateDescription: plan.UpdateDescription()),
             cancellationToken: cancellationToken);
 
     /// <summary>Switches the cluster's running upgrade to another plan.</summary>
     public Task ChangeClusterUpgradePlanAsync(UpgradePlan plan, CancellationToken cancellationToken) =>
         client.Cluster.UpdateClusterUpgradeAsync(
-            new UpdateClusterUpgradeDescription(UpgradeType.Rolling, plan.UpdateDescription()), cancellationToken: cancellationToken);
+            new UpdateClusterUpgradeDescription(UpgradeType.Rolling, plan.UpdateDescription()),
+            cancellationToken: cancellationToken);
 
     /// <summary>Upgrades the cluster's code, configuration or both to versions already provisioned.</summary>
     /// <param name="codeVersion">The Service Fabric version to move to, or null to keep today's.</param>
@@ -179,13 +210,23 @@ public sealed class ClusterOperations(IServiceFabricClient client)
     /// <param name="policy">Timeouts and health limits; null, or null fields, leave the cluster's defaults.</param>
     /// <param name="clusterManifest">The cluster manifest, whose health policy fills in what <paramref name="policy"/> leaves out.</param>
     public Task UpgradeClusterAsync(
-        string? codeVersion, string? configVersion, UpgradeMode mode, FailureAction? failureAction, UpgradePolicy? policy,
-        string? clusterManifest, CancellationToken cancellationToken) =>
+        string? codeVersion,
+        string? configVersion,
+        UpgradeMode mode,
+        FailureAction? failureAction,
+        UpgradePolicy? policy,
+        string? clusterManifest,
+        CancellationToken cancellationToken) =>
         client.Cluster.StartClusterUpgradeAsync(
-            ClusterUpgradeDescription(codeVersion, configVersion, mode, failureAction, policy, clusterManifest), cancellationToken: cancellationToken);
+            ClusterUpgradeDescription(codeVersion, configVersion, mode, failureAction, policy, clusterManifest),
+            cancellationToken: cancellationToken);
 
     internal static StartClusterUpgradeDescription ClusterUpgradeDescription(
-        string? codeVersion, string? configVersion, UpgradeMode mode, FailureAction? failureAction, UpgradePolicy? policy,
+        string? codeVersion,
+        string? configVersion,
+        UpgradeMode mode,
+        FailureAction? failureAction,
+        UpgradePolicy? policy,
         string? clusterManifest = null)
     {
         if (string.IsNullOrEmpty(codeVersion) && string.IsNullOrEmpty(configVersion))
@@ -261,12 +302,23 @@ public sealed class ClusterOperations(IServiceFabricClient client)
 
     public Task RestartCodePackageAsync(string node, string applicationId, DeployedCodePackageRow codePackage, CancellationToken cancellationToken) =>
         RestartCodePackageAsync(
-            node, applicationId, codePackage.ServiceManifestName, codePackage.Name, codePackage.InstanceId, codePackage.ActivationId, cancellationToken);
+            node,
+            applicationId,
+            codePackage.ServiceManifestName,
+            codePackage.Name,
+            codePackage.InstanceId,
+            codePackage.ActivationId,
+            cancellationToken);
 
     /// <param name="instanceId">The running instance; if the code package restarted since, the cluster refuses rather than restart it again.</param>
     /// <param name="activationId">The service package's activation; empty for shared activation.</param>
     public Task RestartCodePackageAsync(
-        string node, string applicationId, string serviceManifestName, string codePackageName, string instanceId, string activationId,
+        string node,
+        string applicationId,
+        string serviceManifestName,
+        string codePackageName,
+        string instanceId,
+        string activationId,
         CancellationToken cancellationToken) =>
         client.CodePackages.RestartDeployedCodePackageAsync(
             new NodeName(node),

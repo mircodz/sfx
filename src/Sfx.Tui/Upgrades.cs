@@ -23,7 +23,9 @@ public sealed partial class Views
             .Column("KIND", Constraint.Length(11), u => Plain(u.Kind), u => u.Kind)
             .Column("VERSION", Constraint.Fill(2), u => Plain(u.From.Length > 0 ? $"{u.From} → {u.Report.Target}" : u.Report.Target), u => u.Report.Target)
             .Column("MODE", Constraint.Length(17), u => Plain(u.Report.Mode), u => u.Report.Mode)
-            .Column("PROGRESS", Constraint.Length(14),
+            .Column(
+                "PROGRESS",
+                Constraint.Length(14),
                 u => Progress(u.DomainsDone, u.Report.Domains.Count, UpgradeColor(u.Report.State)),
                 u => u.Report.Domains.Count == 0 ? 0 : (double)u.DomainsDone / u.Report.Domains.Count)
             .Column("STATE", Constraint.Length(18), State, u => u.Urgency)
@@ -38,13 +40,16 @@ public sealed partial class Views
             : UpgradeState(upgrade.Report.State);
 
     public IResourceView DescribeUpgrade(UpgradeRow upgrade, string clusterName = "cluster") =>
-        new DescribeView("upgrade", upgrade.Name,
-        [
-            Tab("Progress", async ct => Lines.Upgrade(upgrade.ApplicationId is { } id
-                ? UpgradeReport.From(await _inspect.GetApplicationUpgradeAsync(id, ct))
-                : UpgradeReport.From(await _inspect.GetClusterUpgradeAsync(ct)))),
-            Tab("Raw", async ct => Lines.Json(upgrade.ApplicationId is { } id
-                ? await _inspect.GetApplicationUpgradeAsync(id, ct)
-                : await _inspect.GetClusterUpgradeAsync(ct))),
-        ], actions: Bind(UpgradeRowActions(clusterName), upgrade, "Upgrade"));
+        new DescribeView(
+            "upgrade",
+            upgrade.Name,
+            [
+                Tab("Progress", async ct => Lines.Upgrade(upgrade.ApplicationId is { } id
+                    ? UpgradeReport.From(await _inspect.GetApplicationUpgradeAsync(id, ct))
+                    : UpgradeReport.From(await _inspect.GetClusterUpgradeAsync(ct)))),
+                Tab("Raw", async ct => Lines.Json(upgrade.ApplicationId is { } id
+                    ? await _inspect.GetApplicationUpgradeAsync(id, ct)
+                    : await _inspect.GetClusterUpgradeAsync(ct))),
+            ],
+            actions: Bind(UpgradeRowActions(clusterName), upgrade, "Upgrade"));
 }

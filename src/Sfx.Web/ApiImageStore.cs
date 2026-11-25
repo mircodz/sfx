@@ -13,7 +13,12 @@ public sealed record StoreDto(string Path, string Kind, StoreUsageDto? Usage, IR
 public sealed record StoreUseDto(long? Bytes, long? Files);
 
 public sealed record StoreUsageDto(
-    long? DiskCapacity, long? DiskAvailable, StoreUseDto? Metadata, StoreUseDto? Staging, StoreUseDto? Copy, StoreUseDto? Register);
+    long? DiskCapacity,
+    long? DiskAvailable,
+    StoreUseDto? Metadata,
+    StoreUseDto? Staging,
+    StoreUseDto? Copy,
+    StoreUseDto? Register);
 
 /// <param name="Path">Its path in the image store, as the cluster gives it (Windows clusters separate with '\'); send it back as ?path=.</param>
 /// <param name="FileCount">How many files it holds, all the way down; null when the cluster doesn't say.</param>
@@ -22,7 +27,13 @@ public sealed record StoreUsageDto(
 /// <param name="Reserved">One of the cluster's own folders (Store, WindowsFabricStore) or in one: never deleted.</param>
 /// <param name="Actions">delete-store-content and provision-package, where they apply.</param>
 public sealed record StoreFolderDto(
-    string Path, string Name, long? FileCount, long? Size, StorePackageDto? Package, bool Reserved, IReadOnlyList<ActionDto> Actions);
+    string Path,
+    string Name,
+    long? FileCount,
+    long? Size,
+    StorePackageDto? Package,
+    bool Reserved,
+    IReadOnlyList<ActionDto> Actions);
 
 /// <summary>
 /// The application type a package folder holds, as far as its name tells (the image store can't be read back): its
@@ -57,7 +68,9 @@ internal static class ApiImageStore
             var listing = s.ImageStore.GetContentAsync(folder, ct);
             var kind = KindAsync(s, ct);
             var usage = root ? s.ImageStore.GetUsageAsync(ct) : Task.FromResult<ImageStoreUsage?>(null);
-            var packages = root ? PackagesAsync(s, ct) : Task.FromResult<IReadOnlyDictionary<string, ImageStorePackage>>(new Dictionary<string, ImageStorePackage>());
+            var packages = root ? PackagesAsync(
+                s,
+                ct) : Task.FromResult<IReadOnlyDictionary<string, ImageStorePackage>>(new Dictionary<string, ImageStorePackage>());
             var l = await listing;
             return Listing(s, l, await kind, await usage, await packages);
         });
@@ -68,7 +81,11 @@ internal static class ApiImageStore
     }
 
     internal static StoreDto Listing(
-        UiSession s, ImageStoreListing listing, string kind, ImageStoreUsage? usage, IReadOnlyDictionary<string, ImageStorePackage> packages)
+        UiSession s,
+        ImageStoreListing listing,
+        string kind,
+        ImageStoreUsage? usage,
+        IReadOnlyDictionary<string, ImageStorePackage> packages)
     {
         static StoreUseDto? Use(ImageStoreUse? u) => u is null ? null : new StoreUseDto(u.Bytes, u.Files);
         return new StoreDto(
@@ -82,19 +99,33 @@ internal static class ApiImageStore
                 var package = packages.GetValueOrDefault(f.Path);
                 var target = Target(f.Path, f.Name, "folder", provision: package is { Provisioned: null });
                 return new StoreFolderDto(
-                    f.Path, f.Name, f.FileCount, f.Size ?? s.KnownFolderSize(f.Path),
-                    package is null ? null : new StorePackageDto(package.TypeName, package.TypeVersion, package.Provisioned is not null, package.Provisioned?.Status),
+                    f.Path,
+                    f.Name,
+                    f.FileCount,
+                    f.Size ?? s.KnownFolderSize(f.Path),
+                    package is null ? null : new StorePackageDto(
+                        package.TypeName,
+                        package.TypeVersion,
+                        package.Provisioned is not null,
+                        package.Provisioned?.Status),
                     ImageStore.IsReserved(f.Path),
                     WebActions.For(s, "store", target));
             }).ToList(),
             listing.Files.Select(f => new StoreFileDto(
-                f.Path, f.Name, f.Size, f.Version.Length > 0 ? f.Version : null, f.Modified,
+                f.Path,
+                f.Name,
+                f.Size,
+                f.Version.Length > 0 ? f.Version : null,
+                f.Modified,
                 WebActions.For(s, "store", Target(f.Path, f.Name, "file", provision: false)))).ToList());
     }
 
     private static Dictionary<string, string> Target(string path, string name, string entry, bool provision) => new()
     {
-        ["path"] = path, ["name"] = name, ["entry"] = entry, ["provision"] = provision ? "true" : "false",
+        ["path"] = path,
+        ["name"] = name,
+        ["entry"] = entry,
+        ["provision"] = provision ? "true" : "false",
     };
 
     private static async Task<string> KindAsync(UiSession s, CancellationToken ct)
@@ -189,7 +220,9 @@ internal static class ApiImageStore
 
     /// <summary>Saves each file part under <paramref name="files"/> as it streams in; returns their relative paths and the plain fields.</summary>
     internal static async Task<(IReadOnlyList<string> Files, IReadOnlyDictionary<string, string> Fields)> ReceiveAsync(
-        MultipartReader reader, string files, CancellationToken ct)
+        MultipartReader reader,
+        string files,
+        CancellationToken ct)
     {
         var saved = new List<string>();
         var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -230,7 +263,9 @@ internal static class ApiImageStore
                 await using var file = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true);
                 await section.Body.CopyToAsync(file, ct);
             }
-            catch (IOException) when (File.Exists(destination) || Directory.Exists(destination) || saved.Any(p => relative.StartsWith(p + "/", StringComparison.Ordinal)))
+            catch (IOException) when (File.Exists(destination) || Directory.Exists(destination) || saved.Any(p => relative.StartsWith(
+                p + "/",
+                StringComparison.Ordinal)))
             {
                 throw new ActionException($"'{relative}' is in the upload twice.");
             }
@@ -295,7 +330,10 @@ internal static class ApiImageStore
         try
         {
             await s.ImageStore.UploadFolderAsync(
-                package.Folder, storePath, new Reporter(p => s.Progress(id, "Uploading " + PackageUpload.Progress(p), p.Fraction)), timeout.Token);
+                package.Folder,
+                storePath,
+                new Reporter(p => s.Progress(id, "Uploading " + PackageUpload.Progress(p), p.Fraction)),
+                timeout.Token);
         }
         catch (Exception ex)
         {
@@ -325,7 +363,10 @@ internal static class ApiImageStore
         }
         var started = DateTime.UtcNow;
         await s.WatchAsync(id, title, async ct => SettleChecks.TypeProvisioned(
-            (await s.Queries.GetApplicationTypesAsync(ct)).FirstOrDefault(t => t.Name == name && t.Version == version), name, version, DateTime.UtcNow - started));
+            (await s.Queries.GetApplicationTypesAsync(ct)).FirstOrDefault(t => t.Name == name && t.Version == version),
+            name,
+            version,
+            DateTime.UtcNow - started));
     }
 
     private static string Failure(string what, Exception ex) => ex switch

@@ -11,8 +11,7 @@ public sealed class CertificateAuth(X509Certificate2 certificate, ServerIdentity
     public ServerIdentity Server => server;
 
     public ServiceFabricClientBuilder Configure(ServiceFabricClientBuilder builder) =>
-        builder.UseX509Security(_ => Task.FromResult<SecuritySettings>(
-            new X509SecuritySettings(certificate, server.ToRemoteSettings())));
+        builder.UseX509Security(_ => Task.FromResult<SecuritySettings>(new X509SecuritySettings(certificate, server.ToRemoteSettings())));
 }
 
 public sealed class CertificateAuthProvider : IClusterAuthProvider

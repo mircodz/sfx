@@ -75,13 +75,24 @@ public class ApplicationLifecycleTests
 
     private static FakeCluster Shop(bool defaultServicesUpgrade = true)
     {
-        var defaults1 = new Dictionary<string, string> { ["Counter_TargetReplicaSetSize"] = "3", ["Counter_PartitionCount"] = "1", ["Greeting"] = "hi", ["Old"] = "o" };
+        var defaults1 = new Dictionary<string, string>
+        {
+            ["Counter_TargetReplicaSetSize"] = "3",
+            ["Counter_PartitionCount"] = "1",
+            ["Greeting"] = "hi",
+            ["Old"] = "o",
+        };
         var defaults2 = new Dictionary<string, string> { ["Counter_TargetReplicaSetSize"] = "3", ["Counter_PartitionCount"] = "1", ["Greeting"] = "hi" };
         return new FakeCluster()
             .On("GetApplicationInfoAsync", new ApplicationInfo(
-                "shop", new ApplicationName("fabric:/shop"), "ShopType", "1.0.0", ApplicationStatus.Ready,
+                "shop",
+                new ApplicationName("fabric:/shop"),
+                "ShopType",
+                "1.0.0",
+                ApplicationStatus.Ready,
                 new Dictionary<string, string> { ["Greeting"] = "hey", ["Old"] = "x" }))
-            .Paged("GetApplicationTypeInfoListByNameAsync",
+            .Paged(
+                "GetApplicationTypeInfoListByNameAsync",
                 new ApplicationTypeInfo("ShopType", "1.0.0", defaults1, ApplicationTypeStatus.Available),
                 new ApplicationTypeInfo("ShopType", "2.0.0", defaults2, ApplicationTypeStatus.Available))
             .Paged<ServiceInfo>("GetServiceInfoListAsync", new StatefulServiceInfo("shop~Counter", new ServiceName("fabric:/shop/Counter"), "CounterType"))
@@ -98,7 +109,10 @@ public class ApplicationLifecycleTests
     public async Task An_upgrade_keeps_parameters_the_target_still_has_and_applies_changes()
     {
         var cluster = Shop();
-        var request = new ApplicationUpgradeRequest("2.0.0", UpgradePlan.MonitoredRollback, new Dictionary<string, string> { ["Counter_TargetReplicaSetSize"] = "5" });
+        var request = new ApplicationUpgradeRequest("2.0.0", UpgradePlan.MonitoredRollback, new Dictionary<string, string>
+        {
+            ["Counter_TargetReplicaSetSize"] = "5",
+        });
 
         await new ApplicationLifecycle(cluster.Client).UpgradeAsync("shop", request, default);
 
@@ -129,7 +143,10 @@ public class ApplicationLifecycleTests
     public async Task An_upgrade_refuses_repartitioning_an_existing_default_service()
     {
         var cluster = Shop();
-        var request = new ApplicationUpgradeRequest("2.0.0", UpgradePlan.MonitoredRollback, new Dictionary<string, string> { ["Counter_PartitionCount"] = "4" });
+        var request = new ApplicationUpgradeRequest("2.0.0", UpgradePlan.MonitoredRollback, new Dictionary<string, string>
+        {
+            ["Counter_PartitionCount"] = "4",
+        });
 
         var ex = await Assert.ThrowsAsync<RefusedException>(() => new ApplicationLifecycle(cluster.Client).UpgradeAsync("shop", request, default));
 
@@ -141,7 +158,10 @@ public class ApplicationLifecycleTests
     public async Task An_upgrade_says_to_scale_when_the_cluster_cannot_change_default_services()
     {
         var cluster = Shop(defaultServicesUpgrade: false);
-        var request = new ApplicationUpgradeRequest("1.0.0", UpgradePlan.UnmonitoredAuto, new Dictionary<string, string> { ["Counter_TargetReplicaSetSize"] = "5" });
+        var request = new ApplicationUpgradeRequest("1.0.0", UpgradePlan.UnmonitoredAuto, new Dictionary<string, string>
+        {
+            ["Counter_TargetReplicaSetSize"] = "5",
+        });
 
         var ex = await Assert.ThrowsAsync<RefusedException>(() => new ApplicationLifecycle(cluster.Client).UpgradeAsync("shop", request, default));
 
@@ -153,7 +173,10 @@ public class ApplicationLifecycleTests
     public async Task An_upgrade_uses_the_callers_default_services_setting()
     {
         var cluster = Shop(defaultServicesUpgrade: false);
-        var request = new ApplicationUpgradeRequest("1.0.0", UpgradePlan.UnmonitoredAuto, new Dictionary<string, string> { ["Counter_TargetReplicaSetSize"] = "5" });
+        var request = new ApplicationUpgradeRequest("1.0.0", UpgradePlan.UnmonitoredAuto, new Dictionary<string, string>
+        {
+            ["Counter_TargetReplicaSetSize"] = "5",
+        });
 
         await new ApplicationLifecycle(cluster.Client, _ => Task.FromResult(true)).UpgradeAsync("shop", request, default);
 
@@ -201,12 +224,18 @@ public class ApplicationLifecycleTests
     public void Describes_an_upgrade_like_the_browser_did()
     {
         var request = new ApplicationUpgradeRequest(
-            "2.0.0", UpgradePlan.MonitoredManual, new Dictionary<string, string> { ["A"] = "1", ["B"] = "2" }, ["C"], new UpgradePolicy(ForceRestart: true));
+            "2.0.0",
+            UpgradePlan.MonitoredManual,
+            new Dictionary<string, string> { ["A"] = "1", ["B"] = "2" },
+            ["C"],
+            new UpgradePolicy(ForceRestart: true));
 
         Assert.Equal(
             "Upgrade fabric:/shop to 2.0.0 (monitored, stop on failure), setting A, B, resetting C, custom policy",
             ApplicationLifecycle.Describe("fabric:/shop", request));
-        Assert.Equal("Upgrade fabric:/shop to 1.0 (unmonitored, automatic)", ApplicationLifecycle.Describe("fabric:/shop", new("1.0", UpgradePlan.UnmonitoredAuto)));
+        Assert.Equal(
+            "Upgrade fabric:/shop to 1.0 (unmonitored, automatic)",
+            ApplicationLifecycle.Describe("fabric:/shop", new("1.0", UpgradePlan.UnmonitoredAuto)));
     }
 
     [Fact]
@@ -246,7 +275,8 @@ public class ApplicationLifecycleTests
     {
         var cluster = new FakeCluster()
             .On("GetApplicationHealthAsync", new ApplicationHealth(HealthState.Ok))
-            .Paged("GetApplicationInfoListAsync",
+            .Paged(
+                "GetApplicationInfoListAsync",
                 new ApplicationInfo("a", new ApplicationName("fabric:/a"), "ShopType", "1.0.0"),
                 new ApplicationInfo("b", new ApplicationName("fabric:/b"), "ShopType", "1.0.0"),
                 new ApplicationInfo("c", new ApplicationName("fabric:/c"), "ShopType", "2.0.0"))
@@ -323,9 +353,13 @@ public class ApplicationLifecycleTests
             .OnCall("ResumeApplicationUpgradeAsync");
 
         Assert.Equal("UD2", await new ApplicationLifecycle(cluster.Client).ResumeNextUpgradeDomainAsync("shop", default));
-        Assert.Equal("UD2", Assert.IsType<ResumeApplicationUpgradeDescription>(Assert.Single(cluster.CallsTo("ResumeApplicationUpgradeAsync"))[1]).UpgradeDomainName);
+        Assert.Equal(
+            "UD2",
+            Assert.IsType<ResumeApplicationUpgradeDescription>(Assert.Single(cluster.CallsTo("ResumeApplicationUpgradeAsync"))[1]).UpgradeDomainName);
 
-        cluster.On("GetApplicationUpgradeAsync", new ApplicationUpgradeProgressInfo(upgradeState: UpgradeState.RollingForwardInProgress, nextUpgradeDomain: "UD3"));
+        cluster.On(
+            "GetApplicationUpgradeAsync",
+            new ApplicationUpgradeProgressInfo(upgradeState: UpgradeState.RollingForwardInProgress, nextUpgradeDomain: "UD3"));
         var ex = await Assert.ThrowsAsync<RefusedException>(() => new ApplicationLifecycle(cluster.Client).ResumeNextUpgradeDomainAsync("shop", default));
         Assert.Equal("The upgrade of fabric:/shop isn't waiting to start an upgrade domain.", ex.Message);
     }
@@ -462,7 +496,9 @@ public class LocalPackageTests
 
             var ex = Assert.Throws<RefusedException>(() => LocalPackage.Open(file));
 
-            Assert.Equal($"{file} has no ApplicationManifest.xml at its root, but {Path.GetFileName(folder)}/ has one: use that folder, or package what's inside it.", ex.Message);
+            Assert.Equal(
+                $"{file} has no ApplicationManifest.xml at its root, but {Path.GetFileName(folder)}/ has one: use that folder, or package what's inside it.",
+                ex.Message);
         }
         finally
         {

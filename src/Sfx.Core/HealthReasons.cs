@@ -46,13 +46,24 @@ public static partial class HealthReasons
         {
             "node" => await client.Nodes.GetNodeHealthAsync(new NodeName(id), eventsHealthStateFilter: unhealthy, cancellationToken: cancellationToken),
             "application" => await client.Applications.GetApplicationHealthAsync(
-                id, eventsHealthStateFilter: unhealthy, deployedApplicationsHealthStateFilter: none, servicesHealthStateFilter: none,
-                excludeHealthStatistics: true, cancellationToken: cancellationToken),
+                id,
+                eventsHealthStateFilter: unhealthy,
+                deployedApplicationsHealthStateFilter: none,
+                servicesHealthStateFilter: none,
+                excludeHealthStatistics: true,
+                cancellationToken: cancellationToken),
             "service" => await client.Services.GetServiceHealthAsync(
-                id, eventsHealthStateFilter: unhealthy, partitionsHealthStateFilter: none, excludeHealthStatistics: true, cancellationToken: cancellationToken),
+                id,
+                eventsHealthStateFilter: unhealthy,
+                partitionsHealthStateFilter: none,
+                excludeHealthStatistics: true,
+                cancellationToken: cancellationToken),
             "partition" => await client.Partitions.GetPartitionHealthAsync(
-                new PartitionId(Guid.Parse(id)), eventsHealthStateFilter: unhealthy, replicasHealthStateFilter: none,
-                excludeHealthStatistics: true, cancellationToken: cancellationToken),
+                new PartitionId(Guid.Parse(id)),
+                eventsHealthStateFilter: unhealthy,
+                replicasHealthStateFilter: none,
+                excludeHealthStatistics: true,
+                cancellationToken: cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
         return From(health);

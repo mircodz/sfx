@@ -180,12 +180,17 @@ internal sealed class Shell : IActionHost
         new("help", "Keys", () => _keymap.ShowHelp(_app)) { Keys = ["?"], Commands = ["help"], Footer = "help" },
         new("refresh", "Refresh now; :refresh 2s, 1m or off sets how often it refreshes on its own", ChangeRefresh)
         {
-            Keys = ["r"], Commands = ["refresh"], ArgumentHint = "[interval|off]",
+            Keys = ["r"],
+            Commands = ["refresh"],
+            ArgumentHint = "[interval|off]",
         },
         new("copy", "Copy the selected name, or the text being read", Copy) { Keys = ["y"], Commands = ["copy"] },
         new("find", "Find a node, application or service by name, type or address; a partition by its id", Find)
         {
-            Keys = ["ctrl+f"], Commands = ["find", "f"], ArgumentHint = "[text|partition id]", Footer = "find",
+            Keys = ["ctrl+f"],
+            Commands = ["find", "f"],
+            ArgumentHint = "[text|partition id]",
+            Footer = "find",
         },
         new("last-error", "Show the last error in full", ShowLastError) { Keys = ["!"], Commands = ["error", "errors"] },
         new("quit", "Quit", _app.Quit) { Keys = ["q", "ctrl+c"], Commands = ["quit", "q"], Footer = "quit" },
@@ -194,69 +199,90 @@ internal sealed class Shell : IActionHost
         new("escape", "Dismiss the error or warning, clear the marks or the filter, or go back", Escape) { Group = Navigation, Keys = ["esc"] },
 
         new("go.nodes", "Nodes", () => ShowRoot(_views.Nodes())) { Group = PagesGroup, Commands = ["nodes", "node", "no"] },
-        new("go.applications", "Applications", () => ShowRoot(_views.Applications()))
-        {
-            Group = PagesGroup, Commands = ["apps", "app", "applications"],
-        },
+        new("go.applications", "Applications", () => ShowRoot(_views.Applications())) { Group = PagesGroup, Commands = ["apps", "app", "applications"] },
         new("go.cluster", "Cluster", () => ShowRoot(_views.DescribeCluster(_session.Context.Name))) { Group = PagesGroup, Commands = ["cluster"] },
-        new("go.health", "Everything unhealthy, and why", () => ShowRoot(_views.Unhealthy()))
+        new("go.health", "Everything unhealthy, and why", () => ShowRoot(_views.Unhealthy())) { Group = PagesGroup, Commands = ["health", "unhealthy"] },
+        new(
+            "go.cluster-health",
+            "Cluster health: evaluations and events",
+            () => ShowRoot(_views.DescribeCluster(_session.Context.Name, Views.ClusterHealthTab)))
         {
-            Group = PagesGroup, Commands = ["health", "unhealthy"],
-        },
-        new("go.cluster-health", "Cluster health: evaluations and events", () => ShowRoot(_views.DescribeCluster(_session.Context.Name, Views.ClusterHealthTab)))
-        {
-            Group = PagesGroup, Commands = ["cluster-health"],
+            Group = PagesGroup,
+            Commands = ["cluster-health"],
         },
         new("go.types", "Application types: provisioned versions and their service types", () => ShowRoot(_views.ApplicationTypes()))
         {
-            Group = PagesGroup, Commands = ["types", "apptypes"],
+            Group = PagesGroup,
+            Commands = ["types", "apptypes"],
         },
         new("go.store", "Image store: packages, folders and files", () => ShowRoot(_views.ImageStoreRoot()))
         {
-            Group = PagesGroup, Commands = ["store", "imagestore"],
+            Group = PagesGroup,
+            Commands = ["store", "imagestore"],
         },
         new("provision", "Upload a local application package (folder, .sfpkg or .zip) and provision it", Provision)
         {
-            Commands = ["provision"], ArgumentHint = "<path>", When = () => Allows(ActionRisk.Confirm, power: false),
+            Commands = ["provision"],
+            ArgumentHint = "<path>",
+            When = () => Allows(ActionRisk.Confirm, power: false),
         },
         new("go.upgrades", "Upgrades of the cluster and applications", () => ShowRoot(_views.Upgrades(_session.Context.Name)))
         {
-            Group = PagesGroup, Commands = ["upgrades", "updates", "up"],
+            Group = PagesGroup,
+            Commands = ["upgrades", "updates", "up"],
         },
         new("go.activity", "Activity: what sfx changed, this session and before", () => ShowRoot(Views.Activity(_activity)))
         {
-            Group = PagesGroup, Commands = ["activity", "act"],
+            Group = PagesGroup,
+            Commands = ["activity", "act"],
         },
         new("go.events", "Events of the last hour; :events 6h for longer", ShowEvents)
         {
-            Group = PagesGroup, Commands = ["events", "ev"], ArgumentHint = "[window]",
+            Group = PagesGroup,
+            Commands = ["events", "ev"],
+            ArgumentHint = "[window]",
         },
         new("go.repairs", "Repair tasks: reboots, patching and other infrastructure work", () => ShowRoot(_views.Repairs()))
         {
-            Group = PagesGroup, Commands = ["repairs", "repair", "rt"],
+            Group = PagesGroup,
+            Commands = ["repairs", "repair", "rt"],
         },
         new("go.contexts", "Contexts; :ctx <name> switches", SwitchContext)
         {
-            Group = PagesGroup, Keys = ["c"], Commands = ["ctx", "context", "contexts"], ArgumentHint = "[name]",
+            Group = PagesGroup,
+            Keys = ["c"],
+            Commands = ["ctx", "context", "contexts"],
+            ArgumentHint = "[name]",
         },
         new("power", "Unlock or lock power actions (recover, delete, remove node state…)", TogglePower) { Commands = ["power"] },
 
         new("group", "Group rows by a column, e.g. :group type; :group alone ungroups", Group)
         {
-            Group = Rows, Commands = ["group"], ArgumentHint = "[column]", When = () => Current?.Columns.Count > 0,
+            Group = Rows,
+            Commands = ["group"],
+            ArgumentHint = "[column]",
+            When = () => Current?.Columns.Count > 0,
         },
         new("mark", "Mark the row, so row actions run on every marked row", () => Forward(Key.Char, ' '))
         {
-            Group = Rows, Keys = ["space"], ShowInPalette = false, When = () => Current is { Actions.Count: > 0, Columns.Count: > 0 },
+            Group = Rows,
+            Keys = ["space"],
+            ShowInPalette = false,
+            When = () => Current is { Actions.Count: > 0, Columns.Count: > 0 },
         },
         new("mark-all", "Mark every row shown, or unmark them all", () => Forward(Key.Char, '*'))
         {
-            Group = Rows, Keys = ["*"], ShowInPalette = false, When = () => Current is { Actions.Count: > 0, Columns.Count: > 0 },
+            Group = Rows,
+            Keys = ["*"],
+            ShowInPalette = false,
+            When = () => Current is { Actions.Count: > 0, Columns.Count: > 0 },
         },
 
         new("open", "Open row (or click it twice); on a group, fold or unfold it", () => Forward(Key.Enter))
         {
-            Group = Movement, Keys = ["enter", "l"], ShowInPalette = false,
+            Group = Movement,
+            Keys = ["enter", "l"],
+            ShowInPalette = false,
         },
         new("down", "Down", () => Forward(Key.Down)) { Group = Movement, Keys = ["j"], ShowInPalette = false },
         new("up", "Up", () => Forward(Key.Up)) { Group = Movement, Keys = ["k"], ShowInPalette = false },
@@ -337,7 +363,8 @@ internal sealed class Shell : IActionHost
     }
 
     private void OpenPalette() =>
-        _keymap.ShowPalette(_app,
+        _keymap.ShowPalette(
+            _app,
             _store.Contexts.Select(context => new Command($"Switch to context {context.Name}", () => Connect(context), context.Endpoint)));
 
     private void SwitchContext(string? name)
@@ -820,8 +847,11 @@ internal sealed class Shell : IActionHost
         var session = _session;
         var index = _views.Overview.GetSearchIndexAsync(CancellationToken.None);
         _searchIndex = (session, DateTime.UtcNow, index);
-        _ = index.ContinueWith(t => Post(() => Error($"find: {t.Exception!.GetBaseException().Message}")),
-            CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+        _ = index.ContinueWith(
+            t => Post(() => Error($"find: {t.Exception!.GetBaseException().Message}")),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default);
         return index;
     }
 

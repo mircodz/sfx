@@ -15,8 +15,13 @@ public class CodePackageActionTests
 
     private static Dictionary<string, string> CodePackage(string instanceId) => new()
     {
-        ["node"] = "_Node_1", ["applicationId"] = "orders", ["application"] = "fabric:/orders", ["servicePackage"] = "CounterPkg",
-        ["codePackage"] = "Code", ["instanceId"] = instanceId, ["activationId"] = "",
+        ["node"] = "_Node_1",
+        ["applicationId"] = "orders",
+        ["application"] = "fabric:/orders",
+        ["servicePackage"] = "CounterPkg",
+        ["codePackage"] = "Code",
+        ["instanceId"] = instanceId,
+        ["activationId"] = "",
     };
 
     [Fact]

@@ -6,11 +6,23 @@ namespace Sfx.Tests;
 public class ServiceSettingsTests
 {
     private static StatefulServiceDescription Stateful() => new(
-        new ServiceName("fabric:/shop/Counter"), "CounterType", new SingletonPartitionSchemeDescription(), 3, 2, true,
-        placementConstraints: "NodeType == A", defaultMoveCost: MoveCost.Low, quorumLossWaitDurationSeconds: 120, replicaRestartWaitDurationSeconds: 60);
+        new ServiceName("fabric:/shop/Counter"),
+        "CounterType",
+        new SingletonPartitionSchemeDescription(),
+        3,
+        2,
+        true,
+        placementConstraints: "NodeType == A",
+        defaultMoveCost: MoveCost.Low,
+        quorumLossWaitDurationSeconds: 120,
+        replicaRestartWaitDurationSeconds: 60);
 
     private static StatelessServiceDescription Stateless() => new(
-        new ServiceName("fabric:/shop/Web"), "WebType", new SingletonPartitionSchemeDescription(), 5, minInstanceCount: 2);
+        new ServiceName("fabric:/shop/Web"),
+        "WebType",
+        new SingletonPartitionSchemeDescription(),
+        5,
+        minInstanceCount: 2);
 
     private static ServiceSetting Setting(string key, bool stateful = true) =>
         ServiceSettings.Read(stateful ? Stateful() : Stateless()).Single(s => s.Key == key);
@@ -59,7 +71,9 @@ public class ServiceSettingsTests
 
         Assert.Equal("High", ServiceSettings.Parse(moveCost, "high"));
         Assert.Equal("true", ServiceSettings.Parse(Setting("drop-source-on-move"), "TRUE"));
-        Assert.StartsWith("Default move cost must be one of: Zero, Low, Medium, High", Assert.Throws<RefusedException>(() => ServiceSettings.Parse(moveCost, "huge")).Message);
+        Assert.StartsWith(
+            "Default move cost must be one of: Zero, Low, Medium, High",
+            Assert.Throws<RefusedException>(() => ServiceSettings.Parse(moveCost, "huge")).Message);
     }
 
     [Fact]
@@ -99,8 +113,14 @@ public class ServiceSettingsTests
 
         var combined = Assert.IsType<StatefulServiceUpdateDescription>(ServiceSettings.BuildUpdate(stateful: true, new Dictionary<string, string>
         {
-            ["count"] = "5", ["min-replicas"] = "3", ["placement-constraints"] = "", ["replica-restart-wait"] = "60", ["standby-keep"] = "600",
-            ["placement-time-limit"] = "30", ["drop-source-on-move"] = "true", ["dns-name"] = "counter",
+            ["count"] = "5",
+            ["min-replicas"] = "3",
+            ["placement-constraints"] = "",
+            ["replica-restart-wait"] = "60",
+            ["standby-keep"] = "600",
+            ["placement-time-limit"] = "30",
+            ["drop-source-on-move"] = "true",
+            ["dns-name"] = "counter",
         }));
         Assert.Equal((1 | 16 | 32 | 2 | 8 | 2048 | 65536 | 131072).ToString(), combined.Flags);
         Assert.Equal(5, combined.TargetReplicaSetSize);
@@ -111,7 +131,9 @@ public class ServiceSettingsTests
 
         var waits = Assert.IsType<StatelessServiceUpdateDescription>(ServiceSettings.BuildUpdate(stateful: false, new Dictionary<string, string>
         {
-            ["min-instance-percent"] = "50", ["instance-close-delay"] = "10", ["instance-restart-wait"] = "20",
+            ["min-instance-percent"] = "50",
+            ["instance-close-delay"] = "10",
+            ["instance-restart-wait"] = "20",
         }));
         Assert.Equal((8192 | 16384 | 32768).ToString(), waits.Flags);
     }
@@ -150,7 +172,11 @@ public class ServiceSettingsTests
         var cluster = new FakeCluster().On("GetServiceDescriptionAsync", Stateful()).OnCall("UpdateServiceAsync");
         var settings = new ServiceSettings(cluster.Client);
 
-        var applied = await settings.UpdateAsync("shop~Counter", new Dictionary<string, string> { ["quorum-loss-wait"] = "5m", ["move-cost"] = "high" }, default);
+        var applied = await settings.UpdateAsync("shop~Counter", new Dictionary<string, string>
+        {
+            ["quorum-loss-wait"] = "5m",
+            ["move-cost"] = "high",
+        }, default);
 
         Assert.Equal(new Dictionary<string, string> { ["quorum-loss-wait"] = "300", ["move-cost"] = "High" }, applied);
         var args = Assert.Single(cluster.CallsTo("UpdateServiceAsync"));
@@ -168,7 +194,11 @@ public class ServiceSettingsTests
 
         Assert.Equal(
             "Change Quorum loss wait to 300s and Default move cost to High on fabric:/shop/Counter",
-            ServiceSettings.Describe("fabric:/shop/Counter", settings, new Dictionary<string, string> { ["quorum-loss-wait"] = "300", ["move-cost"] = "High" }));
+            ServiceSettings.Describe("fabric:/shop/Counter", settings, new Dictionary<string, string>
+            {
+                ["quorum-loss-wait"] = "300",
+                ["move-cost"] = "High",
+            }));
         Assert.Equal(
             "Change Placement constraints to nothing on fabric:/shop/Counter",
             ServiceSettings.Describe("fabric:/shop/Counter", settings, new Dictionary<string, string> { ["placement-constraints"] = "" }));

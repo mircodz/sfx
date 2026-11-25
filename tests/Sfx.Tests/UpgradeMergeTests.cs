@@ -59,7 +59,12 @@ public class UpgradeMergeTests
     public void A_cluster_policy_keeps_the_manifest_values_it_does_not_set()
     {
         var d = ClusterOperations.ClusterUpgradeDescription(
-            "10.1", null, UpgradeMode.Monitored, null, new UpgradePolicy(MaxPercentUnhealthyNodes: 5), ClusterManifest);
+            "10.1",
+            null,
+            UpgradeMode.Monitored,
+            null,
+            new UpgradePolicy(MaxPercentUnhealthyNodes: 5),
+            ClusterManifest);
 
         Assert.True(d.ClusterHealthPolicy.ConsiderWarningAsError);
         Assert.Equal(5, d.ClusterHealthPolicy.MaxPercentUnhealthyNodes);

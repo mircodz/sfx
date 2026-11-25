@@ -18,8 +18,11 @@ public sealed partial class Views
 
     /// <summary>Events of the last <paramref name="window"/>, newest first.</summary>
     public IResourceView Events(TimeSpan window) =>
-        new ResourceView<EventRow>("events", $"events {RefreshInterval.Format(window)}",
-                ct => EventQueries.GetEventsAsync(window, ct), e => e.Event.EventInstanceId?.ToString() ?? $"{e.TimeUtc:O}{e.Kind}{e.Entity}")
+        new ResourceView<EventRow>(
+            "events",
+            $"events {RefreshInterval.Format(window)}",
+            ct => EventQueries.GetEventsAsync(window, ct),
+            e => e.Event.EventInstanceId?.ToString() ?? $"{e.TimeUtc:O}{e.Kind}{e.Entity}")
             {
                 Empty = $"no events in the last {RefreshInterval.Format(window)}; :events 6h looks further back",
             }
@@ -31,15 +34,19 @@ public sealed partial class Views
             .Sorting("TIME", SortState.Descending);
 
     public static IResourceView DescribeEvent(EventRow e) =>
-        new DescribeView("event", e.Kind,
-        [
-            Tab("Fields", _ => Task.FromResult(Lines.Fields(Inspect.Fields(e.Event)))),
-            Tab("Raw", _ => Task.FromResult(Lines.Json(e.Event))),
-        ]);
+        new DescribeView(
+            "event",
+            e.Kind,
+            [
+                Tab("Fields", _ => Task.FromResult(Lines.Fields(Inspect.Fields(e.Event)))),
+                Tab("Raw", _ => Task.FromResult(Lines.Json(e.Event))),
+            ]);
 
     /// <summary>Events about something going wrong stand out; the rest read as plain text.</summary>
     private static StyledText EventKind(string kind) =>
-        new[] { "Down", "Failed", "Error", "Aborted", "Lost", "Rollback", "Expired", "Exited", "Closed" }.Any(word => kind.Contains(word, StringComparison.Ordinal))
+        new[] { "Down", "Failed", "Error", "Aborted", "Lost", "Rollback", "Expired", "Exited", "Closed" }.Any(word => kind.Contains(
+            word,
+            StringComparison.Ordinal))
             ? Colored(kind, Theme.Current.Warning)
             : Plain(kind);
 }

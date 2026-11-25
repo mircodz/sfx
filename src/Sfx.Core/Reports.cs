@@ -146,7 +146,8 @@ public sealed class ActionLog(string path)
         // The file keeps whole seconds; the entry matches what a later read returns.
         var time = new DateTimeOffset(now.Ticks - now.Ticks % TimeSpan.TicksPerSecond, now.Offset);
         var entry = new ActionLogEntry(time, Environment.UserName, context, endpoint, action, outcome.ReplaceLineEndings(" "));
-        var line = string.Join('\t',
+        var line = string.Join(
+            '\t',
             entry.Time.ToString(TimeFormat, CultureInfo.InvariantCulture),
             entry.User,
             entry.Context,

@@ -12,7 +12,14 @@ public class EntityMappingTests
     {
         var id = Guid.NewGuid();
         var ranged = Dto.Partition(new PartitionRow(
-            new PartitionId(id), "Stateful", "Int64Range", "Ready", HealthState.Ok, "3/3", LowKey: "-9223372036854775808", HighKey: "9223372036854775807"));
+            new PartitionId(id),
+            "Stateful",
+            "Int64Range",
+            "Ready",
+            HealthState.Ok,
+            "3/3",
+            LowKey: "-9223372036854775808",
+            HighKey: "9223372036854775807"));
         var named = Dto.Partition(new PartitionRow(new PartitionId(id), "Stateless", "Named", "Ready", HealthState.Ok, "1", Name: "east"));
 
         Assert.Equal(("Int64Range", "-9223372036854775808", "9223372036854775807", (string?)null), (ranged.Scheme, ranged.LowKey, ranged.HighKey, ranged.Name));
@@ -24,13 +31,15 @@ public class EntityMappingTests
     {
         HealthEventRow Event(string property, HealthState state, int minute) =>
             new("source", property, state, "", new DateTime(2024, 1, 1, 0, minute, 0, DateTimeKind.Utc), false);
-        var report = new HealthReport(HealthState.Error,
-        [
-            Event("ok", HealthState.Ok, 59),
-            Event("old warning", HealthState.Warning, 1),
-            Event("error", HealthState.Error, 0),
-            Event("new warning", HealthState.Warning, 30),
-        ], []);
+        var report = new HealthReport(
+            HealthState.Error,
+            [
+                Event("ok", HealthState.Ok, 59),
+                Event("old warning", HealthState.Warning, 1),
+                Event("error", HealthState.Error, 0),
+                Event("new warning", HealthState.Warning, 30),
+            ],
+            []);
 
         Assert.Equal(["error", "new warning", "old warning", "ok"], Dto.Health(report).Events.Select(e => e.Property));
     }
@@ -40,9 +49,31 @@ public class EntityMappingTests
     {
         var at = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var app = EventQueries.ToRow(new ApplicationHealthReportExpiredEvent(
-            Guid.NewGuid(), at, "shop~orders", 1, "source", "property", "Warning", 0, 0, "", false, at));
+            Guid.NewGuid(),
+            at,
+            "shop~orders",
+            1,
+            "source",
+            "property",
+            "Warning",
+            0,
+            0,
+            "",
+            false,
+            at));
         var service = EventQueries.ToRow(new ServiceHealthReportExpiredEvent(
-            Guid.NewGuid(), at, "shop~orders~Counter", 1, "source", "property", "Warning", 0, 0, "", false, at));
+            Guid.NewGuid(),
+            at,
+            "shop~orders~Counter",
+            1,
+            "source",
+            "property",
+            "Warning",
+            0,
+            0,
+            "",
+            false,
+            at));
 
         Assert.Equal("fabric:/shop/orders", app.Entity);
         Assert.Equal("fabric:/shop/orders/Counter", service.Entity);
@@ -88,12 +119,14 @@ public class EntityMappingTests
         var empty = await Assert.ThrowsAsync<NotFoundException>(() =>
             ClusterInspector.Required<ApplicationInfo>(() => Task.FromResult<ApplicationInfo?>(null), "There's no application fabric:/x on this cluster."));
         var gone = await Assert.ThrowsAsync<NotFoundException>(() => ClusterInspector.Required<ApplicationInfo>(
-            () => throw new ServiceFabricException("Gone.", FabricErrorCodes.FABRIC_E_APPLICATION_NOT_FOUND, false), "There's no application fabric:/x on this cluster."));
+            () => throw new ServiceFabricException("Gone.", FabricErrorCodes.FABRIC_E_APPLICATION_NOT_FOUND, false),
+            "There's no application fabric:/x on this cluster."));
 
         Assert.Equal("There's no application fabric:/x on this cluster.", empty.Message);
         Assert.Equal("There's no application fabric:/x on this cluster.", gone.Message);
         await Assert.ThrowsAsync<ServiceFabricException>(() => ClusterInspector.Required<ApplicationInfo>(
-            () => throw new ServiceFabricException("Busy.", FabricErrorCodes.FABRIC_E_TIMEOUT, true), "Missing."));
+            () => throw new ServiceFabricException("Busy.", FabricErrorCodes.FABRIC_E_TIMEOUT, true),
+            "Missing."));
     }
 
     [Fact]

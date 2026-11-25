@@ -166,13 +166,7 @@ public sealed record EntityAction<T>(
 
     /// <summary>The action on one entity, offered while the host allows its risk.</summary>
     public AppAction Bind(T subject, string group, IActionHost host) =>
-        new(Id, Title, _ => Run(subject))
-        {
-            Group = group,
-            Keys = Keys ?? [],
-            Commands = Commands ?? [],
-            When = () => host.Allows(Risk, Power),
-        };
+        new(Id, Title, _ => Run(subject)) { Group = group, Keys = Keys ?? [], Commands = Commands ?? [], When = () => host.Allows(Risk, Power) };
 }
 
 /// <summary>The confirmations operations ask for, as Cellar dialogs.</summary>

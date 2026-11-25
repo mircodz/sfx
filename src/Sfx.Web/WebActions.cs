@@ -100,16 +100,30 @@ internal static class WebActions
     [
         // Replicas: target partitionId, replicaId, node, role, serviceId, serviceKind
 
-        new("replica.restart", "replica", "Restart", Risk.Confirm,
+        new(
+            "replica.restart",
+            "replica",
+            "Restart",
+            Risk.Confirm,
             (t, _) => $"Restart replica {t["replicaId"]} on {t["node"]}",
             (s, t, _, ct) => s.Operations.RestartReplicaAsync(t["node"], t.Partition("partitionId"), t["replicaId"], ct),
             "Its process restarts; a primary hands over to a secondary first.",
             Applies: t => t["serviceKind"] == nameof(ServiceKind.Stateful)),
 
-        new("replica.move", "replica", "Move", Risk.Confirm,
+        new(
+            "replica.move",
+            "replica",
+            "Move",
+            Risk.Confirm,
             (t, i) => $"Move {Describe(t)} from {t["node"]} to {i.Optional("node") ?? "a node the cluster picks"}",
             (s, t, i, ct) => s.Operations.MoveReplicaAsync(
-                t["role"], t["serviceId"], t.Partition("partitionId"), t["node"], i.Optional("node"), i.Flag("ignoreConstraints"), ct),
+                t["role"],
+                t["serviceId"],
+                t.Partition("partitionId"),
+                t["node"],
+                i.Optional("node"),
+                i.Flag("ignoreConstraints"),
+                ct),
             Applies: t => ClusterOperations.CanMove(t["role"]),
             Inputs: t =>
             [
@@ -117,13 +131,21 @@ internal static class WebActions
                 new("ignoreConstraints", "Ignore placement constraints", "flag"),
             ]),
 
-        new("replica.remove", "replica", "Remove", Risk.Destructive,
+        new(
+            "replica.remove",
+            "replica",
+            "Remove",
+            Risk.Destructive,
             (t, _) => $"Remove {Describe(t)} from {t["node"]}",
             (s, t, _, ct) => s.Operations.RemoveReplicaAsync(t["node"], t.Partition("partitionId"), t["replicaId"], force: false, ct),
             "The cluster closes it and builds a replacement elsewhere.",
             ConfirmText: t => t["replicaId"]),
 
-        new("replica.force-remove", "replica", "Force remove", Risk.Destructive,
+        new(
+            "replica.force-remove",
+            "replica",
+            "Force remove",
+            Risk.Destructive,
             (t, _) => $"Force-remove {Describe(t)} from {t["node"]}",
             (s, t, _, ct) => s.Operations.RemoveReplicaAsync(t["node"], t.Partition("partitionId"), t["replicaId"], force: true, ct),
             "Skips the graceful close: whatever state is on that node is dropped.",
@@ -132,41 +154,65 @@ internal static class WebActions
 
         // Nodes: target node, status
 
-        new("node.activate", "node", "Activate", Risk.Confirm,
+        new(
+            "node.activate",
+            "node",
+            "Activate",
+            Risk.Confirm,
             (t, _) => $"Activate {t["node"]}",
             (s, t, _, ct) => s.Operations.ActivateNodeAsync(t["node"], ct),
             "The cluster starts placing replicas on it again.",
             Applies: t => t["status"] is nameof(NodeStatus.Disabled) or nameof(NodeStatus.Disabling)),
 
-        new("node.deactivate", "node", "Deactivate", Risk.Confirm,
+        new(
+            "node.deactivate",
+            "node",
+            "Deactivate",
+            Risk.Confirm,
             (t, i) => $"Deactivate {t["node"]} ({i["intent"].ToLowerInvariant()})",
             (s, t, i, ct) => s.Operations.DeactivateNodeAsync(t["node"], Enum.Parse<DeactivationIntent>(i["intent"]), ct),
             "Pause stops placing replicas on it; restart also moves primaries off and closes replicas.",
             Applies: t => t["status"] is nameof(NodeStatus.Up) or nameof(NodeStatus.Enabling),
             Inputs: _ =>
             [
-                new("intent", "Why", "choice",
-                [
-                    new(nameof(DeactivationIntent.Pause), "Pause", "Replicas stay."),
-                    new(nameof(DeactivationIntent.Restart), "Restart", "For a restart."),
-                ], nameof(DeactivationIntent.Pause)),
+                new(
+                    "intent",
+                    "Why",
+                    "choice",
+                    [
+                        new(nameof(DeactivationIntent.Pause), "Pause", "Replicas stay."),
+                        new(nameof(DeactivationIntent.Restart), "Restart", "For a restart."),
+                    ],
+                    nameof(DeactivationIntent.Pause)),
             ]),
 
-        new("node.remove-data", "node", "Deactivate and remove data", Risk.Destructive,
+        new(
+            "node.remove-data",
+            "node",
+            "Deactivate and remove data",
+            Risk.Destructive,
             (t, _) => $"Deactivate {t["node"]} (remove data)",
             (s, t, _, ct) => s.Operations.DeactivateNodeAsync(t["node"], DeactivationIntent.RemoveData, ct),
             "Moves every replica off: the node's data is expected to be lost, e.g. for a reimage.",
             Applies: t => t["status"] is nameof(NodeStatus.Up) or nameof(NodeStatus.Enabling),
             ConfirmText: t => t["node"]),
 
-        new("node.restart", "node", "Restart", Risk.Destructive,
+        new(
+            "node.restart",
+            "node",
+            "Restart",
+            Risk.Destructive,
             (t, _) => $"Restart {t["node"]}",
             (s, t, _, ct) => s.Operations.RestartNodeAsync(t["node"], ct),
             "Every replica on it restarts or fails over to another node.",
             Applies: t => t["status"] == nameof(NodeStatus.Up),
             ConfirmText: t => t["node"]),
 
-        new("node.stop", "node", "Stop for a while", Risk.Destructive,
+        new(
+            "node.stop",
+            "node",
+            "Stop for a while",
+            Risk.Destructive,
             (t, i) => $"Stop {t["node"]} for {i.Int("seconds")}s",
             (s, t, i, ct) => s.Operations.StopNodeAsync(t["node"], TimeSpan.FromSeconds(Positive(i.Int("seconds"))), ct),
             NotForProduction,
@@ -176,7 +222,11 @@ internal static class WebActions
             ConfirmText: t => t["node"],
             Inputs: _ => [new("seconds", "Seconds", "number", Default: "600")]),
 
-        new("node.start", "node", "Start", Risk.Confirm,
+        new(
+            "node.start",
+            "node",
+            "Start",
+            Risk.Confirm,
             (t, _) => $"Start {t["node"]}",
             (s, t, _, ct) => s.Operations.StartNodeAsync(t["node"], ct),
             NotForProduction,
@@ -184,7 +234,11 @@ internal static class WebActions
             Power: true,
             Applies: t => t["status"] == nameof(NodeStatus.Down)),
 
-        new("node.remove-state", "node", "Remove node state", Risk.Destructive,
+        new(
+            "node.remove-state",
+            "node",
+            "Remove node state",
+            Risk.Destructive,
             (t, _) => $"Remove the state of {t["node"]}",
             (s, t, _, ct) => s.Operations.RemoveNodeStateAsync(t["node"], ct),
             "Tells the cluster the node and its data are gone for good; replicas on it are treated as lost.",
@@ -194,21 +248,39 @@ internal static class WebActions
 
         // Code packages: target node, applicationId, application, servicePackage, codePackage, instanceId, activationId
 
-        new("codepackage.restart", "codepackage", "Restart", Risk.Confirm,
+        new(
+            "codepackage.restart",
+            "codepackage",
+            "Restart",
+            Risk.Confirm,
             (t, _) => $"Restart code package {t["codePackage"]} of {t["application"]} on {t["node"]}",
             (s, t, _, ct) => s.Operations.RestartCodePackageAsync(
-                t["node"], t["applicationId"], t["servicePackage"], t["codePackage"], t["instanceId"], t["activationId"], ct),
+                t["node"],
+                t["applicationId"],
+                t["servicePackage"],
+                t["codePackage"],
+                t["instanceId"],
+                t["activationId"],
+                ct),
             "Its process is killed and started again; replicas in it fail over.",
             Applies: t => t.Optional("instanceId") is not null),
 
         // Partitions: target partitionId, serviceId
 
-        new("partition.reset-load", "partition", "Reset load", Risk.Confirm,
+        new(
+            "partition.reset-load",
+            "partition",
+            "Reset load",
+            Risk.Confirm,
             (t, _) => $"Reset the load of partition {t["partitionId"]}",
             (s, t, _, ct) => s.Operations.ResetPartitionLoadAsync(t.Partition("partitionId"), ct),
             "Reported load goes back to the service's defaults."),
 
-        new("partition.restart", "partition", "Restart", Risk.Confirm,
+        new(
+            "partition.restart",
+            "partition",
+            "Restart",
+            Risk.Confirm,
             (t, i) => $"Restart partition {t["partitionId"]} ({(i["mode"] == nameof(RestartPartitionMode.OnlyActiveSecondaries) ? "only active secondaries" : "all replicas or instances")})",
             (s, t, i, ct) => s.Operations.RestartPartitionAsync(t["serviceId"], t.Partition("partitionId"), Enum.Parse<RestartPartitionMode>(i["mode"]), ct),
             NotForProduction,
@@ -216,14 +288,22 @@ internal static class WebActions
             Power: true,
             Inputs: _ =>
             [
-                new("mode", "Restart", "choice",
-                [
-                    new(nameof(RestartPartitionMode.AllReplicasOrInstances), "All replicas or instances"),
-                    new(nameof(RestartPartitionMode.OnlyActiveSecondaries), "Only active secondaries"),
-                ], nameof(RestartPartitionMode.AllReplicasOrInstances)),
+                new(
+                    "mode",
+                    "Restart",
+                    "choice",
+                    [
+                        new(nameof(RestartPartitionMode.AllReplicasOrInstances), "All replicas or instances"),
+                        new(nameof(RestartPartitionMode.OnlyActiveSecondaries), "Only active secondaries"),
+                    ],
+                    nameof(RestartPartitionMode.AllReplicasOrInstances)),
             ]),
 
-        new("partition.recover", "partition", "Recover from quorum loss", Risk.Destructive,
+        new(
+            "partition.recover",
+            "partition",
+            "Recover from quorum loss",
+            Risk.Destructive,
             (t, _) => $"Recover partition {t["partitionId"]}",
             (s, t, _, ct) => s.Operations.RecoverPartitionAsync(t.Partition("partitionId"), ct),
             "Forces the partition out of quorum loss with the replicas that are left; recent writes may be lost.",
@@ -232,7 +312,11 @@ internal static class WebActions
 
         // Services: target serviceId, applicationId, name, kind, count, min
 
-        new("service.scale", "service", "Scale", Risk.Confirm,
+        new(
+            "service.scale",
+            "service",
+            "Scale",
+            Risk.Confirm,
             (t, i) => t["kind"] == nameof(ServiceKind.Stateful)
                 ? $"Scale {t["name"]} to {Count(i.Int("count"), "replica")}" + (i.Optional("min") is { } min ? $" (min {min})" : "")
                 : $"Scale {t["name"]} to {(i.Int("count") == -1 ? "every node" : Count(i.Int("count"), "instance"))}",
@@ -250,12 +334,20 @@ internal static class WebActions
                 : [new("count", "Instance count (-1 for every node)", "number", Default: t["count"])],
             Form: true),
 
-        new("service.recover", "service", "Recover partitions", Risk.Confirm,
+        new(
+            "service.recover",
+            "service",
+            "Recover partitions",
+            Risk.Confirm,
             (t, _) => $"Recover the partitions of {t["name"]}",
             (s, t, _, ct) => s.Operations.RecoverServicePartitionsAsync(t["serviceId"], ct),
             "Partitions stuck in quorum loss are forced out of it; recent writes may be lost."),
 
-        new("service.delete", "service", "Delete", Risk.Destructive,
+        new(
+            "service.delete",
+            "service",
+            "Delete",
+            Risk.Destructive,
             (t, i) => $"Delete {t["name"]}" + (i.Flag("force") ? " (force)" : ""),
             (s, t, i, ct) => s.Operations.DeleteServiceAsync(t["serviceId"], i.Flag("force"), ct),
             "Its replicas and their state are removed.",
@@ -266,7 +358,11 @@ internal static class WebActions
 
         // Applications: target applicationId, name, typeName, version
 
-        new("application.upgrade", "application", "Edit", Risk.Confirm,
+        new(
+            "application.upgrade",
+            "application",
+            "Edit",
+            Risk.Confirm,
             (t, i) => ApplicationLifecycle.Describe(t["name"], UpgradeRequest(i)),
             (s, t, i, ct) => s.Lifecycle.UpgradeAsync(t["applicationId"], UpgradeRequest(i), ct),
             "Services restart domain by domain with the new version or parameters.",
@@ -279,7 +375,11 @@ internal static class WebActions
             ],
             Form: true),
 
-        new("application.delete", "application", "Delete", Risk.Destructive,
+        new(
+            "application.delete",
+            "application",
+            "Delete",
+            Risk.Destructive,
             (t, i) => $"Delete {t["name"]}" + (i.Flag("force") ? " (force)" : ""),
             (s, t, i, ct) => s.Operations.DeleteApplicationAsync(t["applicationId"], i.Flag("force"), ct),
             "All its services, replicas and their state are removed.",
@@ -290,14 +390,22 @@ internal static class WebActions
 
         // Upgrades: target kind (cluster or application), applicationId, name, state, nextDomain
 
-        new("upgrade.resume", "upgrade", "Resume into next domain", Risk.Confirm,
+        new(
+            "upgrade.resume",
+            "upgrade",
+            "Resume into next domain",
+            Risk.Confirm,
             (t, _) => $"Resume the upgrade of {t["name"]} into {t["nextDomain"]}",
             (s, t, _, ct) => t["kind"] == "cluster"
                 ? s.Operations.ResumeClusterUpgradeAsync(t["nextDomain"], ct)
                 : s.Operations.ResumeApplicationUpgradeAsync(t["applicationId"], t["nextDomain"], ct),
             Applies: t => t["state"] == nameof(UpgradeState.RollingForwardPending) && t["nextDomain"].Length > 0),
 
-        new("upgrade.rollback", "upgrade", "Roll back", Risk.Confirm,
+        new(
+            "upgrade.rollback",
+            "upgrade",
+            "Roll back",
+            Risk.Confirm,
             (t, _) => $"Roll back the upgrade of {t["name"]}",
             (s, t, _, ct) => t["kind"] == "cluster"
                 ? s.Operations.RollbackClusterUpgradeAsync(ct)
@@ -308,8 +416,7 @@ internal static class WebActions
         // Cluster: target name, azureManaged ("true", "false" or "unknown")
 
         new("cluster.upgrade", "cluster", "Upgrade", Risk.Confirm,
-            (_, i) => ClusterUpgrades.Describe(
-                i.Optional("codeVersion"), i.Optional("configVersion"), Plan(i["mode"]), ClusterPolicy(i) is not null),
+            (_, i) => ClusterUpgrades.Describe(i.Optional("codeVersion"), i.Optional("configVersion"), Plan(i["mode"]), ClusterPolicy(i) is not null),
             (s, _, i, ct) => s.ClusterUpgrades.StartAsync(i.Optional("codeVersion"), i.Optional("configVersion"), Plan(i["mode"]), ClusterPolicy(i), ct),
             "Nodes restart domain by domain on the new version or configuration.",
             // Azure's resource provider owns the upgrades of the clusters it manages.
@@ -322,14 +429,22 @@ internal static class WebActions
             ],
             Form: true),
 
-        new("cluster.recover-all", "cluster", "Recover every partition in quorum loss", Risk.Destructive,
+        new(
+            "cluster.recover-all",
+            "cluster",
+            "Recover every partition in quorum loss",
+            Risk.Destructive,
             (_, _) => "Recover all partitions in quorum loss",
             (s, _, _, ct) => s.Operations.RecoverAllPartitionsAsync(ct),
             "Every partition stuck in quorum loss is forced out; recent writes may be lost.",
             Power: true,
             ConfirmText: t => t["name"]),
 
-        new("cluster.recover-system", "cluster", "Recover system partitions", Risk.Destructive,
+        new(
+            "cluster.recover-system",
+            "cluster",
+            "Recover system partitions",
+            Risk.Destructive,
             (_, _) => "Recover system partitions in quorum loss",
             (s, _, _, ct) => s.Operations.RecoverSystemPartitionsAsync(ct),
             "System services stuck in quorum loss are forced out; recent writes may be lost.",
@@ -384,7 +499,8 @@ internal static class WebActions
         if (action.NeedsFaultAnalysis && !(await session.GetSystemServicesAsync(cancellationToken)).FaultAnalysis)
         {
             throw new ActionException(
-                $"'{action.Title}' needs the Fault Analysis Service (FaultAnalysisService), which this cluster doesn't run.", StatusCodes.Status409Conflict);
+                $"'{action.Title}' needs the Fault Analysis Service (FaultAnalysisService), which this cluster doesn't run.",
+                StatusCodes.Status409Conflict);
         }
 
         // The target comes back from the browser; only run it if this server offered exactly this action on exactly this target.
