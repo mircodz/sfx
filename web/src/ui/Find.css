@@ -48,6 +48,13 @@ dialog.find::backdrop {
     outline: none;
 }
 
+/* The whole palette is what has focus; the app's focus ring on the field would only frame it twice. */
+.find-input input:focus,
+.find-input input:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
+
 .find-input input::placeholder {
     color: var(--text-muted);
 }

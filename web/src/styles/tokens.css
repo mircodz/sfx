@@ -62,6 +62,9 @@
 
     --sidebar-width: 232px;
     --topbar-height: 48px;
+    /* The sidebar folded to icons; icons sit centred in it whether it's folded or not, so they never move. */
+    --rail-width: 60px;
+    --rail-icon: 18px;
 }
 
 :root[data-theme="light"] {

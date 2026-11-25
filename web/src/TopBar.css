@@ -17,7 +17,8 @@
 .topbar-brand {
     flex: none;
     width: var(--sidebar-width);
-    padding-left: var(--space-5);
+    /* Centred over the folded sidebar's icons (the logo is about 33px wide), open or folded. */
+    padding-left: calc((var(--rail-width) - 33px) / 2);
     font-family: var(--font-mono);
     font-style: italic;
     font-feature-settings: "ss01";
