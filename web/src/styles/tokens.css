@@ -41,6 +41,9 @@
     --fill-warning: light-dark(#ba7517, #ef9f27);
 
     --focus-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--border-accent);
+    /* Something floating over the page, like the find palette. */
+    --shadow-overlay: light-dark(0 16px 48px rgba(0, 0, 0, 0.16), 0 16px 48px rgba(0, 0, 0, 0.5)), 0 0 0 0.5px var(--border-strong);
+    --backdrop-light: light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.45));
 
     /* Code: kept away from the status hues so a tag never reads as a health state. */
     --code-tag: light-dark(#6b3fa0, #c4a7e7);

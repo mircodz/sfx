@@ -8,7 +8,7 @@ import { useModal } from "./Overlay";
 import "./Find.css";
 
 const icons: Record<SearchHit["kind"], string> = { node: "server", application: "apps", service: "box", partition: "layout-grid" };
-const kinds: Record<SearchHit["kind"], string> = { node: "Node", application: "Application", service: "Service", partition: "Partition" };
+const plurals: Record<SearchHit["kind"], string> = { node: "Nodes", application: "Applications", service: "Services", partition: "Partitions" };
 
 /** Where a hit opens: its own page, at its place under its application and service. */
 export function hitHref(hit: SearchHit): string | null {
@@ -30,7 +30,7 @@ export function Find({ onClose }: { onClose: () => void }) {
     const [state, setState] = useState<"idle" | "searching" | "done" | "failed">("idle");
     const [error, setError] = useState("");
     const [at, setAt] = useState(0);
-    const list = useRef<HTMLUListElement>(null);
+    const list = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const q = query.trim();
@@ -82,8 +82,15 @@ export function Find({ onClose }: { onClose: () => void }) {
         }
     };
 
+    // Grouped by kind, in the order the best hit of each kind ranked; the arrows move through all of them.
+    const groups: { kind: SearchHit["kind"]; hits: { hit: SearchHit; index: number }[] }[] = [];
+    hits.forEach((hit, index) => {
+        const group = groups.find((g) => g.kind === hit.kind) ?? groups[groups.push({ kind: hit.kind, hits: [] }) - 1];
+        group.hits.push({ hit, index });
+    });
+
     return (
-        <dialog {...props} className="dialog find" aria-label="Find">
+        <dialog {...props} className="find" aria-label="Find">
             <label className="find-input">
                 <Icon name="search" className="find-icon" />
                 <span className="sr-only">Find a node, application, service or partition id</span>
@@ -100,37 +107,58 @@ export function Find({ onClose }: { onClose: () => void }) {
                     aria-controls="find-results"
                     aria-activedescendant={hits.length ? `find-${at}` : undefined}
                 />
+                {state === "searching" && <span className="find-busy" aria-label="Searching" />}
+                <kbd>esc</kbd>
             </label>
             {state === "failed" && <p className="find-empty text-danger">{error}</p>}
-            {state === "done" && hits.length === 0 && <p className="find-empty">Nothing matches “{query.trim()}”.</p>}
-            {state === "idle" && <p className="find-empty">Names, types and addresses; paste a partition id to jump to it.</p>}
-            {hits.length > 0 && (
-                <ul id="find-results" className="find-results" role="listbox" ref={list}>
-                    {hits.map((hit, i) => (
-                        <li
-                            key={`${hit.kind}:${hit.title}:${hit.partitionId ?? ""}`}
-                            id={`find-${i}`}
-                            data-index={i}
-                            role="option"
-                            aria-selected={i === at}
-                            className="find-hit"
-                            onMouseMove={() => setAt(i)}
-                            onClick={() => open(hit)}
-                        >
-                            <Icon name={icons[hit.kind]} className="find-hit-icon" />
-                            <span className="find-hit-main">
-                                <span className="find-hit-title">{hit.title}</span>
-                                {hit.sub && <span className="find-hit-sub">{hit.sub}</span>}
-                            </span>
-                            <span className="find-hit-kind">{kinds[hit.kind]}</span>
-                        </li>
-                    ))}
-                </ul>
+            {state === "done" && hits.length === 0 && (
+                <p className="find-empty">
+                    Nothing matches <b>{query.trim()}</b>.
+                </p>
             )}
-            <p className="find-keys">
-                <kbd>↑</kbd>
-                <kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close
-            </p>
+            {state === "idle" && <p className="find-empty">Search by name, type or address, or paste a partition id to jump to it.</p>}
+            {hits.length > 0 && (
+                <div id="find-results" className="find-results" role="listbox" ref={list}>
+                    {groups.map((g) => (
+                        <div key={g.kind} role="group" aria-label={plurals[g.kind]}>
+                            <div className="find-group">{plurals[g.kind]}</div>
+                            {g.hits.map(({ hit, index }) => (
+                                <div
+                                    key={`${hit.kind}:${hit.title}:${hit.partitionId ?? ""}`}
+                                    id={`find-${index}`}
+                                    data-index={index}
+                                    role="option"
+                                    aria-selected={index === at}
+                                    className="find-hit"
+                                    onMouseMove={() => setAt(index)}
+                                    onClick={() => open(hit)}
+                                >
+                                    <span className="find-hit-icon">
+                                        <Icon name={icons[hit.kind]} />
+                                    </span>
+                                    <span className="find-hit-title">{hit.title}</span>
+                                    {hit.sub && <span className="find-hit-sub">{hit.sub}</span>}
+                                    <kbd className="find-hit-enter" aria-hidden="true">
+                                        ↵
+                                    </kbd>
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            )}
+            <div className="find-foot">
+                <span>
+                    <kbd>↑</kbd>
+                    <kbd>↓</kbd> to move
+                </span>
+                <span>
+                    <kbd>↵</kbd> to open
+                </span>
+                <span>
+                    <kbd>esc</kbd> to close
+                </span>
+            </div>
         </dialog>
     );
 }

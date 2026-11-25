@@ -109,19 +109,12 @@
     color: var(--text-muted);
 }
 
-/* Icons only: folded by choice, or on a narrower window. */
-.sidebar-collapsed .sidebar {
-    padding-inline: var(--space-2);
-}
-
+/*
+ * Icons only: folded by choice, or on a narrower window. Only the labels go; padding, row height and alignment stay
+ * the same, so the icons don't move when it folds.
+ */
 .sidebar-collapsed .sidebar-label {
     display: none;
-}
-
-.sidebar-collapsed .sidebar-link {
-    justify-content: center;
-    padding: 0;
-    min-height: 40px;
 }
 
 .sidebar-collapsed .sidebar-badge {
@@ -134,18 +127,8 @@
         --sidebar-width: 60px;
     }
 
-    .sidebar {
-        padding-inline: var(--space-2);
-    }
-
     .sidebar-label {
         display: none;
-    }
-
-    .sidebar-link {
-        justify-content: center;
-        padding: 0;
-        min-height: 40px;
     }
 
     .sidebar-badge {
