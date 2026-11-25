@@ -90,8 +90,16 @@ public sealed class TokenCommand(string fileName, IReadOnlyList<string> argument
 
         var stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var stderr = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.StandardInput.WriteAsync(JsonSerializer.Serialize(request, Json));
-        process.StandardInput.Close();
+        try
+        {
+            await process.StandardInput.WriteAsync(JsonSerializer.Serialize(request, Json));
+            process.StandardInput.Close();
+        }
+        catch (IOException)
+        {
+            // The command exited (or closed its input) before reading the request: what it said and its exit code
+            // explain that better than a broken pipe, so carry on and report those.
+        }
         await process.WaitForExitAsync(cancellationToken);
 
         var token = (await stdout).Trim();
