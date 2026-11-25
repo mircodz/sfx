@@ -58,6 +58,7 @@
     --space-6: 24px;
 
     --sidebar-width: 232px;
+    --topbar-height: 48px;
 }
 
 :root[data-theme="light"] {

@@ -1,12 +1,23 @@
-/* The shell: a sidebar and the page beside it. The page is fluid up to a width where lines stay readable. */
+/*
+ * The shell: the top bar across, then the sidebar and the page beside it. The page is fluid up to a width where
+ * lines stay readable.
+ */
 
 .app {
     display: grid;
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+    grid-template-areas: "top top" "side main";
     min-height: 100vh;
 }
 
+/* Folded by the button at the sidebar's bottom (remembered); narrower windows fold it on their own. */
+.app.sidebar-collapsed {
+    --sidebar-width: 60px;
+}
+
 .main {
+    grid-area: main;
     min-width: 0;
     padding: 0 32px;
 }
@@ -17,71 +28,17 @@
 }
 
 .sidebar {
+    grid-area: side;
     position: sticky;
-    top: 0;
+    top: var(--topbar-height);
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
-    height: 100vh;
+    height: calc(100vh - var(--topbar-height));
     padding: var(--space-4) var(--space-3);
     border-right: 0.5px solid var(--border);
     background: var(--surface-1);
     overflow-y: auto;
-}
-
-.sidebar-brand {
-    padding: var(--space-1) var(--space-3) var(--space-3);
-    font-family: var(--font-mono);
-    font-style: italic;
-    font-feature-settings: "ss01";
-    font-size: 19px;
-    text-decoration: none;
-}
-
-.sidebar-context {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-3);
-    padding: var(--space-2) var(--space-3);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface-2);
-    text-decoration: none;
-}
-
-.sidebar-context:hover,
-.sidebar-context[aria-current="page"] {
-    border-color: var(--border-strong);
-}
-
-.sidebar-context-text {
-    display: grid;
-    flex: 1;
-    min-width: 0;
-}
-
-.sidebar-context-folder {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 11px;
-    color: var(--text-secondary);
-}
-
-.sidebar-context-name {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-width: 0;
-    overflow: hidden;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-.sidebar-context-chevron {
-    font-size: 14px;
-    color: var(--text-muted);
 }
 
 .sidebar-nav {
@@ -117,15 +74,6 @@
     font-weight: 500;
 }
 
-.sidebar-static {
-    cursor: default;
-}
-
-.sidebar-static:hover {
-    background: transparent;
-    color: var(--text-secondary);
-}
-
 .sidebar-icon {
     flex: none;
     font-size: 18px;
@@ -149,11 +97,6 @@
     line-height: 18px;
 }
 
-.sidebar-power[aria-pressed="true"] {
-    background: var(--bg-warning);
-    color: var(--text-warning);
-}
-
 .sidebar-end {
     display: grid;
     gap: 2px;
@@ -162,13 +105,30 @@
     border-top: 0.5px solid var(--border);
 }
 
-.sidebar-version {
-    padding: var(--space-2) var(--space-3) 0;
-    font-size: 11px;
+.sidebar-collapse {
     color: var(--text-muted);
 }
 
-/* Narrower windows: icons only; the page keeps the width. */
+/* Icons only: folded by choice, or on a narrower window. */
+.sidebar-collapsed .sidebar {
+    padding-inline: var(--space-2);
+}
+
+.sidebar-collapsed .sidebar-label {
+    display: none;
+}
+
+.sidebar-collapsed .sidebar-link {
+    justify-content: center;
+    padding: 0;
+    min-height: 40px;
+}
+
+.sidebar-collapsed .sidebar-badge {
+    position: absolute;
+    margin: -18px 0 0 22px;
+}
+
 @media (max-width: 1100px) {
     .app {
         --sidebar-width: 60px;
@@ -178,26 +138,14 @@
         padding-inline: var(--space-2);
     }
 
-    .sidebar-label,
-    .sidebar-context-chevron {
+    .sidebar-label {
         display: none;
     }
 
-    .sidebar-brand {
-        padding-inline: 0;
-        text-align: center;
-    }
-
-    .sidebar-link,
-    .sidebar-context {
+    .sidebar-link {
         justify-content: center;
         padding: 0;
         min-height: 40px;
-    }
-
-    .sidebar-context {
-        border: 0;
-        background: transparent;
     }
 
     .sidebar-badge {
@@ -205,21 +153,27 @@
         margin: -18px 0 0 22px;
     }
 
+    /* It's already folded; there's nothing to unfold into. */
+    .sidebar-end {
+        display: none;
+    }
+
     .main {
         padding: 0 24px;
     }
 }
 
-/* A phone: the sidebar becomes a strip across the top. */
+/* A phone: the pages become a strip under the top bar. */
 @media (max-width: 640px) {
-    /* The strip keeps its height; the page takes the rest, not half of it. */
     .app {
         grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: auto 1fr;
+        grid-template-rows: var(--topbar-height) auto 1fr;
+        grid-template-areas: "top" "side" "main";
         align-content: start;
     }
 
     .sidebar {
+        top: var(--topbar-height);
         z-index: 10;
         flex-direction: row;
         align-items: center;
@@ -232,43 +186,15 @@
         mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
     }
 
-    .sidebar-nav,
-    .sidebar-end {
+    .sidebar-nav {
         display: flex;
-        margin: 0;
-        padding: 0;
-        border: 0;
     }
 
-    .sidebar-brand {
-        padding: 0 var(--space-2);
-    }
-
-    .sidebar-context {
-        margin: 0;
-    }
-
-    .sidebar-link,
-    .sidebar-context {
+    .sidebar-link {
         min-width: 40px;
     }
 
     .main {
         padding: 0 var(--space-4);
     }
-}
-
-/* Find sits between the context and the pages, with its shortcut on the right. */
-.sidebar-find {
-    margin-top: var(--space-1);
-}
-
-.sidebar-kbd {
-    margin-left: auto;
-    padding: 0 4px;
-    border: 0.5px solid var(--border);
-    border-radius: 3px;
-    font-family: inherit;
-    font-size: 11px;
-    color: var(--text-muted);
 }

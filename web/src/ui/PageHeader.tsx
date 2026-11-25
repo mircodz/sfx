@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
-import { clock } from "../lib/format";
+import { useOfferRefresh } from "../lib/pageRefresh";
 import type { Status } from "../lib/types";
-import { IconButton } from "./Button";
 import { Icon } from "./Icon";
 import { Pill } from "./Pill";
 import "./PageHeader.css";
@@ -10,7 +9,7 @@ export type Crumb = { label: string; href: string };
 
 /**
  * The top of every page: where it is (breadcrumb, detail pages only), what it is (title and status), a one-line
- * summary, and on the right the page's actions and a refresh button.
+ * summary, and on the right the page's actions. Its refresh goes to the top bar, with when it was last loaded.
  */
 export function PageHeader({
     title,
@@ -26,10 +25,11 @@ export function PageHeader({
     crumbs?: Crumb[];
     status?: Status;
     onRefresh?: () => void;
-    /** When the data was loaded; shown on the refresh button rather than in the summary. */
+    /** When the data was loaded; shown next to the refresh button in the top bar. */
     updated?: Date;
     actions?: ReactNode;
 }) {
+    useOfferRefresh(onRefresh, updated);
     return (
         <header className="page-header">
             <div className="page-header-main">
@@ -53,12 +53,7 @@ export function PageHeader({
                 </div>
                 <div className="page-summary">{summary}</div>
             </div>
-            {(actions || onRefresh) && (
-                <div className="page-header-end">
-                    {actions}
-                    {onRefresh && <IconButton icon="refresh" label={updated ? `Refresh (updated ${clock(updated)})` : "Refresh"} onClick={onRefresh} />}
-                </div>
-            )}
+            {actions && <div className="page-header-end">{actions}</div>}
         </header>
     );
 }
