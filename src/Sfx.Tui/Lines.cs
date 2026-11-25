@@ -77,10 +77,7 @@ public static class Lines
             .ToList();
     }
 
-    /// <summary>
-    /// A name and its value on one line; a value that's JSON or XML with more than one member goes on the lines
-    /// below instead, indented and colored, so nested objects and parameter documents can be read.
-    /// </summary>
+    /// <summary>A name and its value on one line; JSON or XML with several members goes below, indented and colored.</summary>
     private static IEnumerable<StyledText> Value(StyledText name, string value, Color color, string indent = Indent)
     {
         var (pretty, format) = Inspect.TryPretty(value);
@@ -156,7 +153,6 @@ public static class Lines
 
     private static StyledText Heading(string text) => StyledText.Of(text).Bold().Fg(Theme.Current.Accent);
 
-    /// <summary>A labelled value, aligned with the others of its block.</summary>
     private static StyledText Labelled(string label, StyledText value, int width = 12) =>
         StyledText.Of(label.PadRight(width)).Fg(Theme.Current.Muted).Append(value);
 

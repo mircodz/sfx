@@ -73,7 +73,6 @@ public sealed class OperationProgress : IProgress<OperationState>
 {
     private Action<OperationState>? _listener;
 
-    /// <summary>The last report, if any.</summary>
     public OperationState? Last { get; private set; }
 
     public void Report(OperationState value)
@@ -84,7 +83,6 @@ public sealed class OperationProgress : IProgress<OperationState>
 
     public void Report(double? fraction, string detail) => Report(OperationState.Running(detail, fraction));
 
-    /// <summary>Sends every report to <paramref name="listener"/> from now on.</summary>
     public void Attach(Action<OperationState> listener) => _listener = listener;
 }
 

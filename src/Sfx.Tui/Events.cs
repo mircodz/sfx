@@ -7,7 +7,6 @@ using static Sfx.Tui.Styles;
 
 namespace Sfx.Tui;
 
-/// <summary>The cluster's event store: what happened to nodes, applications, services and partitions.</summary>
 public sealed partial class Views
 {
     public static readonly TimeSpan DefaultEventWindow = TimeSpan.FromHours(1);
