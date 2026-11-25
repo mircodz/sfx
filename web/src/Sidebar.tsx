@@ -16,8 +16,8 @@ const pages = [
 ];
 
 /**
- * The pages, and what's running. Folds to icons with the button at its bottom (remembered), and on its own on
- * narrower windows; a strip across the top on a phone. The cluster, find and settings are in the top bar.
+ * Folds to icons with the button at its bottom (remembered), and on its own on narrower windows; a strip across the
+ * top on a phone.
  */
 export function Sidebar({ session, current, collapsed, onCollapse }: { session?: Session; current: string; collapsed: boolean; onCollapse: (collapsed: boolean) => void }) {
     const running = useOperations().filter((o) => o.state === "running");

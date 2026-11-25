@@ -1,4 +1,4 @@
-/* A row that opens a folder, with its actions beside the link rather than inside it. */
+/* Actions beside the link rather than inside it. */
 .row.store-row {
     display: flex;
     align-items: center;

@@ -3,7 +3,7 @@ import type { Action } from "../../lib/types";
 import { ChangePanel } from "../ChangePanel";
 import { ActionInputField, defaultInputs } from "../inputs";
 
-/** Any other action with a form: its inputs as the server described them. */
+/** Any other action with a form: its inputs as the server describes them. */
 export function GenericEditor({ action, onClose }: { action: Action; onClose: () => void }) {
     const initial = defaultInputs(action.inputs);
     const [inputs, setInputs] = useState(initial);

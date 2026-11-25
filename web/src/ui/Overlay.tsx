@@ -3,10 +3,7 @@ import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 import { IconButton } from "./Button";
 import "./Overlay.css";
 
-/**
- * A modal <dialog>: focus stays inside, Esc and the backdrop close it. `onCancel` lets the owner veto closing
- * (e.g. to ask about unsaved edits); without it, closing just closes.
- */
+/** Focus stays inside; Esc and the backdrop close it. `onCancel` lets the owner veto closing (e.g. unsaved edits). */
 export function useModal(onClose: () => void, onCancel?: () => boolean) {
     const ref = useRef<HTMLDialogElement>(null);
     useEffect(() => {
@@ -24,8 +21,8 @@ export function useModal(onClose: () => void, onCancel?: () => boolean) {
     const props = {
         ref,
         onClose,
-        // Escape is handled here rather than by the dialog's cancel event, which browsers stop letting us veto after
-        // the first time: a second Escape would otherwise close it with the edits.
+        // Not via the dialog's cancel event: browsers stop letting us veto it after the first time, so a second Escape
+        // would close it with the edits.
         onKeyDown: (e: React.KeyboardEvent) => {
             if (e.key === "Escape" && !e.defaultPrevented) {
                 e.preventDefault();
@@ -33,7 +30,7 @@ export function useModal(onClose: () => void, onCancel?: () => boolean) {
             }
         },
         onCancel: (e: React.SyntheticEvent) => e.preventDefault(),
-        // Only a click on the backdrop closes it: outside the dialog's box, not on its own padding.
+        // Only a click outside the dialog's box closes it, not one on its own padding.
         onMouseDown: (e: React.MouseEvent) => {
             const box = ref.current?.getBoundingClientRect();
             if (e.target === ref.current && box && (e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom)) tryClose();
@@ -42,7 +39,6 @@ export function useModal(onClose: () => void, onCancel?: () => boolean) {
     return { props, close: tryClose };
 }
 
-/** A small centered dialog for a confirmation. */
 export function Dialog({
     title,
     onClose,
@@ -69,7 +65,7 @@ export function Dialog({
     );
 }
 
-/** A panel that slides in from the right, for changes with a form. Its body is the one place that scrolls on its own. */
+/** For changes with a form. Its body is the one place that scrolls on its own. */
 export function SidePanel({
     title,
     subtitle,
@@ -83,7 +79,7 @@ export function SidePanel({
     onClose: () => void;
     onCancel?: () => boolean;
     children: ReactNode;
-    /** Gets the close that asks first (the same as Escape and the close button), for a Cancel button. */
+    /** Gets the close that asks first (like Escape and the close button), for a Cancel button. */
     footer: ReactNode | ((close: () => void) => ReactNode);
 }) {
     const { props, close } = useModal(onClose, onCancel);
@@ -113,7 +109,7 @@ const minWidth = 380;
 const maxWidth = () => Math.max(minWidth, Math.round(window.innerWidth * 0.9));
 const clamp = (w: number) => Math.min(maxWidth(), Math.max(minWidth, Math.round(w)));
 
-/** The side panel's width, remembered across panels and reloads. */
+/** Remembered across panels and reloads. */
 function usePanelWidth(): [number, (width: number) => void] {
     const [width, setWidth] = useState(() => clamp(Number(localStorage.getItem(widthKey)) || defaultWidth));
     const resize = (next: number) => {
@@ -125,10 +121,7 @@ function usePanelWidth(): [number, (width: number) => void] {
     return [width, resize];
 }
 
-/**
- * The panel's left edge: drag it, or focus it and use the arrow keys (Shift for bigger steps); Home or a
- * double-click goes back to the default width.
- */
+/** Drag, or focus and use the arrow keys (Shift for bigger steps); Home or a double-click restores the default. */
 function ResizeHandle({ width, onResize }: { width: number; onResize: (width: number) => void }) {
     const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
         e.preventDefault();

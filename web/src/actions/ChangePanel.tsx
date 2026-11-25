@@ -22,8 +22,8 @@ export type Draft = {
 };
 
 /**
- * The side panel every change with a form goes through: edit (the editor's fields), then review (the diff, the
- * effect, how to roll it out), then run. Editors supply the fields and the draft; this owns the flow.
+ * Edit, then review (the diff, the effect, how to roll it out), then run. Editors supply the fields and the draft;
+ * this owns the flow.
  */
 export function ChangePanel({
     action,

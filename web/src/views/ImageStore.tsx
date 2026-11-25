@@ -19,10 +19,7 @@ import "./ImageStore.css";
 
 const at = (path: string) => (path ? `#/store?path=${encodeURIComponent(path)}` : "#/store");
 
-/**
- * The image store, folder by folder: application packages waiting to be provisioned (or left behind after it),
- * the copies Service Fabric keeps under Store, and how much room is left. Upload, provision and clean up from here.
- */
+/** Packages waiting to be provisioned (or left behind after it), and the copies Service Fabric keeps under Store. */
 export function ImageStore() {
     const [path] = useQueryParam("path", "");
     const listing = useResource(`store:${path}`, () => api.store(path));
@@ -84,7 +81,7 @@ export function ImageStore() {
     );
 }
 
-/** How full the store's disk is, where the cluster says (native image store, 7.1 and later). */
+/** Only where the cluster reports it (native image store, 7.1 and later). */
 function Usage({ usage }: { usage: StoreListing["usage"] }) {
     if (!usage?.diskCapacity) return null;
     const used = usage.diskCapacity - (usage.diskAvailable ?? 0);
@@ -106,7 +103,7 @@ function Usage({ usage }: { usage: StoreListing["usage"] }) {
     );
 }
 
-/** A folder: opens on click; its size loads on its own, as the store only reports it per folder. */
+/** Its size loads on its own, as the store only reports it per folder. */
 function FolderRow({ folder: f }: { folder: StoreFolder }) {
     const size = useResource(`store-size:${f.path}`, () => (f.size != null ? Promise.resolve({ size: f.size }) : api.storeSize(f.path)), false);
     const pkg = f.package;

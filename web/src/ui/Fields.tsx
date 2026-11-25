@@ -1,10 +1,10 @@
 import { Link } from "./Button";
 import "./Fields.css";
 
-/** A fact. Without a value it reads "None"; with an href, the value opens that page (a node, a service). */
+/** Without a value it reads "None"; with an href, the value opens that page. */
 export type FieldItem = { name: string; value?: string | null; note?: string; href?: string };
 
-/** Lets long code-like names (Counter_TargetReplicaSetSize) wrap after "_" or "." instead of mid-word. */
+/** Code-like names (Counter_TargetReplicaSetSize) wrap after "_" or "." rather than mid-word. */
 function breakable(name: string) {
     return name.split(/(?<=[_.])/).map((part, i) => (
         <span key={i}>
@@ -14,7 +14,7 @@ function breakable(name: string) {
     ));
 }
 
-/** Key-value facts, two columns of pairs on wide screens. With `mono`, names are code-like (parameters). */
+/** Two columns of pairs on wide screens; `mono` for code-like names (parameters). */
 export function Fields({ fields, mono }: { fields: FieldItem[]; mono?: boolean }) {
     return (
         <dl className="fields">

@@ -6,7 +6,6 @@
     --radius: 8px;
     --radius-lg: 12px;
 
-    /* Surfaces and text */
     --surface-1: light-dark(#faf9f5, #1f1e1d);
     --surface-2: light-dark(#ffffff, #2c2c2a);
     --bg-neutral: light-dark(#f1efe8, #3a3a37);
@@ -19,7 +18,6 @@
     --fill-ghost-selected: light-dark(rgba(0, 0, 0, 0.06), rgba(255, 255, 255, 0.08));
     --backdrop: light-dark(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.55));
 
-    /* Status roles: background and text pairs */
     --bg-success: light-dark(#c0dd97, #27500a);
     --text-success: light-dark(#27500a, #c0dd97);
     --bg-warning: light-dark(#fac775, #633806);
@@ -28,20 +26,18 @@
     --text-danger: light-dark(#791f1f, #f7c1c1);
     --bg-accent: light-dark(#b5d4f4, #0c447c);
     --text-accent: light-dark(#0c447c, #b5d4f4);
-    /* Status as a filled bar: the dark theme's pill backgrounds are too close to each other and the card for that. */
+    /* Bars: the dark theme's pill backgrounds are too close to each other and to the card. */
     --bar-success: light-dark(#c0dd97, #639922);
     --bar-warning: light-dark(#fac775, #ba7517);
     --bar-danger: light-dark(#f7c1c1, #e24b4a);
 
-    /* Progress and meters */
     --fill-accent: light-dark(#185fa5, #378add);
-    /* Behind white text: the dark theme's brighter accent is too light for it (3.6:1), this one is 6.5:1. */
+    /* Behind white text: the dark accent is too light (3.6:1); this is 6.5:1. */
     --fill-button: #185fa5;
     --text-on-fill: #ffffff;
     --fill-warning: light-dark(#ba7517, #ef9f27);
 
     --focus-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--border-accent);
-    /* Something floating over the page, like the find palette. */
     --shadow-overlay: light-dark(0 16px 48px rgba(0, 0, 0, 0.16), 0 16px 48px rgba(0, 0, 0, 0.5)), 0 0 0 0.5px var(--border-strong);
     --backdrop-light: light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.45));
 
@@ -52,7 +48,6 @@
     --code-number: light-dark(#a2387a, #e99bc8);
     --code-muted: #8a8880;
 
-    /* Spacing rhythm */
     --space-1: 4px;
     --space-2: 6px;
     --space-3: 8px;
@@ -62,7 +57,7 @@
 
     --sidebar-width: 232px;
     --topbar-height: 48px;
-    /* The sidebar folded to icons; icons sit centred in it whether it's folded or not, so they never move. */
+    /* Icons sit centred in the folded width whether folded or not, so they never move. */
     --rail-width: 60px;
     --rail-icon: 18px;
 }

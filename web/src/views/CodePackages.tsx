@@ -8,7 +8,7 @@ import { Load } from "../ui/Load";
 import { DisclosureRow, RowActions } from "../ui/Row";
 import { Empty, GroupHeading, Section } from "../ui/Section";
 
-/** What runs on a node: each application's service packages and their code packages (processes), with restarts. */
+/** Each application's service packages on a node and their code packages (processes). */
 export function CodePackages({ node }: { node: string }) {
     const packages = useResource(`packages:${node}`, () => api.packages(node));
     const [open, setOpen] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export function CodePackages({ node }: { node: string }) {
                                     .flatMap((p) =>
                                         p.codePackages.map((c) => {
                                             const id = `${p.application}:${p.servicePackage}:${p.activationId}:${c.name}`;
-                                            // Past failures stay in the counters forever; only one that isn't running now is a problem now.
+                                            // Past failures stay in the counters forever; only one that isn't running is a problem now.
                                             const failing = !["Active", "Upgrading", "Activating"].includes(c.status) || (c.status === "Activating" && c.activationFailures > 0);
                                             return (
                                                 <DisclosureRow

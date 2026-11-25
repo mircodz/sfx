@@ -7,11 +7,7 @@ const minWidth = 280;
 /** The main column keeps at least this share of the page, whatever the aside is dragged to. */
 const mainShare = 0.35;
 
-/**
- * A detail page's Overview on a wide screen: what it contains (children) on the left, what it is (errors and
- * warnings, facts, load) in a column on the right, about 40% wide until you drag its edge (remembered across pages
- * and reloads). Narrower, the aside comes first, as one column.
- */
+/** The aside is about 40% wide until dragged (remembered across pages and reloads); narrow screens put it first. */
 export function Split({ aside, children }: { aside: ReactNode; children: ReactNode }) {
     const split = useRef<HTMLDivElement>(null);
     const asideRef = useRef<HTMLElement>(null);
@@ -45,7 +41,7 @@ export function Split({ aside, children }: { aside: ReactNode; children: ReactNo
     );
 }
 
-/** The aside's left edge: drag it, or focus it and use the arrow keys (Shift for bigger steps); Home or a double-click goes back to the default. */
+/** Drag, or focus and use the arrow keys (Shift for bigger steps); Home or a double-click restores the default. */
 function Handle({ current, edge, onResize }: { current: () => number; edge: () => number; onResize: (width: number | null) => void }) {
     const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
         e.preventDefault();

@@ -50,8 +50,6 @@ p {
     border: 0;
 }
 
-/* Text */
-
 .mono {
     font-family: var(--font-mono);
     font-size: 0.93em;
@@ -77,8 +75,6 @@ p {
     overflow-wrap: anywhere;
 }
 
-/* Status roles, as text or as a background-and-text pair */
-
 .text-success { color: var(--text-success); }
 .text-warning { color: var(--text-warning); }
 .text-danger { color: var(--text-danger); }
@@ -90,8 +86,6 @@ p {
 .tone-danger { background: var(--bg-danger); color: var(--text-danger); }
 .tone-accent { background: var(--bg-accent); color: var(--text-accent); }
 .tone-neutral { background: var(--bg-neutral); color: var(--text-secondary); }
-
-/* Layout helpers used across views */
 
 .stack {
     display: grid;

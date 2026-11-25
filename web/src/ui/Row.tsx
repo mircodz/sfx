@@ -30,7 +30,6 @@ function Summary({ icon, name, sub, reason, status, value, chevron }: RowContent
     );
 }
 
-/** A row that opens another page. */
 export function LinkRow({ href, ...content }: RowContent & { href: string }) {
     return (
         <a className="row row-summary" href={href}>
@@ -39,7 +38,6 @@ export function LinkRow({ href, ...content }: RowContent & { href: string }) {
     );
 }
 
-/** A row that reveals its details in place. */
 export function DisclosureRow({
     id,
     open,
@@ -62,7 +60,6 @@ export function DisclosureRow({
     );
 }
 
-/** Actions at the bottom right of an expanded row. */
 export function RowActions({ children }: { children: ReactNode }) {
     return <div className="row-actions">{children}</div>;
 }

@@ -109,7 +109,6 @@
     color: var(--text-secondary);
 }
 
-/* Links in a line, wrapping, after a short label. */
 .link-list {
     display: flex;
     flex-wrap: wrap;

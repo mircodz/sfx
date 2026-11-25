@@ -11,10 +11,6 @@ import { ContextLabel } from "./ui/ContextLabel";
 import { Icon } from "./ui/Icon";
 import "./TopBar.css";
 
-/**
- * Across the top of every page: which cluster you're on (and switching it), whether power actions are unlocked for
- * it, finding anything on it, refreshing the page, and the settings that aren't about the cluster.
- */
 export function TopBar({ session, onSessionChange, onFind, contextsOpen }: { session?: Session; onSessionChange: () => void; onFind: () => void; contextsOpen: boolean }) {
     const mac = /Mac|iPhone|iPad/.test(navigator.platform);
     return (
@@ -55,7 +51,7 @@ function ReadOnly() {
     );
 }
 
-/** Unlocks the riskiest actions on this cluster; amber while on, so a risky mode is never subtle. */
+/** Unlocks the riskiest actions; amber while on, so a risky mode is never subtle. */
 function PowerSwitch({ on, onChange }: { on: boolean; onChange: () => void }) {
     const { bump } = useContext(RefreshContext);
     const notify = useNotice();
@@ -84,7 +80,7 @@ function PowerSwitch({ on, onChange }: { on: boolean; onChange: () => void }) {
     );
 }
 
-/** The page's refresh: when it was last loaded, and a button to load it now. Pages that don't refresh hide it. */
+/** Hidden on pages that don't refresh. */
 function Refresh() {
     const page = usePageRefresh();
     if (!page) return null;
@@ -100,7 +96,6 @@ function Refresh() {
 
 const themeLabels: Record<Theme, string> = { system: "System", light: "Light", dark: "Dark" };
 
-/** What isn't about the cluster: the theme, and which sfx this is. */
 function Settings({ version }: { version?: string }) {
     const [open, setOpen] = useState(false);
     const [theme, setTheme] = useState<Theme>(storedTheme);

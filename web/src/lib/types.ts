@@ -11,13 +11,13 @@ export interface Session {
     readOnly: boolean;
     power: boolean;
     version: string;
-    /** Whether the cluster runs the event store; without it, events aren't offered anywhere. */
+    /** The cluster runs the event store; without it, events aren't offered anywhere. */
     eventStore: boolean;
-    /** Whether it runs the repair manager; without it, there are no repair tasks to show. */
+    /** It runs the repair manager; without it, there are no repair tasks. */
     repairManager: boolean;
-    /** Whether it runs the Fault Analysis Service; the server only offers the actions that need it when it does. */
+    /** It runs the Fault Analysis Service; the server offers the actions that need it only then. */
     faultAnalysis: boolean;
-    /** Whether the image store can be browsed. */
+    /** The image store can be browsed. */
     imageStore?: boolean;
     folder?: string;
     label?: string;
@@ -323,7 +323,7 @@ export interface Text {
     format: "xml" | "json" | "none";
 }
 
-/** One replica (or instance) anywhere in the cluster, with its owners, for cross-cutting views. */
+/** A replica or instance anywhere in the cluster, with its owners. */
 export interface ClusterReplica {
     applicationId: string;
     application: string;
@@ -414,7 +414,7 @@ export interface LoadMetric {
     maxLoad?: number;
 }
 
-/** How many entities of a kind are in each health state, from the cluster's health statistics. */
+/** Entities of a kind per health state, from the cluster's health statistics. */
 export interface HealthCount {
     kind: "Node" | "Application" | "Service" | "Partition" | "Replica";
     healthy: number;
@@ -433,7 +433,7 @@ export interface Overview {
     runningUpgrades: Upgrade[];
 }
 
-/** A search result, with the ids to open it at its place: node, application, service, partition. */
+/** With the ids to open it at its place: node, application, service, partition. */
 export interface SearchHit {
     kind: "node" | "application" | "service" | "partition";
     title: string;
@@ -445,7 +445,7 @@ export interface SearchHit {
     partitionId?: string;
 }
 
-/** A provisioned application type version, with what uses it and what can be done with it. */
+/** One provisioned version of an application type. */
 export interface ApplicationType {
     name: string;
     version: string;

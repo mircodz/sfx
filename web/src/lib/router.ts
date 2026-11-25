@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-// Hash routing: #/apps/orders/services/orders~Counter?tab=health. The path picks the page; the query holds the page's
-// own state (tab, filters) so links and reloads keep it.
+// Hash routing: #/apps/orders/services/orders~Counter?tab=health. The path picks the page; the query holds page state
+// (tab, filters) so links and reloads keep it.
 
 const changed = "sfx:query";
 
@@ -18,7 +18,7 @@ function readQuery() {
     return new URLSearchParams(location.hash.split("?")[1] ?? "");
 }
 
-/** The path's segments, e.g. ["apps", "orders"]; scrolls to the top when it changes. */
+/** e.g. ["apps", "orders"]; scrolls to the top on change. */
 export function usePath() {
     const [path, setPath] = useState(readPath);
     useEffect(() => {
@@ -46,10 +46,7 @@ function subscribe(onChange: () => void) {
     };
 }
 
-/**
- * One query parameter as state, read straight from the URL (so back, forward, links and edits to the address all
- * show). Setting it to the default removes it from the URL.
- */
+/** Read straight from the URL so back, forward and address edits show; setting the default removes it. */
 export function useQueryParam<T extends string = string>(name: string, fallback: NoInfer<T>): [T, (value: T) => void] {
     const value = (useSyncExternalStore(subscribe, () => readQuery().get(name)) as T | null) ?? fallback;
     const set = (next: T) => {

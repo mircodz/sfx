@@ -27,7 +27,7 @@ const kindLabels: Record<Kind, string> = {
     replica: "Replicas",
 };
 
-/** Where an event's entity lives, when it has a page. */
+/** Undefined when the entity has no page. */
 function entityHref(kind: EntityKind, entity: string): string | undefined {
     switch (kind) {
         case "node":
@@ -43,7 +43,6 @@ function entityHref(kind: EntityKind, entity: string): string | undefined {
     }
 }
 
-/** Events as a timeline with day headings. */
 function Timeline({ events }: { events: ClusterEvent[] }) {
     let lastDay = "";
     return (
@@ -108,7 +107,7 @@ export function Events() {
     );
 }
 
-/** An entity's own events (and those of what's under it) over the last day, for its Events tab. */
+/** Includes what's under the entity, over the last day. */
 export function EntityEvents({ entity }: { entity: string }) {
     const events = useResource(`events:${entity}`, () => api.events(24, entity));
     return (

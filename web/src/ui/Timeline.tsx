@@ -3,7 +3,7 @@ import type { Status } from "../lib/types";
 import { Pill } from "./Pill";
 import "./Timeline.css";
 
-/** One line of a timeline: when, what (and about what), and how it ended or how healthy it is. */
+/** `sub` is what it's about; `status` is how it ended or how healthy it is. */
 export function TimelineRow({
     time,
     title,
@@ -32,7 +32,6 @@ export function TimelineRow({
     );
 }
 
-/** "Today", "Yesterday", "18 Nov" above a day's rows. */
 export function DayHeading({ children }: { children: ReactNode }) {
     return <h3 className="timeline-day">{children}</h3>;
 }

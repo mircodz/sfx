@@ -19,7 +19,7 @@ type Picked = {
     problem?: string;
 };
 
-/** The manifest at the package's root: the shallowest ApplicationManifest.xml in the chosen folder. */
+/** The package root is the shallowest ApplicationManifest.xml in the chosen folder. */
 async function readFolder(files: File[]): Promise<Picked> {
     const size = files.reduce((n, f) => n + f.size, 0);
     const label = files[0]?.webkitRelativePath.split("/")[0] ?? "Folder";
@@ -35,10 +35,7 @@ async function readFolder(files: File[]): Promise<Picked> {
     return { files, label, size, typeName, typeVersion };
 }
 
-/**
- * Uploads an application package (a folder, or an .sfpkg or .zip file) to the image store and provisions it.
- * The upload runs on the server and shows its progress in Activity; this panel only picks and reviews.
- */
+/** The upload runs on the server and shows its progress in Activity; this panel only picks and reviews. */
 export function ProvisionPanel({ onClose }: { onClose: () => void }) {
     const notify = useNotice();
     const folder = useRef<HTMLInputElement>(null);

@@ -6,8 +6,7 @@ export const SessionContext = createContext<Session | undefined>(undefined);
 
 export const useSession = () => useContext(SessionContext);
 
-/** Whether to offer events; true until the session says otherwise, so nothing flickers away on load. */
+/** True until the session says otherwise, so nothing flickers away on load. */
 export const useEventsAvailable = () => useSession()?.eventStore ?? true;
 
-/** Whether to offer repair tasks; true until the session says otherwise. */
 export const useRepairsAvailable = () => useSession()?.repairManager ?? true;

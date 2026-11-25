@@ -32,7 +32,7 @@ import "./Gallery.css";
 
 const statuses: Status[] = ["Healthy", "Warning", "Error", "Unknown", "Done", "Upgrading", "Verifying", "Pending", "Failed"];
 
-/** One component's states, labelled, so a change to it is seen everywhere it's used. */
+/** Labelled, so a change to a component is seen everywhere it's used. */
 function Specimen({ name, children }: { name: string; children: ReactNode }) {
     return (
         <section className="specimen" id={name.toLowerCase().replace(/\W+/g, "-")}>
@@ -42,10 +42,7 @@ function Specimen({ name, children }: { name: string; children: ReactNode }) {
     );
 }
 
-/**
- * Every component in every state it can be in, from fixtures: no cluster needed. It's what the
- * screenshot check (web/scripts/check-gallery.ts) renders; open it at #/gallery.
- */
+/** Every component in every state, from fixtures, so no cluster is needed; scripts/check-gallery.ts screenshots it. */
 export function Gallery() {
     const [chip, setChip] = useState<"All" | "Healthy" | "Warning" | "Error">("All");
     const [tab, setTab] = useState<"overview" | "health" | "events">("overview");

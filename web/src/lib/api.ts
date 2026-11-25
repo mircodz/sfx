@@ -27,7 +27,7 @@ import type {
     StoreListing,
 } from "./types";
 
-// sfx ui opens the page as /?token=…; keep the token for this tab and take it out of the address bar (only it).
+// sfx ui opens /?token=…; keep the token for this tab and strip only it from the address bar.
 const tokenKey = "sfx-token";
 const params = new URLSearchParams(location.search);
 const fromUrl = params.get("token");
@@ -47,7 +47,7 @@ export class ApiError extends Error {
     }
 }
 
-/** A multipart upload (a package folder or file); the browser sets the boundary itself. */
+/** No Content-Type: the browser sets the multipart boundary itself. */
 async function upload<T>(path: string, form: FormData): Promise<T> {
     let response: Response;
     try {

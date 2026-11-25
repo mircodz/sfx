@@ -52,7 +52,7 @@ function seconds(n: number) {
     return [h && `${h}h`, m && `${m}m`, s && `${s}s`].filter(Boolean).join(" ");
 }
 
-/** What the cluster uses when a field is left empty, as shown in its placeholder. */
+/** What the cluster uses for an empty field, shown as its placeholder. */
 function defaultOf(key: PolicyKey, d: UpgradeDefaults): string {
     const hp = d.healthPolicy;
     switch (key) {
@@ -88,9 +88,9 @@ function defaultOf(key: PolicyKey, d: UpgradeDefaults): string {
 
 export const emptyPolicy = Object.fromEntries(specs.map((s) => [s.key, ""])) as Policy;
 
-/** Field problems, by key; only fields that apply to the mode are checked, since the others aren't sent. */
 const inScope = (s: Spec, scope: PolicyScope) => !s.scope || s.scope === scope;
 
+/** Only fields that apply to the mode are checked, since the others aren't sent. */
 export function policyErrors(policy: Policy, monitored: boolean, scope: PolicyScope = "application"): Partial<Record<PolicyKey, string>> {
     const errors: Partial<Record<PolicyKey, string>> = {};
     for (const s of specs.filter((x) => inScope(x, scope))) {
@@ -118,7 +118,7 @@ export function policyInputs(policy: Policy, monitored: boolean, scope: PolicySc
     return { inputs, changes };
 }
 
-/** Timeouts and the health policy, collapsed: most upgrades are fine with the cluster's defaults. */
+/** Collapsed: most upgrades are fine with the cluster's defaults. */
 export function PolicyFields({
     policy,
     onChange,

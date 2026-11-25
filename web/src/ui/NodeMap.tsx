@@ -3,7 +3,6 @@ import { toneOf } from "../lib/health";
 import type { Node } from "../lib/types";
 import "./NodeMap.css";
 
-/** Nodes as cells colored by health, grouped by node type; one can be selected. */
 export function NodeMap({
     nodes,
     selected,
@@ -19,7 +18,7 @@ export function NodeMap({
     // Beyond this many, named cells don't fit at a glance: small squares, still links, with the details in a tooltip.
     if (nodes.length > denseAbove) return <DenseMap nodes={nodes} onSelect={onSelect} />;
     const types = [...new Set(nodes.map((n) => n.nodeType))].sort();
-    // Mostly one node per type: headings would stack single cells down the page; one grid with the type on each says the same.
+    // Mostly one node per type: headings would stack single cells; one grid with the type on each cell says the same.
     if (!grouped || types.length * 2 > nodes.length) {
         const sorted = [...nodes].sort((a, b) => a.upgradeDomain.localeCompare(b.upgradeDomain, undefined, { numeric: true }) || a.name.localeCompare(b.name));
         return <div className="node-map">{sorted.map((n) => cell(n, selected, onSelect, n.nodeType))}</div>;
@@ -67,7 +66,7 @@ const denseAbove = 60;
 
 const byDomain = (a: Node, b: Node) => natural(a.upgradeDomain, b.upgradeDomain) || natural(a.name, b.name);
 
-/** Hundreds of nodes: one square each, by node type, in upgrade domain order; unhealthy ones stand out by color. */
+/** For hundreds of nodes: one square each, by node type, in upgrade domain order. */
 function DenseMap({ nodes, onSelect }: { nodes: Node[]; onSelect: (name: string | null) => void }) {
     const types = [...new Set(nodes.map((n) => n.nodeType))].sort();
     return (

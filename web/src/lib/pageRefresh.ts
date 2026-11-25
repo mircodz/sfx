@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 
-/** The current page's refresh, shown in the top bar: how to reload it, and when it was last loaded. */
+/** The current page's refresh, shown in the top bar. */
 export type PageRefresh = { reload: () => void; at?: Date };
 
 let current: PageRefresh | null = null;

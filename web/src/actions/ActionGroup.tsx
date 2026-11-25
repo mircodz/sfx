@@ -9,7 +9,7 @@ import { ScaleEditor } from "./editors/ScaleEditor";
 import { ClusterUpgradeEditor } from "./editors/ClusterUpgradeEditor";
 import { ServiceSettingsEditor } from "./editors/ServiceSettingsEditor";
 
-// The id the server gives the "edit settings" action (dotted like the others, or as first agreed).
+// The server's ids for "edit settings": dotted like the others, or as first agreed.
 const settingsActions = new Set(["service.settings", "service.edit-settings", "edit-service-settings"]);
 import "./actions.css";
 
@@ -17,8 +17,8 @@ import "./actions.css";
 export type ActionContext = { application?: ApplicationDetail; service?: { appId: string; serviceId: string } };
 
 /**
- * An entity's actions: the two most common as buttons, the rest (and everything destructive) in a "More actions"
- * menu. Actions with a form open the side panel; the others confirm in a dialog.
+ * The two most common as buttons, the rest (and everything destructive) under "More actions". Actions with a form
+ * open the side panel; the others confirm in a dialog.
  */
 export function ActionGroup({ actions, context, label = "Actions" }: { actions: Action[]; context?: ActionContext; label?: string }) {
     const [open, setOpen] = useState<Action | null>(null);

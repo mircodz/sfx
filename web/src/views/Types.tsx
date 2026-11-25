@@ -15,10 +15,6 @@ import { DisclosureRow, RowActions } from "../ui/Row";
 import { Empty, GroupHeading, Section } from "../ui/Section";
 import { SearchBox, Toolbar } from "../ui/Toolbar";
 
-/**
- * Application types and their versions: what's provisioned, which applications run each version, its default
- * parameters and service types. Provision a package from here; create applications and unprovision per version.
- */
 export function Types() {
     const types = useResource("types", api.types);
     const session = useSession();
@@ -92,7 +88,7 @@ export function Types() {
     );
 }
 
-/** One version, opened: its applications, its service types (loaded on open) and its default parameters. */
+/** Service types load on open. */
 function TypeDetails({ type: t }: { type: ApplicationType }) {
     const services = useResource(`service-types:${t.name}:${t.version}`, () => api.serviceTypes(t.name, t.version), false);
     const parameters = Object.entries(t.defaultParameters).sort(([a], [b]) => natural(a, b));

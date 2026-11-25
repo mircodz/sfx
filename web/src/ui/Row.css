@@ -101,10 +101,7 @@ button.row-summary {
     gap: var(--space-2);
 }
 
-/*
- * Consecutive rows read as one list: they join into a single card with hairlines between them, instead of a
- * stack of separate cards.
- */
+/* Consecutive rows join into one card with hairlines between them, rather than a stack of cards. */
 .row:has(+ .row) {
     margin-bottom: 0;
     border-bottom-left-radius: 0;
@@ -140,10 +137,7 @@ button.row-summary {
     margin-top: 1px;
 }
 
-/*
- * A wide row (by its own width, so it works in a dashboard card too): one line, in columns that line up down the
- * list: name, facts, why it's unhealthy.
- */
+/* Wide by the row's own width, so it works in a dashboard card too: one line, columns aligned down the list. */
 .row {
     container-type: inline-size;
 }

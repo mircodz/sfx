@@ -48,7 +48,7 @@ dialog.find::backdrop {
     outline: none;
 }
 
-/* The whole palette is what has focus; the app's focus ring on the field would only frame it twice. */
+/* The palette shows focus; a ring on the field too would frame it twice. */
 .find-input input:focus,
 .find-input input:focus-visible {
     outline: none;
@@ -59,7 +59,6 @@ dialog.find::backdrop {
     color: var(--text-muted);
 }
 
-/* A small spinner while the search runs. */
 .find-busy {
     width: 14px;
     height: 14px;

@@ -37,8 +37,8 @@ function groupKey(grouping: Grouping, r: ClusterReplica) {
 }
 
 /**
- * Every replica in the cluster, flattened out of the app, service, partition hierarchy so a slice like "what's
- * primary on node 3" is one filter away. Filters live in the URL, so a slice can be linked to.
+ * Flattened out of the app, service, partition hierarchy so "what's primary on node 3" is one filter away. Filters
+ * live in the URL, so a slice can be linked to.
  */
 export function Replicas() {
     const replicas = useResource("replicas", api.replicas);
@@ -168,7 +168,6 @@ function ReplicaList({ replicas, total, grouping, limit, onMore }: { replicas: C
     );
 }
 
-/** One row per partition: its service, where its replicas are, and its health. */
 function PartitionList({ replicas }: { replicas: ClusterReplica[] }) {
     const partitions = new Map<string, ClusterReplica[]>();
     for (const r of replicas) partitions.set(r.partitionId, [...(partitions.get(r.partitionId) ?? []), r]);

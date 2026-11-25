@@ -20,7 +20,7 @@ export function upgradeWord(u: Upgrade): UpgradeWord {
     }
 }
 
-/** Still under way: moving forward or back, or waiting to be resumed. A failed upgrade has stopped; it isn't running. */
+/** Paused counts as running; a failed upgrade has stopped. */
 export function isRunning(u: Upgrade) {
     return ["In progress", "Paused", "Rolling back"].includes(upgradeWord(u));
 }
@@ -51,7 +51,7 @@ export function modeText(mode: string) {
     return ({ Monitored: "Monitored", UnmonitoredAuto: "Unmonitored, automatic", UnmonitoredManual: "Unmonitored, manual" } as Record<string, string>)[mode] ?? mode;
 }
 
-/** What each upgrade mode does, for the review step. Keys are the server's mode choices. */
+/** For the review step; keys are the server's upgrade modes. */
 export const modeEffects: Record<string, string> = {
     "monitored-rollback": "One upgrade domain at a time, checking health after each; rolls back on its own if health fails.",
     "monitored-manual": "One upgrade domain at a time, checking health after each; stops for you to decide if health fails.",

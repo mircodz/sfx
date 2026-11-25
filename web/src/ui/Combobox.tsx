@@ -4,10 +4,7 @@ import "./Combobox.css";
 
 export type Option = { value: string; label: ReactNode; hint?: ReactNode; disabled?: boolean; search: string };
 
-/**
- * A text box that suggests matching options as you type (arrow keys to move, Enter to pick, Esc to close). Disabled
- * options are listed with their hint, so it's clear why something can't be picked.
- */
+/** Arrows move, Enter picks, Esc closes. Disabled options show their hint, so it's clear why they can't be picked. */
 export function Combobox({
     label,
     placeholder,
@@ -52,7 +49,7 @@ export function Combobox({
             e.preventDefault();
             pick(shown[active]);
         } else if (e.key === "Escape" && shown.length > 0) {
-            // Close the list, and only the list: not the panel it's in.
+            // Close only the list, not the panel it's in.
             e.preventDefault();
             e.stopPropagation();
             setOpen(false);

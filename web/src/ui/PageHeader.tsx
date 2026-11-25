@@ -7,10 +7,7 @@ import "./PageHeader.css";
 
 export type Crumb = { label: string; href: string };
 
-/**
- * The top of every page: where it is (breadcrumb, detail pages only), what it is (title and status), a one-line
- * summary, and on the right the page's actions. Its refresh goes to the top bar, with when it was last loaded.
- */
+/** The breadcrumb is for detail pages only. The refresh goes to the top bar, with when it was last loaded. */
 export function PageHeader({
     title,
     summary,
@@ -25,7 +22,7 @@ export function PageHeader({
     crumbs?: Crumb[];
     status?: Status;
     onRefresh?: () => void;
-    /** When the data was loaded; shown next to the refresh button in the top bar. */
+    /** Shown next to the refresh button in the top bar. */
     updated?: Date;
     actions?: ReactNode;
 }) {
