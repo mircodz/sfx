@@ -1,11 +1,11 @@
 namespace Sfx.Web;
 
-/// <summary>Where the files of an uploaded package go, from the names the browser gives them.</summary>
+/// <summary>Turns the file names the browser sends into paths inside the package.</summary>
 internal static class PackageUpload
 {
     /// <summary>
-    /// A file's path inside the package from the name the browser sent (a folder upload sends each file's relative path,
-    /// e.g. "MyAppPkg/Code/app.dll"), with '/' between parts. Refuses absolute paths, "..", and names that aren't files.
+    /// A folder upload sends each file's relative path (e.g. "MyAppPkg/Code/app.dll"); this returns it '/'-separated
+    /// and refuses absolute paths, ".." and names that aren't files.
     /// </summary>
     public static string RelativePath(string? fileName)
     {
@@ -33,8 +33,8 @@ internal static class PackageUpload
     private static readonly char[] Invalid = ['\0', '<', '>', '"', '|', '?', '*', .. Enumerable.Range(1, 31).Select(c => (char)c)];
 
     /// <summary>
-    /// The folder every file is in, when they share one (a folder upload names the chosen folder first): it's the
-    /// package's root. Empty when the files are at the root already, or don't share a folder.
+    /// The folder all files share, which is the package's root (a folder upload names the chosen folder first); empty
+    /// when they're at the root already or don't share one.
     /// </summary>
     public static string CommonFolder(IReadOnlyList<string> relativePaths)
     {

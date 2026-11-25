@@ -10,13 +10,12 @@ public sealed partial class UiSession
     private readonly Lock _reasonsLock = new();
     private readonly Dictionary<string, (DateTime At, Task<string?> Reason)> _reasons = [];
 
-    // Shared by every request, so several tabs polling at once still ask the cluster at most this many at a time.
+    // Shared across requests, so tabs polling at once still ask the cluster at most this many at a time.
     private readonly SemaphoreSlim _reasonGate = new(8);
 
     /// <summary>
-    /// Why each entity is unhealthy, by id, for entities of one <paramref name="kind"/> (node, application, service or
-    /// partition) with the health they're listed with. Each is asked at most once per 30 seconds, and again as soon as its
-    /// health changes; ones whose reason can't be had are left out.
+    /// Why each entity is unhealthy, by id. Each is asked at most every 30 seconds, and again as soon as its health
+    /// changes; ones whose reason can't be had are left out.
     /// </summary>
     internal async Task<IReadOnlyDictionary<string, string>> GetReasonsAsync(
         string kind,

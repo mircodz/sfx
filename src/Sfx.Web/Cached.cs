@@ -1,8 +1,8 @@
 namespace Sfx.Web;
 
 /// <summary>
-/// A value loaded at most once per <paramref name="lifetime"/>, for queries too heavy to run on every poll of every tab.
-/// Callers that arrive during a load share it; a failed load isn't kept, so the next caller tries again.
+/// Loaded at most once per <paramref name="lifetime"/>, for queries too heavy for every poll of every tab. Callers
+/// during a load share it; a failed load isn't kept, so the next caller retries.
 /// </summary>
 internal sealed class Cached<T>(TimeSpan lifetime, Func<CancellationToken, Task<T>> load)
 {
@@ -29,7 +29,7 @@ internal sealed class Cached<T>(TimeSpan lifetime, Func<CancellationToken, Task<
         return (await current.WaitAsync(cancellationToken)).Value;
     }
 
-    /// <summary>Drops the value, e.g. after an action changed what it shows, so the next caller loads it again.</summary>
+    /// <summary>Makes the next caller reload, e.g. after an action changed what it shows.</summary>
     public void Invalidate()
     {
         lock (_lock)
@@ -46,12 +46,12 @@ internal sealed class Cached<T>(TimeSpan lifetime, Func<CancellationToken, Task<
 }
 
 /// <summary>
-/// A value served stale while it's refreshed, for loads that take long on a large cluster (walking every replica).
-/// Within <paramref name="lifetime"/> the value is served as is; after it, the first caller starts a refresh in the
-/// background and every caller gets the previous value right away. One refresh runs at a time, and a failed one keeps
-/// the previous value (the next caller tries again). Only the very first load is waited for.
+/// Served stale while refreshing, for loads that are slow on a large cluster (walking every replica). Past
+/// <paramref name="lifetime"/>, the first caller starts a background refresh and every caller gets the previous
+/// value at once; one refresh runs at a time and a failed one keeps the previous value. Only the first load is
+/// waited for.
 /// </summary>
-/// <param name="timeout">Bounds a refresh nobody waits for, so a hung one can't stop the next; defaults to 10 minutes.</param>
+/// <param name="timeout">Bounds a refresh nobody waits for, so a hung one can't block the next.</param>
 internal sealed class StaleCache<T>(TimeSpan lifetime, Func<CancellationToken, Task<T>> load, TimeSpan? timeout = null, TimeProvider? time = null)
 {
     private readonly TimeProvider _time = time ?? TimeProvider.System;
@@ -59,7 +59,6 @@ internal sealed class StaleCache<T>(TimeSpan lifetime, Func<CancellationToken, T
     private (T Value, DateTimeOffset LoadedAt)? _value;
     private Task<T>? _refresh;
 
-    /// <summary>Whether a refresh is running.</summary>
     public bool Refreshing
     {
         get

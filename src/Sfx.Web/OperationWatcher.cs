@@ -4,15 +4,15 @@ using Sfx.Core;
 
 namespace Sfx.Web;
 
-/// <summary>Asks the cluster how far an operation got; one poll, returning its state and what to show.</summary>
+/// <summary>One poll of the cluster for how far an operation got.</summary>
 internal delegate Task<(string State, string? Detail)> OperationProbe(CancellationToken cancellationToken);
 
-/// <summary>Picks, per action, how to tell from the cluster that a change it asked for has actually happened.</summary>
+/// <summary>Per action, how to tell from the cluster that the requested change has happened.</summary>
 internal static class OperationWatcher
 {
     private static readonly string[] CountedRoles = ["Primary", "ActiveSecondary", "Instance"];
 
-    /// <summary>The probe for an action, or null when there's nothing to wait for: it's done once requested.</summary>
+    /// <summary>Null when the action is done once requested.</summary>
     public static OperationProbe? For(UiSession s, string actionId, Args target, Args inputs, DateTime startedUtc) => actionId switch
     {
         "replica.move" => async ct =>
@@ -99,8 +99,8 @@ internal static class OperationWatcher
     };
 
     /// <summary>
-    /// Counts ready replicas in every partition, <see cref="Bounded.Parallelism"/> at a time. A big service takes a call per
-    /// partition, so it's counted every partitions/100 seconds (at least every 3); polls in between get the last count.
+    /// A big service costs a call per partition, so it's recounted every partitions/100 seconds (at least 3); polls in
+    /// between get the last count.
     /// </summary>
     private static OperationProbe ScaleProbe(UiSession s, Args target, Args inputs)
     {

@@ -22,8 +22,8 @@ public sealed record StoreUsageDto(
 
 /// <param name="Path">Its path in the image store, as the cluster gives it (Windows clusters separate with '\'); send it back as ?path=.</param>
 /// <param name="FileCount">How many files it holds, all the way down; null when the cluster doesn't say.</param>
-/// <param name="Size">Its size in bytes when it was asked for (GET /api/store/size) within the last minute; null otherwise.</param>
-/// <param name="Package">For a top-level folder holding an application package (an ApplicationManifest.xml); null otherwise.</param>
+/// <param name="Size">In bytes, if asked for (GET /api/store/size) within the last minute; null otherwise.</param>
+/// <param name="Package">Set for a top-level folder holding an application package (an ApplicationManifest.xml).</param>
 /// <param name="Reserved">One of the cluster's own folders (Store, WindowsFabricStore) or in one: never deleted.</param>
 /// <param name="Actions">delete-store-content and provision-package, where they apply.</param>
 public sealed record StoreFolderDto(
@@ -36,10 +36,10 @@ public sealed record StoreFolderDto(
     IReadOnlyList<ActionDto> Actions);
 
 /// <summary>
-/// The application type a package folder holds, as far as its name tells (the image store can't be read back): its
-/// type when a provisioned type's name is in it, and its version when that type's provisioned version is in it too.
+/// Guessed from the folder's name, since the image store can't be read back: the type when a provisioned type's name is
+/// in it, and the version when that type's provisioned version is in it too.
 /// </summary>
-/// <param name="Provisioned">Whether that type version is provisioned (in any state; see <paramref name="Status"/>).</param>
+/// <param name="Provisioned">Whether that type version is provisioned, in any state.</param>
 /// <param name="Status">The provisioned type version's status (Available, Provisioning, …); null when it isn't provisioned.</param>
 public sealed record StorePackageDto(string? TypeName, string? TypeVersion, bool Provisioned, string? Status);
 
@@ -51,7 +51,6 @@ public sealed record StoreSizeDto(long? Size);
 /// <param name="OperationId">The operation in GET /api/operations that follows the upload (and provisioning).</param>
 public sealed record UploadResultDto(string OperationId, string Message);
 
-/// <summary>GET /api/store and /api/store/size: browsing the image store; POST /api/store/upload: uploading a package to it.</summary>
 internal static class ApiImageStore
 {
     public const long MaxUpload = 4L * 1024 * 1024 * 1024;
@@ -140,7 +139,7 @@ internal static class ApiImageStore
         }
     }
 
-    /// <summary>The package folders by path; none when they can't be told (the listing still shows).</summary>
+    /// <summary>None when they can't be told, so the listing still shows.</summary>
     private static async Task<IReadOnlyDictionary<string, ImageStorePackage>> PackagesAsync(UiSession s, CancellationToken ct)
     {
         try
@@ -154,9 +153,8 @@ internal static class ApiImageStore
     }
 
     /// <summary>
-    /// Takes a package as multipart/form-data: one .sfpkg or .zip file, or a folder's files each named by its path in the
-    /// folder. Saves it to a temporary folder as it arrives, checks it's a package, then uploads (and provisions) it in the
-    /// background as an operation.
+    /// Takes multipart/form-data: one .sfpkg or .zip, or a folder's files each named by its path. Saves to a temporary
+    /// folder as it arrives, checks it's a package, then uploads (and provisions) it in the background as an operation.
     /// </summary>
     internal static async Task<UploadResultDto> UploadAsync(UiSession s, HttpContext context)
     {
@@ -218,7 +216,7 @@ internal static class ApiImageStore
         }
     }
 
-    /// <summary>Saves each file part under <paramref name="files"/> as it streams in; returns their relative paths and the plain fields.</summary>
+    /// <summary>Saves each file part under <paramref name="files"/> as it streams in; also returns the plain fields.</summary>
     internal static async Task<(IReadOnlyList<string> Files, IReadOnlyDictionary<string, string> Fields)> ReceiveAsync(
         MultipartReader reader,
         string files,
@@ -274,7 +272,7 @@ internal static class ApiImageStore
         return (saved, fields);
     }
 
-    /// <summary>Opens what was saved as a package: a lone .sfpkg or .zip, else the folder the files share (or all of them).</summary>
+    /// <summary>A lone .sfpkg or .zip, else the folder the files share (or all of them).</summary>
     internal static LocalPackage Open(string files, IReadOnlyList<string> saved)
     {
         if (saved.Count == 0)
@@ -304,7 +302,7 @@ internal static class ApiImageStore
         }
     }
 
-    /// <summary>Where in the image store to upload to: as given, or the package's own "{type}_{version}".</summary>
+    /// <summary>As given, or the package's own "{type}_{version}".</summary>
     internal static string StorePath(string? given, string fallback)
     {
         if (string.IsNullOrWhiteSpace(given))
@@ -391,7 +389,7 @@ internal static class ApiImageStore
         }
     }
 
-    /// <summary>Reports progress as it comes, on the uploading thread, never going backwards (files upload in parallel).</summary>
+    /// <summary>Reports on the uploading thread, never going backwards (files upload in parallel).</summary>
     private sealed class Reporter(Action<UploadProgress> report) : IProgress<UploadProgress>
     {
         private readonly Lock _lock = new();

@@ -5,7 +5,7 @@ using Sfx.Core;
 namespace Sfx.Web;
 
 /// <summary>One connected cluster, shared by every browser tab; <see cref="UiHost"/> replaces it on a context switch.</summary>
-/// <param name="resolved">The context after folder rules, with its folder's label and color; defaults to none.</param>
+/// <param name="resolved">The context after folder rules, with its folder's label and color.</param>
 public sealed partial class UiSession(ClusterSession session, ActionLog log, string version, ResolvedContext? resolved = null)
 {
     public string? Label => resolved?.Label;
@@ -21,7 +21,7 @@ public sealed partial class UiSession(ClusterSession session, ActionLog log, str
     public ClusterUpgrades ClusterUpgrades { get; } = new(session.Queries.Client);
     public ClusterOverview Overview { get; } = new(session.Queries);
 
-    /// <summary>Applications' lifecycle, sharing this session's cached EnableDefaultServicesUpgrade.</summary>
+    /// <summary>Shares this session's cached EnableDefaultServicesUpgrade.</summary>
     public ApplicationLifecycle Lifecycle => _lifecycle ??= new(Queries.Client, DefaultServicesUpgradeEnabledAsync);
 
     private ApplicationLifecycle? _lifecycle;
@@ -35,8 +35,8 @@ public sealed partial class UiSession(ClusterSession session, ActionLog log, str
     private Task<SystemServices>? _systemServices;
 
     /// <summary>
-    /// Which optional system services the cluster runs; asked once per connection (they rarely change), with one call.
-    /// A failed check isn't kept, so the next request asks again.
+    /// Which optional system services the cluster runs; asked once per connection since they rarely change. A failed
+    /// check isn't kept.
     /// </summary>
     public Task<SystemServices> GetSystemServicesAsync(CancellationToken cancellationToken)
     {
@@ -48,7 +48,7 @@ public sealed partial class UiSession(ClusterSession session, ActionLog log, str
         return check.WaitAsync(cancellationToken);
     }
 
-    /// <summary>The system services if they've been checked already; null until then (so nothing is hidden early).</summary>
+    /// <summary>Null until checked, so nothing is hidden early.</summary>
     public SystemServices? KnownSystemServices => _systemServices is { IsCompletedSuccessfully: true } done ? done.Result : null;
 
     /// <summary>For tests: what the cluster runs, without asking it.</summary>
@@ -68,7 +68,7 @@ public sealed partial class UiSession(ClusterSession session, ActionLog log, str
 
     private (DateTime At, bool Enabled)? _defaultServicesUpgrade;
 
-    /// <summary>ClusterManager/EnableDefaultServicesUpgrade, read from the cluster manifest at most once a minute.</summary>
+    /// <summary>ClusterManager/EnableDefaultServicesUpgrade, read from the cluster manifest.</summary>
     public async Task<bool> DefaultServicesUpgradeEnabledAsync(CancellationToken cancellationToken)
     {
         if (_defaultServicesUpgrade is { } cached && DateTime.UtcNow - cached.At < TimeSpan.FromMinutes(1))
@@ -86,8 +86,8 @@ public sealed partial class UiSession(ClusterSession session, ActionLog log, str
         new(TimeSpan.FromMinutes(2), ct => ClusterReplicas.LoadAsync(session.Queries, ct));
 
     /// <summary>
-    /// Every replica in the cluster. One walk serves every tab for 2 minutes; after that the last walk is still served
-    /// while one new walk runs in the background, so a slow walk never holds up a poll.
+    /// One walk serves every tab; once stale, the last walk is still served while a new one runs in the background, so
+    /// a slow walk never holds up a poll.
     /// </summary>
     public Task<IReadOnlyList<ClusterReplicaDto>> GetClusterReplicasAsync(CancellationToken cancellationToken) =>
         _replicas.GetAsync(cancellationToken);
@@ -95,7 +95,7 @@ public sealed partial class UiSession(ClusterSession session, ActionLog log, str
     private readonly Lock _serviceReplicasLock = new();
     private readonly Dictionary<string, (DateTime At, Task<IReadOnlyList<ClusterReplicaDto>> Load)> _serviceReplicas = [];
 
-    /// <summary>The replicas of one service; asked at most once per 15 seconds, shared by every tab.</summary>
+    /// <summary>Shared by every tab.</summary>
     public Task<IReadOnlyList<ClusterReplicaDto>> GetServiceReplicasAsync(string applicationId, string serviceId, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;

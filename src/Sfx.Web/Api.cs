@@ -4,14 +4,14 @@ using Sfx.Core;
 
 namespace Sfx.Web;
 
-/// <summary>The read endpoints under /api, plus actions and the power toggle. Ids are Service Fabric's (e.g. "orders~Counter").</summary>
+/// <summary>Read endpoints, actions and the power toggle; ids are Service Fabric's (e.g. "orders~Counter").</summary>
 internal static class Api
 {
     private const int Parallelism = 8;
 
     /// <summary>
-    /// Every handler takes the current <see cref="UiSession"/> as a parameter (resolved per request from
-    /// <see cref="UiHost"/>), so switching context takes effect on the next request.
+    /// Handlers take the current <see cref="UiSession"/> as a parameter (resolved per request from
+    /// <see cref="UiHost"/>), so a context switch takes effect on the next request.
     /// </summary>
     public static void Map(IEndpointRouteBuilder app, UiHost host)
     {
@@ -99,7 +99,7 @@ internal static class Api
                     UpgradeDefaultsDto.For("<ApplicationManifest />"));
             }
 
-            // Asked first, so an unknown id is a 404 that says so rather than whichever query fails first.
+            // Asked first so an unknown id is a 404 that says so, not whichever query fails first.
             var info = await s.Inspector.GetApplicationAsync(appId, ct);
             var appServices = s.Queries.GetServicesAsync(appId, ct);
             var appHealth = s.Inspector.GetApplicationHealthAsync(appId, ct);
@@ -163,7 +163,7 @@ internal static class Api
 
         api.MapGet("/applications/{appId}/services/{serviceId}", async (UiSession s, string appId, string serviceId, CancellationToken ct) =>
         {
-            // Asked first, so an unknown id is a 404 that says so rather than whichever query fails first.
+            // Asked first so an unknown id is a 404 that says so, not whichever query fails first.
             var service = Service(await s.Inspector.GetServiceAsync(appId, serviceId, ct));
             var description = s.Inspector.GetServiceDescriptionAsync(serviceId, ct);
             var health = s.Inspector.GetServiceHealthAsync(serviceId, ct);
@@ -320,8 +320,8 @@ internal static class Api
     }
 
     /// <summary>
-    /// The replicas on a node, system services' included (as application "fabric:/System", which the node's application
-    /// list leaves out). A node that isn't up may not answer; it then shows none rather than failing the page.
+    /// Includes system services' replicas (as application "fabric:/System", which the node's application list leaves
+    /// out). A node that isn't up may not answer; it then shows none rather than failing the page.
     /// </summary>
     private static async Task<IReadOnlyList<DeployedReplicaDto>> DeployedReplicasAsync(UiSession s, NodeRow node, CancellationToken ct)
     {
@@ -391,7 +391,7 @@ internal static class Api
             ["plan"] = LifecycleActions.PlanOf(u.Report)?.Id ?? "",
         });
 
-    /// <summary>The target of a service's actions, with its counts from its description.</summary>
+    /// <summary>A service's action target, with counts from its description.</summary>
     internal static Dictionary<string, string> ServiceTarget(ServiceDto service, string appId, ServiceDescription d)
     {
         var (count, min) = d switch
@@ -411,7 +411,7 @@ internal static class Api
         };
     }
 
-    /// <summary>The service types an application's version provides, for its create-service action; none when they can't be read.</summary>
+    /// <summary>For the create-service action; empty when the service types can't be read.</summary>
     private static async Task<string> ServiceTypesTargetAsync(UiSession s, string typeName, string typeVersion, CancellationToken ct)
     {
         try

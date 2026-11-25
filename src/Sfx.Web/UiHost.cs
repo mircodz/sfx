@@ -29,8 +29,8 @@ public sealed record ContextsDto(
     string ConfigPath);
 
 /// <summary>
-/// What `sfx ui` is connected to, and switching it. Connecting runs in the background so sign-in (e.g. a device
-/// code) can be shown in the browser; the current cluster stays in use until the new one is ready, and stays if it fails.
+/// Connecting runs in the background so sign-in (e.g. a device code) can show in the browser; the current cluster stays
+/// in use until the new one is ready, and stays if it fails.
 /// </summary>
 public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterConnector connector, ActionLog log, string version)
 {
@@ -77,11 +77,11 @@ public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterCo
         }
     }
 
-    /// <summary>Starts connecting to a saved context; the switch happens once it's connected.</summary>
+    /// <summary>Starts connecting to a saved context; switches once connected.</summary>
     public void Switch(string name)
     {
         var saved = store.Find(name) ?? throw new ActionException($"No context named '{name}'. Add it with 'sfx context add'.", StatusCodes.Status404NotFound);
-        // Folder rules apply here too: a context in a read-only folder connects read-only.
+        // Folder rules apply: a context in a read-only folder connects read-only.
         var resolved = store.Resolve(saved);
         var context = resolved.Context;
         Connecting connecting;
@@ -136,7 +136,7 @@ public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterCo
         }
     }
 
-    /// <summary>The config path with the home directory as ~, as people write it.</summary>
+    /// <summary>The config path with the home directory as ~.</summary>
     private static string Home(string path)
     {
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -150,7 +150,7 @@ public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterCo
         return new(c.Name, c.Endpoint, c.Auth.Count > 0 ? c.Auth : ["none"], c.ReadOnly, c.Power, saved, c.Folder, r.Label, r.Color);
     }
 
-    /// <summary>The context's folder label and color, if it's saved; one given on the command line has none.</summary>
+    /// <summary>Folder label and color for a saved context; one given on the command line has none.</summary>
     private static ResolvedContext Labelled(ContextStore store, ClusterContext context) =>
         store.Find(context.Name) is { } saved ? store.Resolve(saved) with { Context = context } : new ResolvedContext(context, null, null);
 }

@@ -1,8 +1,8 @@
 namespace Sfx.Web;
 
 /// <summary>
-/// Whether a tracked operation has finished, judged from what the cluster reports. Each check takes data already
-/// fetched, so <see cref="OperationWatcher"/> does the asking and these stay easy to test.
+/// Whether a tracked operation has finished. Checks take already-fetched data, so <see cref="OperationWatcher"/> does
+/// the asking and these stay easy to test.
 /// </summary>
 internal static class SettleChecks
 {
@@ -14,7 +14,6 @@ internal static class SettleChecks
     public static readonly TimeSpan ClockSkew = TimeSpan.FromMinutes(2);
 
     /// <summary>A replica or instance moved off <paramref name="fromNode"/> (to <paramref name="toNode"/>, if one was asked for).</summary>
-    /// <param name="replicas">The partition's replicas now: id, node and role.</param>
     public static (string State, string? Detail) ReplicaMove(
         string role,
         string replicaId,
@@ -75,7 +74,7 @@ internal static class SettleChecks
         return uptime is { } up && up < sinceRequested ? (Done, "Node is Up again.") : (Running, "Waiting for the node to restart.");
     }
 
-    /// <summary>Whether the upgrade the cluster reports is the one an operation started, rather than an earlier one.</summary>
+    /// <summary>Whether the reported upgrade is the one the operation started, not an earlier one.</summary>
     public static bool IsThisUpgrade(DateTime? upgradeStartedUtc, DateTime operationStartedUtc) =>
         upgradeStartedUtc is { } at && at >= operationStartedUtc - ClockSkew;
 
@@ -119,7 +118,7 @@ internal static class SettleChecks
         _ => (Running, $"{Capital(noun)} is {status}."),
     };
 
-    /// <summary>A type version provisioned: Available. <paramref name="row"/> is null while the cluster doesn't list it.</summary>
+    /// <summary>Done once Available; <paramref name="row"/> is null while the cluster doesn't list it.</summary>
     public static (string State, string? Detail) TypeProvisioned(
         Sfx.Core.ApplicationTypeRow? row,
         string name,

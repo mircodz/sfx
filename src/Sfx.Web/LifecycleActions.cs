@@ -4,8 +4,8 @@ using Sfx.Core;
 namespace Sfx.Web;
 
 /// <summary>
-/// Actions on application types, new applications and services, service settings, running upgrades' plans and the
-/// image store; part of <see cref="WebActions"/>.
+/// The <see cref="WebActions"/> for application types, new applications and services, service settings, upgrade plans
+/// and the image store.
 /// </summary>
 internal static class LifecycleActions
 {
@@ -24,7 +24,7 @@ internal static class LifecycleActions
 
     public static IReadOnlyList<ActionDef> All { get; } =
     [
-        // Application types: target typeName, version, status, inUse ("true" or "false"), and "default:{name}" per parameter
+        // Application types: target typeName, version, status, inUse ("true"/"false"), and "default:{name}" per parameter.
 
         new(
             "create-application",
@@ -51,7 +51,7 @@ internal static class LifecycleActions
             Applies: t => t["inUse"] == "false" && t["status"] is nameof(ApplicationTypeStatus.Available) or nameof(ApplicationTypeStatus.Failed),
             ConfirmText: t => t["version"]),
 
-        // Applications: the target of WebActions' application actions, plus serviceTypes ("{name}={Stateful|Stateless}" per line)
+        // Applications: WebActions' application target plus serviceTypes ("{name}={Stateful|Stateless}" per line).
 
         new(
             "create-service",
@@ -82,8 +82,6 @@ internal static class LifecycleActions
             },
             Form: true),
 
-        // Services: the target of WebActions' service actions
-
         new(
             "edit-service-settings",
             "service",
@@ -104,7 +102,7 @@ internal static class LifecycleActions
                     : ServiceSettings.Describe(t["name"], settings, changes);
             }),
 
-        // Upgrades: the target of WebActions' upgrade actions, plus plan (the id of the plan it follows; empty when unknown)
+        // Upgrades: WebActions' upgrade target plus plan (the followed plan's id; empty when unknown).
 
         new(
             "change-upgrade-plan",
@@ -121,7 +119,7 @@ internal static class LifecycleActions
             Applies: t => t["state"] is nameof(UpgradeState.RollingForwardInProgress) or nameof(UpgradeState.RollingForwardPending),
             Inputs: t => [new("plan", "Plan", "choice", Plans, t.Optional("plan") ?? UpgradePlan.All[0].Id)]),
 
-        // Image store entries: target path, name, entry ("folder" or "file"), provision ("true" for a package folder not provisioned)
+        // Image store entries: target path, name, entry ("folder"/"file"), provision ("true" for an unprovisioned package folder).
 
         new(
             "delete-store-content",
@@ -166,13 +164,12 @@ internal static class LifecycleActions
         return trimmed.StartsWith("fabric:/", StringComparison.Ordinal) ? trimmed.TrimEnd('/') : $"{applicationName}/{trimmed.Trim('/')}";
     }
 
-    /// <summary>The type's default parameters, from its target.</summary>
     public static IEnumerable<KeyValuePair<string, string>> Defaults(Args type) => type.Values
         .Where(kv => kv.Key.StartsWith(DefaultPrefix, StringComparison.Ordinal))
         .Select(kv => KeyValuePair.Create(kv.Key[DefaultPrefix.Length..], kv.Value))
         .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>The parameters to create an application with: those typed differently from the type's default (or unknown to it, for Core to refuse).</summary>
+    /// <summary>Only parameters typed differently from the type's default (or unknown to it, for Core to refuse).</summary>
     public static IReadOnlyDictionary<string, string> Parameters(Args type, Args inputs) => inputs.Values
         .Where(kv => kv.Key.StartsWith(ParameterPrefix, StringComparison.Ordinal))
         .Select(kv => (Name: kv.Key[ParameterPrefix.Length..], kv.Value))
@@ -191,7 +188,7 @@ internal static class LifecycleActions
                 : (line, false))
             .ToList();
 
-    /// <summary>The service the create-service form asks for; its name relative to the application, or full.</summary>
+    /// <summary>The create-service form's service; its name is relative to the application, or full.</summary>
     public static NewService NewService(Args application, Args inputs)
     {
         var name = ServiceName(application["name"], inputs["name"]);
@@ -212,7 +209,7 @@ internal static class LifecycleActions
         return $"Create {service.Name} ({service.TypeName}, {(service.Stateful ? "stateful" : "stateless")}, {count}, {WebActions.Count(service.Partitions, "partition")})";
     }
 
-    /// <summary>The plan a running upgrade follows, from what it reports; null when it doesn't say.</summary>
+    /// <summary>Null when the upgrade doesn't say.</summary>
     public static UpgradePlan? PlanOf(UpgradeReport report) => UpgradePlan.Of(
         Enum.TryParse<UpgradeMode>(report.Mode, out var mode) ? mode : null,
         Enum.TryParse<FailureAction>(report.OnFailure, out var onFailure) ? onFailure : null);

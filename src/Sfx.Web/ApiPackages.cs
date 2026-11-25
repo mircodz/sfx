@@ -24,7 +24,6 @@ public sealed record CodePackageDto(
     long ActivationFailures,
     IReadOnlyList<ActionDto> Actions);
 
-/// <summary>GET /api/nodes/{name}/packages: the service and code packages deployed on a node.</summary>
 internal static class ApiPackages
 {
     public static void Map(RouteGroupBuilder api) =>
@@ -39,7 +38,7 @@ internal static class ApiPackages
             {
                 return await LoadAsync(s, name, ct);
             }
-            // A disabled or disabling node still hosts packages but may not answer for them; show none rather than fail.
+            // A disabled or disabling node may not answer for its packages; show none rather than fail.
             catch (Exception) when (status != nameof(NodeStatus.Up) && !ct.IsCancellationRequested)
             {
                 return [];
@@ -55,7 +54,7 @@ internal static class ApiPackages
             .SelectMany(p => p)
             .ToList();
 
-        // One query per manifest returns its code packages for every activation of it; split them by activation below.
+        // One query per manifest returns code packages for all its activations; they're split by activation below.
         var codePackages = (await Bounded.SelectAsync(
             packages.Select(p => (p.App, p.Package.Name)).Distinct(),
             async p => (Key: (p.App.Id, p.Name), Code: await s.Deployed.GetCodePackagesAsync(node, p.App.Id, p.Name, ct))))
