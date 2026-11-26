@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Compression;
 using Microsoft.ServiceFabric.Common;
 using Sfx.Core;
@@ -312,14 +313,36 @@ public class ApplicationLifecycleTests
         Assert.True(stateful.HasPersistedState);
         var range = Assert.IsType<UniformInt64RangePartitionSchemeDescription>(stateful.PartitionDescription);
         Assert.Equal(4, range.Count);
-        Assert.Equal(long.MinValue.ToString(), range.LowKey);
-        Assert.Equal(long.MaxValue.ToString(), range.HighKey);
+        Assert.Equal("-9223372036854775808", range.LowKey);
+        Assert.Equal("9223372036854775807", range.HighKey);
 
         var stateless = Assert.IsType<StatelessServiceDescription>(
             ApplicationLifecycle.Description("fabric:/shop", new NewService("fabric:/shop/Web", "WebType", false, -1)));
         Assert.Equal("fabric:/shop/Web", stateless.ServiceName.ToString());
         Assert.Equal(-1, stateless.InstanceCount);
         Assert.IsType<SingletonPartitionSchemeDescription>(stateless.PartitionDescription);
+    }
+
+    [Theory]
+    [InlineData("sv-SE")]
+    [InlineData("nb-NO")]
+    [InlineData("fi-FI")]
+    public void Key_ranges_use_an_ascii_minus_whatever_the_culture(string culture)
+    {
+        var previous = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo(culture);
+        try
+        {
+            Assert.NotEqual("-1", (-1).ToString());
+            var range = Assert.IsType<UniformInt64RangePartitionSchemeDescription>(
+                ApplicationLifecycle.Description("fabric:/shop", new NewService("Counter", "CounterType", true, 3, Partitions: 4)).PartitionDescription);
+            Assert.Equal("-9223372036854775808", range.LowKey);
+            Assert.Equal("9223372036854775807", range.HighKey);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
     }
 
     [Fact]

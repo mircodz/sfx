@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.ServiceFabric.Client;
 using Microsoft.ServiceFabric.Common;
 using Microsoft.ServiceFabric.Common.Exceptions;
@@ -28,7 +29,7 @@ public sealed class ClusterQueries(IServiceFabricClient client)
             n.FaultDomain ?? "",
             n.IsSeedNode ?? false,
             n.CodeVersion ?? "",
-            long.TryParse(n.NodeUpTimeInSeconds, out var seconds) ? TimeSpan.FromSeconds(seconds) : null,
+            long.TryParse(n.NodeUpTimeInSeconds, CultureInfo.InvariantCulture, out var seconds) ? TimeSpan.FromSeconds(seconds) : null,
             n.Id?.Id ?? "")).ToList();
     }
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.ServiceFabric.Client;
 using Microsoft.ServiceFabric.Common;
 
@@ -319,7 +320,10 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
             : $"{applicationName}/{service.Name.Trim().Trim('/')}";
         PartitionSchemeDescription partitions = service.Partitions <= 1
             ? new SingletonPartitionSchemeDescription()
-            : new UniformInt64RangePartitionSchemeDescription(service.Partitions, long.MinValue.ToString(), long.MaxValue.ToString());
+            : new UniformInt64RangePartitionSchemeDescription(
+                service.Partitions,
+                long.MinValue.ToString(CultureInfo.InvariantCulture),
+                long.MaxValue.ToString(CultureInfo.InvariantCulture));
         return service.Stateful
             ? new StatefulServiceDescription(
                 new ServiceName(name),
