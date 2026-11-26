@@ -286,10 +286,10 @@ internal static class Api
             .Select(e => new ActivityDto(e.Time, e.User, e.Context, e.Action, e.Outcome, e.Succeeded))
             .ToList());
 
-        api.MapPost("/actions/{id}", (UiSession s, string id, ActionRequest request, HttpContext http, CancellationToken ct) =>
+        api.MapPost("/actions/{id}", (UiSession s, string id, ActionRequest request, HttpContext http, IHostApplicationLifetime life, CancellationToken ct) =>
         {
             host.Expect(s, http);
-            return WebActions.RunAsync(s, id, request, ct);
+            return WebActions.RunAsync(s, id, request, ct, life.ApplicationStopping);
         });
         ApiClusterUpgrades.Map(api);
         ApiOperations.Map(api);

@@ -484,7 +484,16 @@ internal static class WebActions
             .ToList();
     }
 
-    public static async Task<ActionResult> RunAsync(UiSession session, string id, ActionRequest request, CancellationToken cancellationToken)
+    private static readonly TimeSpan ActionTimeout = TimeSpan.FromMinutes(10);
+
+    /// <param name="cancellationToken">The request's: checks before the change stop when the tab goes away.</param>
+    /// <param name="stopping">sfx ui shutting down: the only thing besides a timeout that stops a change once it's checked.</param>
+    public static async Task<ActionResult> RunAsync(
+        UiSession session,
+        string id,
+        ActionRequest request,
+        CancellationToken cancellationToken,
+        CancellationToken stopping = default)
     {
         if (!ById.TryGetValue(id, out var action))
         {
@@ -529,10 +538,15 @@ internal static class WebActions
             throw new ActionException($"Type '{expected}' to confirm.");
         }
 
+        // Confirmed and checked: closing the tab mustn't stop the change halfway, unlogged and unfollowed.
+        using var operation = CancellationTokenSource.CreateLinkedTokenSource(stopping);
+        operation.CancelAfter(ActionTimeout);
+        var ct = operation.Token;
+
         string title;
         try
         {
-            title = action.Prepare is { } prepare ? await prepare(session, target, inputs, cancellationToken) : action.Describe(target, inputs);
+            title = action.Prepare is { } prepare ? await prepare(session, target, inputs, ct) : action.Describe(target, inputs);
         }
         catch (RefusedException ex)
         {
@@ -543,17 +557,23 @@ internal static class WebActions
         {
             if (action.Start is { } start)
             {
-                probe = await start(session, target, inputs, cancellationToken);
+                probe = await start(session, target, inputs, ct);
             }
             else
             {
-                await action.Run!(session, target, inputs, cancellationToken);
+                await action.Run!(session, target, inputs, ct);
             }
         }
         // Refused before anything was asked of the cluster, like an ActionException: nothing to log.
         catch (RefusedException ex)
         {
             throw Refusal(ex);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            var why = stopping.IsCancellationRequested ? "sfx ui stopped" : $"no answer within {ActionTimeout.TotalMinutes:0} minutes";
+            session.TryLog(title, $"{why}; check the cluster");
+            throw new ActionException($"{title}: {why}; check the cluster.", StatusCodes.Status504GatewayTimeout);
         }
         catch (Exception ex) when (ex is not ActionException)
         {
