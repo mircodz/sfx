@@ -31,7 +31,7 @@ public sealed class PathCompletionTests : IDisposable
     public void Folders_end_in_a_slash_and_only_packages_are_offered_among_files()
     {
         Assert.Equal(["app.sfpkg", "Build.ZIP", "pkgs/"], PathCompletion.Complete("", _dir));
-        Assert.Equal(["pkgs/", "pkgs/VotingPkg/"], PathCompletion.Complete("P", _dir));
+        Assert.Equal(["pkgs/"], PathCompletion.Complete("P", _dir));
         Assert.Equal(["pkgs/VotingPkg/"], PathCompletion.Complete("pkgs/", _dir));
         Assert.Empty(PathCompletion.Complete("nope/", _dir));
     }
@@ -47,7 +47,7 @@ public sealed class PathCompletionTests : IDisposable
     public void Absolute_paths_keep_the_form_typed_and_the_home_folder_is_tilde()
     {
         var typed = _dir + "/pk";
-        Assert.Equal([_dir + "/pkgs/", _dir + "/pkgs/VotingPkg/"], PathCompletion.Complete(typed));
+        Assert.Equal([_dir + "/pkgs/"], PathCompletion.Complete(typed));
         Assert.Equal(["~/"], PathCompletion.Complete("~"));
 
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -85,6 +85,20 @@ public sealed class ShellFeatureKeymapTests : IDisposable
     }
 
     private static KeyEvent Char(char c, KeyModifiers modifiers = KeyModifiers.None) => new(Key.Char, new Rune(c), modifiers);
+
+    [Fact]
+    public void The_contexts_page_gets_the_keys_and_gives_them_back()
+    {
+        var shell = Shell();
+        Assert.False(shell.ContextsTable.HasFocus);
+
+        Assert.True(shell.Keymap.RunCommand("ctx"));
+        // A table ignores keys without focus, so arrows did nothing on the contexts page.
+        Assert.True(shell.ContextsTable.HasFocus);
+
+        Assert.True(shell.Keymap.RunCommand("back"));
+        Assert.False(shell.ContextsTable.HasFocus);
+    }
 
     [Fact]
     public void Find_and_the_last_error_have_keys()

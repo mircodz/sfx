@@ -6,6 +6,7 @@ import { usePath } from "./lib/router";
 import { Notice } from "./ui/Notice";
 import { Empty } from "./ui/Section";
 import { Sidebar } from "./Sidebar";
+import { TopBar } from "./TopBar";
 import { Activity } from "./views/Activity";
 import { ApplicationDetail } from "./views/ApplicationDetail";
 import { Applications } from "./views/Applications";
@@ -68,6 +69,12 @@ export function App() {
     const refresh = useMemo(() => ({ generation, bump }), [generation, bump]);
     const [outcome, setOutcome] = useState<Outcome | null>(null);
     const [finding, setFinding] = useState(false);
+    const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sfx-sidebar") === "collapsed");
+    const collapse = (folded: boolean) => {
+        setCollapsed(folded);
+        if (folded) localStorage.setItem("sfx-sidebar", "collapsed");
+        else localStorage.removeItem("sfx-sidebar");
+    };
     const notify = useCallback((text: string, ok: boolean) => setOutcome({ text, ok }), []);
     // When a change actually finishes: say so, and load what's on screen again.
     const operations = useOperationsPoll(generation, (op) => {
@@ -122,8 +129,9 @@ export function App() {
             <SessionContext.Provider value={session.data}>
             <OperationsContext.Provider value={operations}>
             <NoticeContext.Provider value={notify}>
-                <div className="app">
-                    <Sidebar session={session.data} current={path[0] ?? ""} onSessionChange={session.reload} onFind={() => setFinding(true)} />
+                <div className={`app ${collapsed ? "sidebar-collapsed" : ""}`}>
+                    <TopBar session={session.data} onSessionChange={session.reload} onFind={() => setFinding(true)} contextsOpen={path[0] === "contexts"} />
+                    <Sidebar session={session.data} current={path[0] ?? ""} collapsed={collapsed} onCollapse={collapse} />
                     {finding && session.data && <Find onClose={() => setFinding(false)} />}
                     <div className="main">
                         <div className="main-inner">

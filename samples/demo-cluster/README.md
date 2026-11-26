@@ -5,7 +5,8 @@ real. It's Service Fabric's local 5-node dev cluster running on one Linux VM: a 
 authentication, reached over an SSH tunnel.
 
 Costs about $0.19/hour while running (a `Standard_D4s_v5` VM). It **deallocates itself 30 minutes after each
-start**, after which only its disk is billed (about $10/month), until you `destroy` it.
+start** (or after as long as you ask for), after which only its disk is billed (about $10/month), until you
+`destroy` it.
 
 ## Use
 
@@ -17,9 +18,11 @@ SSH key at `~/.ssh/id_ed25519.pub`. Creating the cluster accepts the Service Fab
 sfx localhost           # in another terminal
 
 ./cluster.sh status     # VM state, time left, tunnel
-./cluster.sh extend     # 30 more minutes
+./cluster.sh extend     # 30 more minutes from now
+./cluster.sh extend 4h  # or as long as you like: 90m, 4h, 24h, 1d
 ./cluster.sh down       # deallocate now
-./cluster.sh up         # start it again (~7 minutes)
+./cluster.sh up         # start it again (~7 minutes), for 30 minutes
+./cluster.sh up 24h     # or for a day
 ./cluster.sh tunnel     # reopen the tunnel, e.g. after a network change
 ./cluster.sh destroy    # delete everything
 ```
@@ -32,7 +35,7 @@ Settings, as environment variables:
 | `SFX_DEMO_VM` | `sfx-dev` | VM name |
 | `SFX_DEMO_LOCATION` | `westeurope` | Azure region |
 | `SFX_DEMO_SIZE` | `Standard_D4s_v5` | VM size; 8 GB isn't enough for the demo apps |
-| `SFX_DEMO_EXPIRE_MINUTES` | `30` | minutes after each start before the VM deallocates |
+| `SFX_DEMO_EXPIRE_MINUTES` | `30` | how long it stays up when `create`, `up` or `extend` aren't given a duration |
 | `SFX_DEMO_PORT` | `19080` | local end of the tunnel |
 | `SFX_DEMO_SSH_KEY` | `~/.ssh/id_ed25519.pub` | public key for the VM's `azureuser` |
 
@@ -56,5 +59,7 @@ Settings, as environment variables:
   `localhost:19080` through the tunnel.
 - Shutting down from inside a VM leaves it allocated, and billed. So the VM gets a managed identity that may only
   manage VMs in its resource group, and a systemd timer (`sfx-expire.timer`) calls Azure to deallocate it.
-  The timer starts at every boot; `extend` restarts it.
-- A nightly auto-shutdown at 23:00 CET is a backstop in case the timer fails.
+  The timer starts at every boot; `up`, `create` and `extend` set how long it runs (a drop-in in
+  `sfx-expire.timer.d`) and restart it.
+- A nightly auto-shutdown at 22:00 UTC is a backstop in case the timer fails. A run that lasts past it turns it
+  off; the next shorter run turns it back on.

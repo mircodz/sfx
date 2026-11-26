@@ -2,8 +2,8 @@ namespace Sfx.Tui;
 
 /// <summary>
 /// Tab completion of a path on this machine, for <c>:provision</c> and <c>:upload</c>: folders (with a trailing
-/// <c>/</c>; a lone folder is followed by what's in it, so tab goes on into it) and application packages (.sfpkg, .zip). Values keep the form typed, <c>~</c>
-/// included; hidden entries only show once a <c>.</c> is typed.
+/// <c>/</c>, so tab on a lone one goes on into it) and application packages (.sfpkg, .zip). Values keep the form
+/// typed, <c>~</c> included; hidden entries only show once a <c>.</c> is typed.
 /// </summary>
 public static class PathCompletion
 {
@@ -29,19 +29,13 @@ public static class PathCompletion
             {
                 return [];
             }
-            var found = dir.EnumerateFileSystemInfos()
+            return dir.EnumerateFileSystemInfos()
                 .Where(entry => entry.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 .Where(entry => !entry.Name.StartsWith('.') || prefix.StartsWith('.'))
                 .Where(entry => entry is DirectoryInfo || IsPackage(entry.Name))
                 .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(entry => folderPart + entry.Name + (entry is DirectoryInfo ? "/" : ""))
                 .ToList();
-            // Tab cycles through the candidates: with a single folder, what's in it comes next, so tab goes on into it.
-            if (found is [var only] && only.EndsWith('/') && prefix.Length > 0)
-            {
-                found.AddRange(Complete(only, directory));
-            }
-            return found;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {

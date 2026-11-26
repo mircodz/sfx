@@ -124,6 +124,9 @@ internal sealed class Shell : IActionHost
         _main.Add(ClusterPage, _navigator);
         _main.Add(ContextsPage, _contexts.Widget);
         _main.Show(ClusterPage);
+        // The switcher hands focus to whichever page it shows, but only once it has it: without this the contexts
+        // table never gets focus, and a table ignores keys without it.
+        _main.HasFocus = true;
 
         app.Root = new Stack(Direction.Vertical)
             .Add(_summary, Constraint.Length(1))
@@ -148,6 +151,9 @@ internal sealed class Shell : IActionHost
     }
 
     private bool OnContexts => _main.CurrentName == ContextsPage;
+
+    /// <summary>The contexts page's table, for tests.</summary>
+    internal Table<ResolvedContext> ContextsTable => _contexts.Table;
 
     private IResourceView? Current =>
         OnContexts ? _contexts
@@ -869,10 +875,8 @@ internal sealed class Shell : IActionHost
         if (!OnContexts)
         {
             _main.Show(ContextsPage);
-            if (_contexts.Table.Rows.FirstOrDefault(c => c.Context.Name == _session.Context.Name) is { } current)
-            {
-                _contexts.Table.SelectRow(current);
-            }
+            // Once the rows are loaded (the first time, they aren't yet): start on the context in use.
+            _contexts.Select(_session.Context.Name);
             Refresh();
         }
     }
