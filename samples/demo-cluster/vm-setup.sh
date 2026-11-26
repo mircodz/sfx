@@ -23,6 +23,18 @@ if ! systemctl is-enabled servicefabric >/dev/null 2>&1; then
   /opt/microsoft/sdk/servicefabric/common/clustersetup/devclustersetup.sh
 fi
 
+# A deallocation mid-write can leave a corrupt trace session; Service Fabric's trace converter then crashes on it every
+# few seconds, and each crash's 1.4 GB core dump fills the disk. So: no core dumps, and each boot drops the old sessions.
+echo "kernel.core_pattern=|/bin/false" > /etc/sysctl.d/60-sfx-no-core.conf
+sysctl -q -p /etc/sysctl.d/60-sfx-no-core.conf
+systemctl disable --now apport >/dev/null 2>&1 || true
+rm -rf /var/lib/apport/coredump/*
+mkdir -p /etc/systemd/system/servicefabric.service.d
+cat > /etc/systemd/system/servicefabric.service.d/drop-traces.conf <<'EOF'
+[Service]
+ExecStartPre=/bin/sh -c 'rm -rf /home/sfuser/sfdevcluster/data/log/lttng-traces/*'
+EOF
+
 # Shutting down from inside would leave the VM allocated, and billed; deallocating goes through Azure, using the
 # VM's managed identity.
 cat > /usr/local/bin/sfx-expire <<'EOF'
