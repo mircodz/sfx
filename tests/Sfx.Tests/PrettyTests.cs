@@ -22,9 +22,7 @@ public class PrettyTests
         var (text, format) = Inspect.TryPretty(manifest);
 
         Assert.Equal(Inspect.Format.Xml, format);
-        Assert.Equal(
-            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<App Name=\"a\" Version=\"1\">\n  <!-- note -->\n  <Svc Type=\"t\" />\n</App>",
-            text);
+        Assert.Equal("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<App Name=\"a\" Version=\"1\">\n  <!-- note -->\n  <Svc Type=\"t\" />\n</App>", text);
     }
 
     [Theory]
@@ -76,21 +74,22 @@ public class PrettyTests
     public void Fields_holding_json_or_xml_unfold_below_their_name()
     {
         var lines = Lines.Fields(
-        [
-            new Field("Id", """{"Id":"x"}"""),
-            new Field("Policy", """{"MaxPercentUnhealthy":0,"ConsiderWarningAsError":false}"""),
-            new Field("Name", "fabric:/a"),
-        ]).Select(l => l.PlainText).ToList();
+            [
+                new Field("Id", """{"Id":"x"}"""),
+                new Field("Policy", """{"MaxPercentUnhealthy":0,"ConsiderWarningAsError":false}"""),
+                new Field("Name", "fabric:/a"),
+            ]).Select(l => l.PlainText).ToList();
 
         Assert.Equal(
-        [
-            "Id      {\"Id\":\"x\"}",
-            "Policy  ",
-            "  {",
-            "    \"MaxPercentUnhealthy\": 0,",
-            "    \"ConsiderWarningAsError\": false",
-            "  }",
-            "Name    fabric:/a",
-        ], lines);
+            [
+                "Id      {\"Id\":\"x\"}",
+                "Policy  ",
+                "  {",
+                "    \"MaxPercentUnhealthy\": 0,",
+                "    \"ConsiderWarningAsError\": false",
+                "  }",
+                "Name    fabric:/a",
+            ],
+            lines);
     }
 }

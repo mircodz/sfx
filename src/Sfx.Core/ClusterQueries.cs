@@ -14,7 +14,9 @@ public sealed class ClusterQueries(IServiceFabricClient client)
     public async Task<IReadOnlyList<NodeRow>> GetNodesAsync(CancellationToken cancellationToken)
     {
         var nodes = await PageAsync(token => client.Nodes.GetNodeInfoListAsync(
-            continuationToken: token, nodeStatusFilter: NodeStatusFilter.All, cancellationToken: cancellationToken));
+            continuationToken: token,
+            nodeStatusFilter: NodeStatusFilter.All,
+            cancellationToken: cancellationToken));
 
         return nodes.Select(n => new NodeRow(
             n.Name.ToString(),
@@ -35,7 +37,9 @@ public sealed class ClusterQueries(IServiceFabricClient client)
     {
         var system = GetSystemApplicationHealthAsync(cancellationToken);
         var apps = await PageAsync(token => client.Applications.GetApplicationInfoListAsync(
-            excludeApplicationParameters: true, continuationToken: token, cancellationToken: cancellationToken));
+            excludeApplicationParameters: true,
+            continuationToken: token,
+            cancellationToken: cancellationToken));
 
         var rows = new List<ApplicationRow>
         {
@@ -53,7 +57,9 @@ public sealed class ClusterQueries(IServiceFabricClient client)
             return new(SystemApplicationId, SystemApplicationName, "System", "", "Ready", await GetSystemApplicationHealthAsync(cancellationToken));
         }
         var app = await OrNullAsync(() => client.Applications.GetApplicationInfoAsync(
-            applicationId, excludeApplicationParameters: true, cancellationToken: cancellationToken));
+            applicationId,
+            excludeApplicationParameters: true,
+            cancellationToken: cancellationToken));
         return app is null ? null : Row(app);
     }
 
@@ -69,8 +75,12 @@ public sealed class ClusterQueries(IServiceFabricClient client)
         try
         {
             var health = await client.Applications.GetApplicationHealthAsync(
-                SystemApplicationId, eventsHealthStateFilter: HealthFilter.None, deployedApplicationsHealthStateFilter: HealthFilter.None,
-                servicesHealthStateFilter: HealthFilter.None, excludeHealthStatistics: true, cancellationToken: cancellationToken);
+                SystemApplicationId,
+                eventsHealthStateFilter: HealthFilter.None,
+                deployedApplicationsHealthStateFilter: HealthFilter.None,
+                servicesHealthStateFilter: HealthFilter.None,
+                excludeHealthStatistics: true,
+                cancellationToken: cancellationToken);
             return health?.AggregatedHealthState ?? HealthState.Unknown;
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
@@ -82,7 +92,9 @@ public sealed class ClusterQueries(IServiceFabricClient client)
     public async Task<IReadOnlyList<ServiceRow>> GetServicesAsync(string applicationId, CancellationToken cancellationToken)
     {
         var services = await PageAsync(token => client.Services.GetServiceInfoListAsync(
-            applicationId, continuationToken: token, cancellationToken: cancellationToken));
+            applicationId,
+            continuationToken: token,
+            cancellationToken: cancellationToken));
 
         return services.Select(Row).ToList();
     }
@@ -100,7 +112,9 @@ public sealed class ClusterQueries(IServiceFabricClient client)
     public async Task<IReadOnlyList<PartitionRow>> GetPartitionsAsync(string serviceId, CancellationToken cancellationToken)
     {
         var partitions = await PageAsync(token => client.Partitions.GetPartitionInfoListAsync(
-            serviceId, continuationToken: token, cancellationToken: cancellationToken));
+            serviceId,
+            continuationToken: token,
+            cancellationToken: cancellationToken));
 
         return partitions.Select(Row).ToList();
     }
@@ -131,7 +145,9 @@ public sealed class ClusterQueries(IServiceFabricClient client)
     public async Task<IReadOnlyList<ReplicaRow>> GetReplicasAsync(PartitionId partitionId, CancellationToken cancellationToken)
     {
         var replicas = await PageAsync(token => client.Replicas.GetReplicaInfoListAsync(
-            partitionId, continuationToken: token, cancellationToken: cancellationToken));
+            partitionId,
+            continuationToken: token,
+            cancellationToken: cancellationToken));
 
         return replicas.Select(r => new ReplicaRow(
             r switch
@@ -151,11 +167,17 @@ public sealed class ClusterQueries(IServiceFabricClient client)
     public async Task<IReadOnlyList<ApplicationTypeRow>> GetApplicationTypesAsync(CancellationToken cancellationToken)
     {
         var types = await PageAsync(token => client.ApplicationTypes.GetApplicationTypeInfoListAsync(
-            excludeApplicationParameters: false, continuationToken: token, cancellationToken: cancellationToken));
+            excludeApplicationParameters: false,
+            continuationToken: token,
+            cancellationToken: cancellationToken));
 
         return types
             .Select(t => new ApplicationTypeRow(
-                t.Name ?? "", t.Version ?? "", Text(t.Status), t.DefaultParameterList ?? new Dictionary<string, string>(), t.StatusDetails ?? ""))
+                t.Name ?? "",
+                t.Version ?? "",
+                Text(t.Status),
+                t.DefaultParameterList ?? new Dictionary<string, string>(),
+                t.StatusDetails ?? ""))
             .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
             .ThenByDescending(t => t.Version, VersionComparer.Instance)
             .ToList();
@@ -190,7 +212,9 @@ public sealed class ClusterQueries(IServiceFabricClient client)
 
     /// <summary>Whether the cluster says the entity doesn't exist, e.g. because it was deleted since its parent was listed.</summary>
     public static bool IsGone(ServiceFabricException ex) =>
-        ex.ErrorCode.ToString() is var code && (code.Contains("NOT_FOUND", StringComparison.Ordinal) || code.Contains("DOES_NOT_EXIST", StringComparison.Ordinal));
+        ex.ErrorCode.ToString() is var code && (code.Contains(
+            "NOT_FOUND",
+            StringComparison.Ordinal) || code.Contains("DOES_NOT_EXIST", StringComparison.Ordinal));
 
     /// <summary>What the query returns; null when the cluster says the entity doesn't exist (or answers with nothing).</summary>
     private static async Task<T?> OrNullAsync<T>(Func<Task<T>> query) where T : class

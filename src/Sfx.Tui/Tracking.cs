@@ -121,7 +121,8 @@ public static class Tracking
             "Failed" => OperationState.Failure("failed" + (report.FailureReason is { Length: > 0 } and not "None" ? $": {report.FailureReason}" : "")),
             "RollingBackInProgress" => OperationState.Running("rolling back", progress),
             "RollingForwardPending" => OperationState.Running(
-                $"waiting to start {(report.NextDomain.Length > 0 ? "domain " + report.NextDomain : "the next domain")}" + (domains.Length > 0 ? $" ({domains})" : ""), progress),
+                $"waiting to start {(report.NextDomain.Length > 0 ? "domain " + report.NextDomain : "the next domain")}" + (domains.Length > 0 ? $" ({domains})" : ""),
+                progress),
             _ => OperationState.Running(domains.Length > 0 ? domains : "upgrading", progress),
         };
     }

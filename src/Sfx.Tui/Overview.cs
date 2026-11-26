@@ -162,7 +162,8 @@ public sealed partial class Views
 
     /// <summary>A search hit as a choice: its name (a node's with its address), and what it is.</summary>
     public static Choice SearchChoice(SearchHit hit, Action open) =>
-        new(hit.Node is { } node ? $"{node.Name}  {node.Address}" : hit.Title,
+        new(
+            hit.Node is { } node ? $"{node.Name}  {node.Address}" : hit.Title,
             hit switch
             {
                 { Node: { } n } => $"node · {n.NodeType}",

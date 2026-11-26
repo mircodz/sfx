@@ -57,10 +57,7 @@ internal static class ApiLifecycle
             var service = Api.Service(await s.Inspector.GetServiceAsync(appId, serviceId, ct));
             var description = await s.Inspector.GetServiceDescriptionAsync(serviceId, ct);
             var action = WebActions.For(s, "service", Api.ServiceTarget(service, appId, description)).FirstOrDefault(a => a.Id == "edit-service-settings");
-            return new ServiceSettingsDto(
-                description is StatefulServiceDescription,
-                ServiceSettings.Read(description).Select(Setting).ToList(),
-                action);
+            return new ServiceSettingsDto(description is StatefulServiceDescription, ServiceSettings.Read(description).Select(Setting).ToList(), action);
         });
     }
 
@@ -68,14 +65,22 @@ internal static class ApiLifecycle
     {
         var target = new Dictionary<string, string>
         {
-            ["typeName"] = t.Name, ["version"] = t.Version, ["status"] = t.Status, ["inUse"] = applications.Count > 0 ? "true" : "false",
+            ["typeName"] = t.Name,
+            ["version"] = t.Version,
+            ["status"] = t.Status,
+            ["inUse"] = applications.Count > 0 ? "true" : "false",
         };
         foreach (var (name, value) in t.DefaultParameters)
         {
             target[LifecycleActions.DefaultPrefix + name] = value;
         }
         return new ApplicationTypeDto(
-            t.Name, t.Version, t.Status, t.StatusDetails is { Length: > 0 } details ? details : null, t.DefaultParameters, applications,
+            t.Name,
+            t.Version,
+            t.Status,
+            t.StatusDetails is { Length: > 0 } details ? details : null,
+            t.DefaultParameters,
+            applications,
             WebActions.For(s, "type", target));
     }
 

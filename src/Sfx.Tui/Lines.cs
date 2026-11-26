@@ -290,8 +290,14 @@ public static class Lines
 
     public static IReadOnlyList<StyledText> ServiceDescription(Microsoft.ServiceFabric.Common.ServiceDescription description)
     {
-        var lines = new List<StyledText>(Fields(Inspect.Fields(description,
-            "PartitionDescription", "ServiceLoadMetrics", "ServicePlacementPolicies", "CorrelationScheme", "ScalingPolicies", "InitializationData")));
+        var lines = new List<StyledText>(Fields(Inspect.Fields(
+            description,
+            "PartitionDescription",
+            "ServiceLoadMetrics",
+            "ServicePlacementPolicies",
+            "CorrelationScheme",
+            "ScalingPolicies",
+            "InitializationData")));
 
         lines.Add(StyledText.Empty());
         lines.Add(Heading("Partitioning"));

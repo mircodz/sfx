@@ -189,7 +189,8 @@ public sealed class ClusterUpgrades(IServiceFabricClient client)
             throw new RefusedException(AzureManagedNote, conflict: true);
         }
         await client.Cluster.ProvisionClusterAsync(
-            new ProvisionFabricDescription(Blank(codePath), Blank(clusterManifestPath)), cancellationToken: cancellationToken);
+            new ProvisionFabricDescription(Blank(codePath), Blank(clusterManifestPath)),
+            cancellationToken: cancellationToken);
     }
 
     /// <summary>Removes provisioned code and/or config versions the cluster no longer runs.</summary>
@@ -204,7 +205,8 @@ public sealed class ClusterUpgrades(IServiceFabricClient client)
             throw new RefusedException(AzureManagedNote, conflict: true);
         }
         await client.Cluster.UnprovisionClusterAsync(
-            new UnprovisionFabricDescription(Blank(codeVersion), Blank(configVersion)), cancellationToken: cancellationToken);
+            new UnprovisionFabricDescription(Blank(codeVersion), Blank(configVersion)),
+            cancellationToken: cancellationToken);
     }
 
     /// <summary>The domain an upgrade waits to start: only a pending upgrade (manual, or stopped on failure) waits.</summary>

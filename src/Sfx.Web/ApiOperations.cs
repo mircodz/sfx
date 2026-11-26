@@ -7,7 +7,14 @@ namespace Sfx.Web;
 /// <param name="Finished">UTC; null while running.</param>
 /// <param name="Progress">How far it is, 0 to 1, while that can be counted (an upload); null otherwise.</param>
 public sealed record OperationDto(
-    string Id, string ActionId, string Title, DateTime Started, string State, string? Detail, DateTime? Finished, double? Progress = null);
+    string Id,
+    string ActionId,
+    string Title,
+    DateTime Started,
+    string State,
+    string? Detail,
+    DateTime? Finished,
+    double? Progress = null);
 
 internal static class ApiOperations
 {

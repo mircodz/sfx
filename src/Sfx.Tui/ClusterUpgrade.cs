@@ -50,7 +50,9 @@ public sealed partial class Views
             }
             else
             {
-                host.Edit("Upgrade the cluster", _ => Task.FromResult(ClusterUpgradeFields(start.Options)),
+                host.Edit(
+                    "Upgrade the cluster",
+                    _ => Task.FromResult(ClusterUpgradeFields(start.Options)),
                     fields => ClusterUpgradeOperation(target, start, fields));
             }
         });
@@ -73,7 +75,8 @@ public sealed partial class Views
         },
         new FormField("plan", "Plan", UpgradePlan.All[0].Title)
         {
-            Kind = FormFieldKind.Choice, Choices = UpgradePlan.All.Select(p => p.Title).ToList(),
+            Kind = FormFieldKind.Choice,
+            Choices = UpgradePlan.All.Select(p => p.Title).ToList(),
             Hint = string.Join("; ", UpgradePlan.All.Select(p => $"{p.Title.ToLowerInvariant()}: {p.Hint}")),
         },
         .. PolicyFields(cluster: true),
@@ -91,7 +94,10 @@ public sealed partial class Views
         var plan = PlanOf(fields);
         var policy = ParsePolicy(fields, plan, cluster: true);
         var expected = $"code {code ?? start.Options.CodeVersion}, config {config ?? start.Options.ConfigVersion}";
-        return new Operation(ClusterUpgrades.Describe(code, config, plan, policy is not null), target, ActionRisk.Destructive,
+        return new Operation(
+            ClusterUpgrades.Describe(code, config, plan, policy is not null),
+            target,
+            ActionRisk.Destructive,
             (ct, _) => ClusterUpgrades.StartAsync(code, config, plan, policy, ct),
             "Every node restarts, one upgrade domain at a time; :upgrades shows how far it got.")
         {
@@ -103,15 +109,18 @@ public sealed partial class Views
 
     private void ClusterUpgradeControls(string target) =>
         host.Pick("The cluster is upgrading", _ => Task.FromResult<IReadOnlyList<Choice>>(
-        [
-            new("Resume into the next domain", "manual upgrades wait for this", ResumeClusterUpgrade),
-            new("Change how it proceeds", "monitored, manual, automatic…", ChangeClusterUpgradePlan),
-            new("Roll back", "nodes already upgraded go back", () => RollbackClusterUpgrade(target)),
-        ]));
+            [
+                new("Resume into the next domain", "manual upgrades wait for this", ResumeClusterUpgrade),
+                new("Change how it proceeds", "monitored, manual, automatic…", ChangeClusterUpgradePlan),
+                new("Roll back", "nodes already upgraded go back", () => RollbackClusterUpgrade(target)),
+            ]));
 
     private void ChangeClusterUpgradePlan() =>
         PickPlan("Continue the cluster upgrade as", plan =>
-            host.Run(Op($"Continue the cluster upgrade: {plan.Title.ToLowerInvariant()}", "cluster", ActionRisk.Confirm,
+            host.Run(Op(
+                $"Continue the cluster upgrade: {plan.Title.ToLowerInvariant()}",
+                "cluster",
+                ActionRisk.Confirm,
                 ct => ClusterUpgrades.ChangePlanAsync(plan, ct))));
 
     private void ResumeClusterUpgrade() =>
@@ -122,13 +131,16 @@ public sealed partial class Views
                 host.Warn("the cluster's upgrade isn't waiting to start a domain");
                 return;
             }
-            host.Run(Op($"Resume the cluster upgrade into domain {domain}", "cluster", ActionRisk.Confirm,
-                ct => ClusterUpgrades.ResumeAsync(domain, ct)));
+            host.Run(Op($"Resume the cluster upgrade into domain {domain}", "cluster", ActionRisk.Confirm, ct => ClusterUpgrades.ResumeAsync(domain, ct)));
         });
 
     private void RollbackClusterUpgrade(string target) =>
-        host.Run(Op("Roll back the cluster upgrade", target, ActionRisk.Destructive,
-            ct => ClusterUpgrades.RollbackAsync(ct), "Nodes already upgraded go back to the previous version, one domain at a time.") with
+        host.Run(Op(
+            "Roll back the cluster upgrade",
+            target,
+            ActionRisk.Destructive,
+            ct => ClusterUpgrades.RollbackAsync(ct),
+            "Nodes already upgraded go back to the previous version, one domain at a time.") with
         {
             Track = async (_, ct) => RolledBack(UpgradeReport.From(await _inspect.GetClusterUpgradeAsync(ct))),
             TrackFor = TimeSpan.FromHours(4),
@@ -143,13 +155,24 @@ public sealed partial class Views
     /// <summary>On the upgrades page: <c>u</c> on the cluster's row starts or steers one, on a running application's steers it.</summary>
     private IReadOnlyList<EntityAction<UpgradeRow>> UpgradeRowActions(string clusterName) =>
     [
-        new("Upgrade the cluster, or steer its running upgrade", ActionRisk.Confirm, _ => UpgradeCluster(clusterName), [Upgrade], ["upgrade"],
+        new(
+            "Upgrade the cluster, or steer its running upgrade",
+            ActionRisk.Confirm,
+            _ => UpgradeCluster(clusterName),
+            [Upgrade],
+            ["upgrade"],
             AppliesTo: u => u.ApplicationId is null),
 
-        new("Steer the running upgrade", ActionRisk.Confirm, u => ApplicationUpgradeControls(u.ApplicationId!, u.Name), [Upgrade],
+        new(
+            "Steer the running upgrade",
+            ActionRisk.Confirm,
+            u => ApplicationUpgradeControls(u.ApplicationId!, u.Name),
+            [Upgrade],
             AppliesTo: u => u.ApplicationId is not null && u.Report.InProgress),
 
-        new("Change how the running upgrade proceeds", ActionRisk.Confirm,
+        new(
+            "Change how the running upgrade proceeds",
+            ActionRisk.Confirm,
             u =>
             {
                 if (u.ApplicationId is { } id)
@@ -161,9 +184,12 @@ public sealed partial class Views
                     ChangeClusterUpgradePlan();
                 }
             },
-            Commands: ["upgrade-mode"], AppliesTo: u => u.Report.InProgress),
+            Commands: ["upgrade-mode"],
+            AppliesTo: u => u.Report.InProgress),
 
-        new("Resume the upgrade into the next domain", ActionRisk.Confirm,
+        new(
+            "Resume the upgrade into the next domain",
+            ActionRisk.Confirm,
             u =>
             {
                 if (u.ApplicationId is { } id)
@@ -175,9 +201,12 @@ public sealed partial class Views
                     ResumeClusterUpgrade();
                 }
             },
-            Commands: ["resume"], AppliesTo: u => u.Report.InProgress),
+            Commands: ["resume"],
+            AppliesTo: u => u.Report.InProgress),
 
-        new("Roll back the running upgrade", ActionRisk.Confirm,
+        new(
+            "Roll back the running upgrade",
+            ActionRisk.Confirm,
             u =>
             {
                 if (u.ApplicationId is { } id)
@@ -189,6 +218,7 @@ public sealed partial class Views
                     RollbackClusterUpgrade(clusterName);
                 }
             },
-            Commands: ["rollback"], AppliesTo: u => u.Report.InProgress),
+            Commands: ["rollback"],
+            AppliesTo: u => u.Report.InProgress),
     ];
 }

@@ -14,13 +14,15 @@ public sealed partial class UiSession
     /// <summary>Cluster load per metric, from one call, shared by every tab for 15 seconds.</summary>
     public Task<LoadDto> GetLoadAsync(CancellationToken cancellationToken) =>
         LazyInitializer.EnsureInitialized(ref _load, () => new Cached<LoadDto>(
-                TimeSpan.FromSeconds(15), ct => ApiLoad.LoadAsync(this, includeNodes: false, ct)))
+            TimeSpan.FromSeconds(15),
+            ct => ApiLoad.LoadAsync(this, includeNodes: false, ct)))
             .GetAsync(cancellationToken);
 
     /// <summary>Cluster load with each node's; one walk of the nodes serves every tab for a minute.</summary>
     public Task<LoadDto> GetNodeLoadAsync(CancellationToken cancellationToken) =>
         LazyInitializer.EnsureInitialized(ref _nodeLoad, () => new Cached<LoadDto>(
-                TimeSpan.FromSeconds(60), ct => ApiLoad.LoadAsync(this, includeNodes: true, ct)))
+            TimeSpan.FromSeconds(60),
+            ct => ApiLoad.LoadAsync(this, includeNodes: true, ct)))
             .GetAsync(cancellationToken);
 
     /// <summary>
@@ -53,7 +55,8 @@ public sealed partial class UiSession
             return new Dictionary<string, string>();
         }
         var cache = LazyInitializer.EnsureInitialized(ref _nodeNames, () => new Cached<IReadOnlyDictionary<string, string>>(
-            TimeSpan.FromMinutes(5), async ct => ApiLoad.NamesById(await Queries.GetNodesAsync(ct))));
+            TimeSpan.FromMinutes(5),
+            async ct => ApiLoad.NamesById(await Queries.GetNodesAsync(ct))));
         try
         {
             var names = await cache.GetAsync(cancellationToken);

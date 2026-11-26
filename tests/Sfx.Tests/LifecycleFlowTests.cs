@@ -163,7 +163,13 @@ public class OverviewPageTests
     private static readonly NodeRow Node1 = new("_Node_1", "10.0.0.4", "FrontEnd", "Up", HealthState.Ok, "0", "fd:/0", true, "10.0", null, "id1");
     private static readonly ApplicationRow Voting = new("Voting", "fabric:/Voting", "VotingType", "1.0.0", "Ready", HealthState.Ok);
     private static readonly ServiceRow Web = new("Voting~Web", "fabric:/Voting/Web", "WebType", "Stateless", "Active", HealthState.Ok);
-    private static readonly PartitionRow Partition = new(PartitionId.Parse("2d5a8f0e-0000-4000-8000-000000000001"), "Stateless", "Singleton", "Ready", HealthState.Ok, "1");
+    private static readonly PartitionRow Partition = new(
+        PartitionId.Parse("2d5a8f0e-0000-4000-8000-000000000001"),
+        "Stateless",
+        "Singleton",
+        "Ready",
+        HealthState.Ok,
+        "1");
 
     private static readonly IReadOnlyList<SearchHit> Index =
     [
@@ -175,12 +181,14 @@ public class OverviewPageTests
     [Fact]
     public void The_summary_line_counts_each_kind_with_its_warnings_and_errors()
     {
-        var summary = new ClusterSummary("10.1.2", new HealthReport(HealthState.Warning, [], []),
-        [
-            new HealthCount("Node", 4, 1, 0),
-            new HealthCount("Application", 2, 0, 1),
-            new HealthCount("Service", 7, 0, 0),
-        ]);
+        var summary = new ClusterSummary(
+            "10.1.2",
+            new HealthReport(HealthState.Warning, [], []),
+            [
+                new HealthCount("Node", 4, 1, 0),
+                new HealthCount("Application", 2, 0, 1),
+                new HealthCount("Service", 7, 0, 0),
+            ]);
 
         Assert.Equal(" Warning  ·  5 nodes W1  ·  3 apps E1  ·  7 services  ·  v10.1.2", Views.SummaryLine(summary).PlainText);
     }
@@ -279,7 +287,10 @@ public class ApplicationTypeFormTests
 
     public ApplicationTypeFormTests() => _views = new Views(new ClusterQueries(null!), _host);
 
-    private static readonly ApplicationTypeRow VotingType = new("VotingType", "1.0.0", "Available",
+    private static readonly ApplicationTypeRow VotingType = new(
+        "VotingType",
+        "1.0.0",
+        "Available",
         new Dictionary<string, string> { ["Web_InstanceCount"] = "-1", ["Port"] = "8080" });
 
     [Fact]
@@ -481,8 +492,10 @@ public class ApplicationUpgradeFormTests
 
         Assert.Null(Views.ParsePolicy(Policy(false), UpgradePlan.MonitoredRollback, cluster: false));
 
-        var policy = Views.ParsePolicy(Policy(false, ("healthCheckWait", "5m"), ("forceRestart", "true"), ("maxPercentUnhealthyServices", "20")),
-            UpgradePlan.MonitoredRollback, cluster: false);
+        var policy = Views.ParsePolicy(
+            Policy(false, ("healthCheckWait", "5m"), ("forceRestart", "true"), ("maxPercentUnhealthyServices", "20")),
+            UpgradePlan.MonitoredRollback,
+            cluster: false);
         Assert.Equal(TimeSpan.FromMinutes(5), policy?.HealthCheckWait);
         Assert.True(policy?.ForceRestart);
         Assert.Equal(20, policy?.MaxPercentUnhealthyServices);
@@ -491,7 +504,9 @@ public class ApplicationUpgradeFormTests
             Views.ParsePolicy(Policy(false, ("healthCheckWait", "5m")), UpgradePlan.UnmonitoredAuto, cluster: false)).Message);
         Assert.Contains("duration", Assert.Throws<RefusedException>(() =>
             Views.ParsePolicy(Policy(false, ("upgradeTimeout", "soon")), UpgradePlan.MonitoredRollback, cluster: false)).Message);
-        Assert.Equal(10, Views.ParsePolicy(Policy(true, ("maxPercentUnhealthyNodes", "10")), UpgradePlan.MonitoredRollback, cluster: true)?.MaxPercentUnhealthyNodes);
+        Assert.Equal(
+            10,
+            Views.ParsePolicy(Policy(true, ("maxPercentUnhealthyNodes", "10")), UpgradePlan.MonitoredRollback, cluster: true)?.MaxPercentUnhealthyNodes);
         Assert.DoesNotContain(Views.PolicyFields(cluster: true), f => f.Key == "policy:maxPercentUnhealthyServices");
     }
 
@@ -511,7 +526,11 @@ public class ApplicationUpgradeFormTests
     [InlineData("Upgrading", "Steer the running upgrade")]
     public async Task The_u_key_finds_the_action_that_fits_the_row(string status, string title)
     {
-        var page = new ResourceView<ApplicationRow>("applications", "apps", _ => Task.FromResult<IReadOnlyList<ApplicationRow>>([App with { Status = status }]), a => a.Id)
+        var page = new ResourceView<ApplicationRow>(
+            "applications",
+            "apps",
+            _ => Task.FromResult<IReadOnlyList<ApplicationRow>>([App with { Status = status }]),
+            a => a.Id)
             .Acting(_views.ApplicationActions(), _host)
             .Column("NAME", Constraint.Fill(1), a => Plain(a.Name), a => a.Name);
         (await page.LoadAsync(CancellationToken.None))();
@@ -638,13 +657,14 @@ public class ServiceFormTests
     public void Service_names_go_under_the_application_unless_given_in_full(string name, string full) =>
         Assert.Equal(full, Views.ServiceName(App.Name, name));
 
-    private static readonly ServiceSettingSet Stateful = new(true,
-    [
-        new("count", "Target replicas", SettingKind.Count, "3", Min: 1),
-        new("min-replicas", "Min replicas", SettingKind.Count, "2", Min: 1),
-        new("quorum-loss-wait", "Quorum loss wait", SettingKind.Seconds, ""),
-        new("move-cost", "Default move cost", SettingKind.Choice, "Low", ["Zero", "Low", "Medium", "High"]),
-    ]);
+    private static readonly ServiceSettingSet Stateful = new(
+        true,
+        [
+            new("count", "Target replicas", SettingKind.Count, "3", Min: 1),
+            new("min-replicas", "Min replicas", SettingKind.Count, "2", Min: 1),
+            new("quorum-loss-wait", "Quorum loss wait", SettingKind.Seconds, ""),
+            new("move-cost", "Default move cost", SettingKind.Choice, "Low", ["Zero", "Low", "Medium", "High"]),
+        ]);
 
     private static readonly ServiceRow Data = new("Voting~Data", "fabric:/Voting/Data", "VotingDataType", "Stateful", "Active", HealthState.Ok);
 
@@ -733,8 +753,12 @@ public class LifecycleTrackingTests
     [Fact]
     public void A_provisioned_type_settles_once_available()
     {
-        Assert.Equal("waiting for the type to show up", Tracking.TypeProvisioned("VotingType", "2.0.0", new HashSet<string>(), [Type("1.0.0", "Available")]).Detail);
-        Assert.Equal("VotingType 2.0.0 is provisioning", Tracking.TypeProvisioned("VotingType", "2.0.0", new HashSet<string>(), [Type("2.0.0", "Provisioning")]).Detail);
+        Assert.Equal(
+            "waiting for the type to show up",
+            Tracking.TypeProvisioned("VotingType", "2.0.0", new HashSet<string>(), [Type("1.0.0", "Available")]).Detail);
+        Assert.Equal(
+            "VotingType 2.0.0 is provisioning",
+            Tracking.TypeProvisioned("VotingType", "2.0.0", new HashSet<string>(), [Type("2.0.0", "Provisioning")]).Detail);
         Assert.True(Tracking.TypeProvisioned("VotingType", "2.0.0", new HashSet<string>(), [Type("2.0.0", "Available")]).Done);
 
         var failed = Tracking.TypeProvisioned("VotingType", "2.0.0", new HashSet<string>(), [Type("2.0.0", "Failed", "bad manifest")]);
@@ -748,7 +772,9 @@ public class LifecycleTrackingTests
         var before = new HashSet<string> { "VotingType 1.0.0" };
 
         Assert.False(Tracking.TypeProvisioned(null, null, before, [Type("1.0.0", "Available")]).Done);
-        Assert.Equal("VotingType 3.0.0 is available", Tracking.TypeProvisioned(null, null, before, [Type("1.0.0", "Available"), Type("3.0.0", "Available")]).Detail);
+        Assert.Equal(
+            "VotingType 3.0.0 is available",
+            Tracking.TypeProvisioned(null, null, before, [Type("1.0.0", "Available"), Type("3.0.0", "Available")]).Detail);
     }
 
     private static UpgradeReport Report(string state, string target, string started = "t1", params (string Name, string State)[] domains) =>

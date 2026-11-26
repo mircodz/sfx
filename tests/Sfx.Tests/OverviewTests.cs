@@ -13,15 +13,15 @@ public class OverviewTests
     public void Health_counts_come_in_entity_order_without_other_kinds()
     {
         var statistics = new HealthStatistics(
-        [
-            Count(EntityKind.Replica, 60_000, 3, 1),
-            Count(EntityKind.DeployedApplication, 5, 0, 0),
-            Count(EntityKind.Partition, 20_000, 2, 0),
-            Count(EntityKind.Node, 398, 1, 1),
-            Count(EntityKind.Service, 3_000, 0, 0),
-            Count(EntityKind.DeployedServicePackage, 7, 0, 0),
-            Count(EntityKind.Application, 999, 1, 0),
-        ]);
+            [
+                Count(EntityKind.Replica, 60_000, 3, 1),
+                Count(EntityKind.DeployedApplication, 5, 0, 0),
+                Count(EntityKind.Partition, 20_000, 2, 0),
+                Count(EntityKind.Node, 398, 1, 1),
+                Count(EntityKind.Service, 3_000, 0, 0),
+                Count(EntityKind.DeployedServicePackage, 7, 0, 0),
+                Count(EntityKind.Application, 999, 1, 0),
+            ]);
 
         Assert.Equal(
             [
@@ -44,21 +44,57 @@ public class OverviewTests
     }
 
     private static LoadMetricInformation Metric(
-        string name, string capacity = "0", double? load = null, string clusterLoad = "0", bool? balancedBefore = null, bool? balancedAfter = null,
-        string? minValue = null, double? minimum = null, string? minNode = null, string? maxValue = null, double? maximum = null, string? maxNode = null) =>
-        new(name, balancedBefore, balancedAfter, null, null, null, null, null, capacity, clusterLoad, load, null, null, null, null, null, null, null,
-            minValue, minimum, minNode is null ? null : new NodeId(minNode), maxValue, maximum, maxNode is null ? null : new NodeId(maxNode), null);
+        string name,
+        string capacity = "0",
+        double? load = null,
+        string clusterLoad = "0",
+        bool? balancedBefore = null,
+        bool? balancedAfter = null,
+        string? minValue = null,
+        double? minimum = null,
+        string? minNode = null,
+        string? maxValue = null,
+        double? maximum = null,
+        string? maxNode = null) =>
+        new(
+            name,
+            balancedBefore,
+            balancedAfter,
+            null,
+            null,
+            null,
+            null,
+            null,
+            capacity,
+            clusterLoad,
+            load,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            minValue,
+            minimum,
+            minNode is null ? null : new NodeId(minNode),
+            maxValue,
+            maximum,
+            maxNode is null ? null : new NodeId(maxNode),
+            null);
 
     [Fact]
     public void Load_summaries_skip_system_metrics_and_put_capacity_first()
     {
-        var load = new ClusterLoadInfo(null, null,
-        [
-            Metric("__NamingServiceReplicaCount__", load: 12),
-            Metric("Zeta", load: 1),
-            Metric("MemoryMB", capacity: "4096", load: 1024),
-            Metric("Alpha", capacity: "1e300", clusterLoad: "2.5"),
-        ]);
+        var load = new ClusterLoadInfo(
+            null,
+            null,
+            [
+                Metric("__NamingServiceReplicaCount__", load: 12),
+                Metric("Zeta", load: 1),
+                Metric("MemoryMB", capacity: "4096", load: 1024),
+                Metric("Alpha", capacity: "1e300", clusterLoad: "2.5"),
+            ]);
 
         var summaries = ApiLoad.Summaries(load);
 
@@ -73,12 +109,14 @@ public class OverviewTests
     [Fact]
     public void Load_summaries_carry_the_least_and_most_loaded_nodes()
     {
-        var load = new ClusterLoadInfo(null, null,
-        [
-            Metric("Cpu", balancedBefore: false, balancedAfter: true, minimum: 1.5, minValue: "9", minNode: "a1", maximum: 7, maxNode: "b2"),
-            Metric("Disk", balancedBefore: false, minValue: "3", minNode: "c3", maxValue: "8.25", maxNode: ""),
-            Metric("Net"),
-        ]);
+        var load = new ClusterLoadInfo(
+            null,
+            null,
+            [
+                Metric("Cpu", balancedBefore: false, balancedAfter: true, minimum: 1.5, minValue: "9", minNode: "a1", maximum: 7, maxNode: "b2"),
+                Metric("Disk", balancedBefore: false, minValue: "3", minNode: "c3", maxValue: "8.25", maxNode: ""),
+                Metric("Net"),
+            ]);
 
         var summaries = ApiLoad.Summaries(load);
 
@@ -106,16 +144,18 @@ public class OverviewTests
     [Fact]
     public void Least_and_most_loaded_nodes_are_named()
     {
-        var load = new ClusterLoadInfo(null, null,
-        [
-            Metric("Cpu", minimum: 1, minNode: "A1B2", maximum: 7, maxNode: "ffff"),
-            Metric("Idle", minimum: 0, minNode: "a1b2", maximum: 0, maxNode: "c3d4"),
-        ]);
+        var load = new ClusterLoadInfo(
+            null,
+            null,
+            [
+                Metric("Cpu", minimum: 1, minNode: "A1B2", maximum: 7, maxNode: "ffff"),
+                Metric("Idle", minimum: 0, minNode: "a1b2", maximum: 0, maxNode: "c3d4"),
+            ]);
         var names = ApiLoad.NamesById(
-        [
-            new NodeRow("_Node_0", "", "FrontEnd", "Up", HealthState.Ok, "0", "fd:/0", false, "", null, "a1b2"),
-            new NodeRow("_Node_1", "", "FrontEnd", "Up", HealthState.Ok, "1", "fd:/1", false, "", null, "c3d4"),
-        ]);
+            [
+                new NodeRow("_Node_0", "", "FrontEnd", "Up", HealthState.Ok, "0", "fd:/0", false, "", null, "a1b2"),
+                new NodeRow("_Node_1", "", "FrontEnd", "Up", HealthState.Ok, "1", "fd:/1", false, "", null, "c3d4"),
+            ]);
 
         var summaries = ApiLoad.Summaries(load, nodeNames: names);
 

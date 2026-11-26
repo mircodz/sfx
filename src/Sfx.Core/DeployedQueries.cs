@@ -37,26 +37,44 @@ public sealed class DeployedQueries(IServiceFabricClient client)
     public async Task<IReadOnlyList<DeployedApplicationRow>> GetApplicationsAsync(string node, CancellationToken cancellationToken)
     {
         var apps = await ClusterQueries.PageAsync(token => client.Applications.GetDeployedApplicationInfoListAsync(
-            new NodeName(node), includeHealthState: true, continuationToken: token, cancellationToken: cancellationToken));
+            new NodeName(node),
+            includeHealthState: true,
+            continuationToken: token,
+            cancellationToken: cancellationToken));
 
         return apps.Select(a => new DeployedApplicationRow(
-            a.Id, a.Name.ToString(), a.TypeName ?? "", a.Status?.ToString() ?? "", a.HealthState ?? HealthState.Unknown)).ToList();
+            a.Id,
+            a.Name.ToString(),
+            a.TypeName ?? "",
+            a.Status?.ToString() ?? "",
+            a.HealthState ?? HealthState.Unknown)).ToList();
     }
 
     public async Task<IReadOnlyList<DeployedServicePackageRow>> GetServicePackagesAsync(string node, string applicationId, CancellationToken cancellationToken)
     {
         var packages = await client.ServicePackages.GetDeployedServicePackageInfoListAsync(
-            new NodeName(node), applicationId, cancellationToken: cancellationToken);
+            new NodeName(node),
+            applicationId,
+            cancellationToken: cancellationToken);
 
         return (packages ?? []).Select(p => new DeployedServicePackageRow(
-            p.Name ?? "", p.Version ?? "", p.Status?.ToString() ?? "", p.ServicePackageActivationId ?? "")).ToList();
+            p.Name ?? "",
+            p.Version ?? "",
+            p.Status?.ToString() ?? "",
+            p.ServicePackageActivationId ?? "")).ToList();
     }
 
     public async Task<IReadOnlyList<DeployedCodePackageRow>> GetCodePackagesAsync(
-        string node, string applicationId, string serviceManifestName, CancellationToken cancellationToken)
+        string node,
+        string applicationId,
+        string serviceManifestName,
+        CancellationToken cancellationToken)
     {
         var packages = await client.CodePackages.GetDeployedCodePackageInfoListAsync(
-            new NodeName(node), applicationId, serviceManifestName, cancellationToken: cancellationToken);
+            new NodeName(node),
+            applicationId,
+            serviceManifestName,
+            cancellationToken: cancellationToken);
 
         return (packages ?? []).Select(c =>
         {
@@ -79,10 +97,16 @@ public sealed class DeployedQueries(IServiceFabricClient client)
     }
 
     public async Task<IReadOnlyList<DeployedReplicaRow>> GetReplicasAsync(
-        string node, string applicationId, string? serviceManifestName, CancellationToken cancellationToken)
+        string node,
+        string applicationId,
+        string? serviceManifestName,
+        CancellationToken cancellationToken)
     {
         var replicas = await client.Replicas.GetDeployedServiceReplicaInfoListAsync(
-            new NodeName(node), applicationId, serviceManifestName: serviceManifestName, cancellationToken: cancellationToken);
+            new NodeName(node),
+            applicationId,
+            serviceManifestName: serviceManifestName,
+            cancellationToken: cancellationToken);
 
         return (replicas ?? []).Select(r => new DeployedReplicaRow(
             r.ServiceName?.ToString() ?? "",
@@ -101,7 +125,13 @@ public sealed class DeployedQueries(IServiceFabricClient client)
     }
 
     public async Task<HealthReport> GetServicePackageHealthAsync(
-        string node, string applicationId, string servicePackageName, CancellationToken cancellationToken) =>
+        string node,
+        string applicationId,
+        string servicePackageName,
+        CancellationToken cancellationToken) =>
         HealthReport.From(await client.ServicePackages.GetDeployedServicePackageHealthAsync(
-            new NodeName(node), applicationId, servicePackageName, cancellationToken: cancellationToken));
+            new NodeName(node),
+            applicationId,
+            servicePackageName,
+            cancellationToken: cancellationToken));
 }

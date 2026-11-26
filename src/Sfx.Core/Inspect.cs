@@ -11,20 +11,17 @@ namespace Sfx.Core;
 /// <summary>A named value of an entity, for an overview.</summary>
 public sealed record Field(string Name, string Value);
 
-public sealed record HealthEventRow(
-    string Source,
-    string Property,
-    HealthState State,
-    string Description,
-    DateTime? LastModifiedUtc,
-    bool IsExpired);
+public sealed record HealthEventRow(string Source, string Property, HealthState State, string Description, DateTime? LastModifiedUtc, bool IsExpired);
 
 /// <summary>One step of the chain explaining an unhealthy state; <see cref="Depth"/> nests it under the step above.</summary>
 public sealed record HealthEvaluationRow(int Depth, string Kind, HealthState State, string Description);
 
 /// <param name="Reason">One line on why it isn't healthy (see <see cref="HealthReasons.From"/>); null when nothing says.</param>
 public sealed record HealthReport(
-    HealthState State, IReadOnlyList<HealthEventRow> Events, IReadOnlyList<HealthEvaluationRow> Evaluations, string? Reason = null)
+    HealthState State,
+    IReadOnlyList<HealthEventRow> Events,
+    IReadOnlyList<HealthEvaluationRow> Evaluations,
+    string? Reason = null)
 {
     public static HealthReport From(EntityHealth health) => new(
         health.AggregatedHealthState ?? HealthState.Unknown,
@@ -70,11 +67,7 @@ public static class Inspect
 {
     private const int MaxDepth = 32;
 
-    private static readonly JsonSerializerOptions Indented = new()
-    {
-        WriteIndented = true,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
+    private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private static readonly JsonSerializerOptions Compact = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
@@ -126,8 +119,14 @@ public static class Inspect
             xml = xml[(end + 2)..];
         }
 
-        using var reader = System.Xml.XmlReader.Create(new StringReader(xml),
-            new System.Xml.XmlReaderSettings { ConformanceLevel = System.Xml.ConformanceLevel.Auto, IgnoreWhitespace = true, DtdProcessing = System.Xml.DtdProcessing.Ignore });
+        using var reader = System.Xml.XmlReader.Create(
+            new StringReader(xml),
+            new System.Xml.XmlReaderSettings
+            {
+                ConformanceLevel = System.Xml.ConformanceLevel.Auto,
+                IgnoreWhitespace = true,
+                DtdProcessing = System.Xml.DtdProcessing.Ignore,
+            });
         var output = new StringWriter(CultureInfo.InvariantCulture);
         using (var writer = System.Xml.XmlWriter.Create(output, new System.Xml.XmlWriterSettings
         {

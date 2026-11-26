@@ -106,8 +106,7 @@ public sealed class TokenCommand(string fileName, IReadOnlyList<string> argument
         if (process.ExitCode != 0 || token.Length == 0)
         {
             var error = (await stderr).Trim();
-            throw new InvalidOperationException(
-                $"{Path.GetFileName(fileName)} failed (exit {process.ExitCode}){(error.Length > 0 ? ": " + error : ".")}");
+            throw new InvalidOperationException($"{Path.GetFileName(fileName)} failed (exit {process.ExitCode}){(error.Length > 0 ? ": " + error : ".")}");
         }
         return token;
     }
@@ -129,8 +128,7 @@ public sealed class ClaimsCommandAuth(ServerIdentity server, TokenCommand comman
     private bool _signedIn;
 
     public ServiceFabricClientBuilder Configure(ServiceFabricClientBuilder builder) =>
-        builder.UseClaimsSecurity(_ => Task.FromResult<SecuritySettings>(
-            new DstsClaimsSecuritySettings(GetTokenAsync, server.ToRemoteSettings())));
+        builder.UseClaimsSecurity(_ => Task.FromResult<SecuritySettings>(new DstsClaimsSecuritySettings(GetTokenAsync, server.ToRemoteSettings())));
 
     internal async Task<string> GetTokenAsync(TokenServiceMetadata metadata, CancellationToken cancellationToken)
     {
@@ -171,7 +169,10 @@ public sealed class ClaimsCommandAuth(ServerIdentity server, TokenCommand comman
 
 public sealed class ClaimsCommandAuthProvider : IClusterAuthProvider
 {
-    public static readonly AuthOptionInfo Interactive = new("interactive", "allow a sign-in prompt (the first time, and when a silent sign-in fails)", IsFlag: true);
+    public static readonly AuthOptionInfo Interactive = new(
+        "interactive",
+        "allow a sign-in prompt (the first time, and when a silent sign-in fails)",
+        IsFlag: true);
 
     public string Name => "claims-command";
 

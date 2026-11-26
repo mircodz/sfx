@@ -58,10 +58,16 @@ public class ClusterOverviewTests
         var cluster = new FakeCluster()
             .On("GetServiceNameInfoAsync", new ServiceNameInfo("shop~Counter", new ServiceName("fabric:/shop/Counter")))
             .On("GetApplicationNameInfoAsync", new ApplicationNameInfo("shop", new ApplicationName("fabric:/shop")))
-            .On("GetApplicationInfoAsync", new ApplicationInfo("shop", new ApplicationName("fabric:/shop"), "ShopType", "1.0.0", ApplicationStatus.Ready, healthState: HealthState.Ok))
+            .On(
+                "GetApplicationInfoAsync",
+                new ApplicationInfo("shop", new ApplicationName("fabric:/shop"), "ShopType", "1.0.0", ApplicationStatus.Ready, healthState: HealthState.Ok))
             .On("GetServiceInfoAsync", new StatefulServiceInfo("shop~Counter", new ServiceName("fabric:/shop/Counter"), "CounterType", healthState: HealthState.Ok, serviceStatus: ServiceStatus.Active))
             .On("GetPartitionInfoAsync", new StatefulServicePartitionInfo(
-                HealthState.Ok, ServicePartitionStatus.Ready, new SingletonPartitionInformation(new PartitionId(id)), targetReplicaSetSize: 3, minReplicaSetSize: 2));
+                HealthState.Ok,
+                ServicePartitionStatus.Ready,
+                new SingletonPartitionInformation(new PartitionId(id)),
+                targetReplicaSetSize: 3,
+                minReplicaSetSize: 2));
 
         var hit = await new ClusterOverview(new ClusterQueries(cluster.Client)).FindPartitionAsync(id, default);
 
@@ -83,7 +89,9 @@ public class ClusterOverviewTests
             .On("GetApplicationNameInfoAsync", new ApplicationNameInfo("System", new ApplicationName("fabric:/System")))
             .On("GetApplicationHealthAsync", new ApplicationHealth(HealthState.Warning))
             .On("GetServiceInfoAsync", new StatefulServiceInfo("System~NamingService", new ServiceName("fabric:/System/NamingService"), "NamingStoreService"))
-            .On("GetPartitionInfoAsync", new StatefulServicePartitionInfo(HealthState.Ok, partitionInformation: new SingletonPartitionInformation(new PartitionId(id))));
+            .On(
+                "GetPartitionInfoAsync",
+                new StatefulServicePartitionInfo(HealthState.Ok, partitionInformation: new SingletonPartitionInformation(new PartitionId(id))));
 
         var hit = await new ClusterOverview(new ClusterQueries(cluster.Client)).FindPartitionAsync(id, default);
 
@@ -95,7 +103,8 @@ public class ClusterOverviewTests
     public async Task A_partition_that_does_not_exist_is_not_found()
     {
         var cluster = new FakeCluster().Throws(
-            "GetServiceNameInfoAsync", new ServiceFabricException("gone", FabricErrorCodes.FABRIC_E_PARTITION_NOT_FOUND, false));
+            "GetServiceNameInfoAsync",
+            new ServiceFabricException("gone", FabricErrorCodes.FABRIC_E_PARTITION_NOT_FOUND, false));
 
         Assert.Null(await new ClusterOverview(new ClusterQueries(cluster.Client)).FindPartitionAsync(Guid.NewGuid(), default));
     }
@@ -107,11 +116,15 @@ public class ClusterOverviewTests
         var cluster = new FakeCluster()
             .On("GetClusterHealthAsync", new ClusterHealth(
                 HealthState.Error,
-                nodeHealthStates: [new NodeHealthState(HealthState.Warning, new NodeName("_Node_1")), new NodeHealthState(HealthState.Ok, new NodeName("_Node_2"))],
+                nodeHealthStates: [new NodeHealthState(
+                    HealthState.Warning,
+                    new NodeName("_Node_1")), new NodeHealthState(HealthState.Ok, new NodeName("_Node_2"))],
                 applicationHealthStates: [new ApplicationHealthState(HealthState.Error, new ApplicationName("fabric:/shop/eu"))]))
             .On("GetNodeHealthAsync", new NodeHealth(HealthState.Warning, [Event(HealthState.Warning, "Disk is 95% full.")], name: new NodeName("_Node_1")))
             .On("GetApplicationHealthAsync", args => new ApplicationHealth(
-                HealthState.Error, [Event(HealthState.Error, "Shop is down.")], name: new ApplicationName("fabric:/shop/eu"),
+                HealthState.Error,
+                [Event(HealthState.Error, "Shop is down.")],
+                name: new ApplicationName("fabric:/shop/eu"),
                 serviceHealthStates: [new ServiceHealthState(HealthState.Error, new ServiceName("fabric:/shop/eu/Counter"))]))
             .On("GetServiceHealthAsync", new ServiceHealth(HealthState.Error, [Event(HealthState.Error, "No primary.")]));
 
@@ -136,7 +149,9 @@ public class ClusterOverviewTests
             .Paged("GetApplicationInfoListAsync", new ApplicationInfo("shop", new ApplicationName("fabric:/shop"), "ShopType", "1.0.0"))
             .On("GetServiceInfoListAsync", args => (string)args[0]! == "System"
                 ? new PagedData<ServiceInfo>(new ContinuationToken(""), [])
-                : new PagedData<ServiceInfo>(new ContinuationToken(""), [new StatelessServiceInfo("shop~Web", new ServiceName("fabric:/shop/Web"), "WebType")]));
+                : new PagedData<ServiceInfo>(
+                    new ContinuationToken(""),
+                    [new StatelessServiceInfo("shop~Web", new ServiceName("fabric:/shop/Web"), "WebType")]));
 
         var index = await new ClusterOverview(new ClusterQueries(cluster.Client)).GetSearchIndexAsync(default);
 
@@ -179,7 +194,9 @@ public class CoreClusterUpgradeTests
 
     private static FakeCluster Cluster(string manifest) => new FakeCluster()
         .On("GetClusterManifestAsync", new ClusterManifest(manifest))
-        .On("GetProvisionedFabricCodeVersionInfoListAsync", (IEnumerable<FabricCodeVersionInfo>)[new FabricCodeVersionInfo("10.0"), new FabricCodeVersionInfo("10.1")])
+        .On(
+            "GetProvisionedFabricCodeVersionInfoListAsync",
+            (IEnumerable<FabricCodeVersionInfo>)[new FabricCodeVersionInfo("10.0"), new FabricCodeVersionInfo("10.1")])
         .On("GetProvisionedFabricConfigVersionInfoListAsync", (IEnumerable<FabricConfigVersionInfo>)[new FabricConfigVersionInfo("1.0")])
         .OnCall("StartClusterUpgradeAsync")
         .OnCall("ProvisionClusterAsync")
@@ -255,8 +272,12 @@ public class CoreClusterUpgradeTests
     [Fact]
     public void A_health_report_carries_its_one_line_reason()
     {
-        var unhealthy = HealthReport.From(new NodeHealth(HealthState.Warning, [new HealthEvent(sourceId: "W", property: "P", healthState: HealthState.Warning, description: "Disk  full.")]));
-        var healthy = HealthReport.From(new NodeHealth(HealthState.Ok, [new HealthEvent(sourceId: "W", property: "P", healthState: HealthState.Warning, description: "Old news.")]));
+        var unhealthy = HealthReport.From(new NodeHealth(
+            HealthState.Warning,
+            [new HealthEvent(sourceId: "W", property: "P", healthState: HealthState.Warning, description: "Disk  full.")]));
+        var healthy = HealthReport.From(new NodeHealth(
+            HealthState.Ok,
+            [new HealthEvent(sourceId: "W", property: "P", healthState: HealthState.Warning, description: "Old news.")]));
 
         Assert.Equal("Disk full.", unhealthy.Reason);
         Assert.Null(healthy.Reason);

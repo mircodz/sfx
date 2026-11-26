@@ -278,11 +278,33 @@ public class ReportTests
     public void Upgrade_report_reads_domains_and_the_nodes_being_upgraded()
     {
         var progress = new ApplicationUpgradeProgressInfo(
-            "fabric:/App", "AppType", "2.0.0",
-            [new UpgradeDomainInfo("0", UpgradeDomainState.Completed), new UpgradeDomainInfo("1", UpgradeDomainState.InProgress), new UpgradeDomainInfo("2", UpgradeDomainState.Pending)],
-            null, UpgradeState.RollingForwardInProgress, "2", UpgradeMode.Monitored, null, "65000", null, null,
-            new CurrentUpgradeDomainProgressInfo("1", [new NodeUpgradeProgressInfo(new NodeName("_Node_1"), NodeUpgradePhase.PreUpgradeSafetyCheck, [], "00:01:00")]),
-            null, "2026-11-19T12:00:00Z", null, null, null, null, false, null, null, null);
+            "fabric:/App",
+            "AppType",
+            "2.0.0",
+            [new UpgradeDomainInfo("0", UpgradeDomainState.Completed), new UpgradeDomainInfo(
+                "1",
+                UpgradeDomainState.InProgress), new UpgradeDomainInfo("2", UpgradeDomainState.Pending)],
+            null,
+            UpgradeState.RollingForwardInProgress,
+            "2",
+            UpgradeMode.Monitored,
+            null,
+            "65000",
+            null,
+            null,
+            new CurrentUpgradeDomainProgressInfo(
+                "1",
+                [new NodeUpgradeProgressInfo(new NodeName("_Node_1"), NodeUpgradePhase.PreUpgradeSafetyCheck, [], "00:01:00")]),
+            null,
+            "2026-11-19T12:00:00Z",
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            null,
+            null);
 
         var report = UpgradeReport.From(progress);
         var text = string.Join('\n', Lines.Upgrade(report).Select(l => l.PlainText));

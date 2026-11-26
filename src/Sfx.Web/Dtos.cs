@@ -13,8 +13,18 @@ namespace Sfx.Web;
 /// isn't the native one (a file share or Azure blob storage).
 /// </param>
 public sealed record SessionDto(
-    string Context, string Endpoint, bool ReadOnly, bool Power, string Version, bool EventStore, string? Folder, string? Label, string? Color,
-    bool RepairManager, bool FaultAnalysis, bool ImageStore = true);
+    string Context,
+    string Endpoint,
+    bool ReadOnly,
+    bool Power,
+    string Version,
+    bool EventStore,
+    string? Folder,
+    string? Label,
+    string? Color,
+    bool RepairManager,
+    bool FaultAnalysis,
+    bool ImageStore = true);
 
 /// <summary>The optional system services a cluster may run; what isn't there isn't offered.</summary>
 public sealed record SystemServices(bool EventStore, bool RepairManager, bool FaultAnalysis);
@@ -39,7 +49,14 @@ public sealed record HealthCountDto(string Kind, long Healthy, long Warning, lon
 /// </param>
 /// <param name="MaxNode">The name of the node with the most load, likewise.</param>
 public sealed record LoadSummaryDto(
-    string Name, double ClusterLoad, double? ClusterCapacity, bool? Balanced, string? MinNode, double? MinLoad, string? MaxNode, double? MaxLoad);
+    string Name,
+    double ClusterLoad,
+    double? ClusterCapacity,
+    bool? Balanced,
+    string? MinNode,
+    double? MinLoad,
+    string? MaxNode,
+    double? MaxLoad);
 
 /// <summary>The cluster at a glance, cheap to ask even of a large cluster.</summary>
 /// <param name="Health">The cluster's evaluations and unhealthy events.</param>
@@ -54,13 +71,30 @@ public sealed record OverviewDto(
     IReadOnlyList<UpgradeDto> RunningUpgrades);
 
 public sealed record NodeDto(
-    string Name, string Address, string NodeType, string Status, string Health, string UpgradeDomain, string FaultDomain,
-    bool IsSeed, string CodeVersion, long? UptimeSeconds, IReadOnlyList<ActionDto> Actions, string? Reason = null);
+    string Name,
+    string Address,
+    string NodeType,
+    string Status,
+    string Health,
+    string UpgradeDomain,
+    string FaultDomain,
+    bool IsSeed,
+    string CodeVersion,
+    long? UptimeSeconds,
+    IReadOnlyList<ActionDto> Actions,
+    string? Reason = null);
 
 public sealed record MetricDto(string Name, double Value, double? Capacity);
 
 public sealed record DeployedReplicaDto(
-    string Application, string ApplicationId, string Service, string PartitionId, string Id, string Role, string Status, string CodePackage);
+    string Application,
+    string ApplicationId,
+    string Service,
+    string PartitionId,
+    string Id,
+    string Role,
+    string Status,
+    string CodePackage);
 
 public sealed record NodeDetailDto(NodeDto Node, HealthDto Health, IReadOnlyList<MetricDto> Load, IReadOnlyList<DeployedReplicaDto> Replicas);
 
@@ -124,8 +158,16 @@ public sealed record FieldDto(string Name, string Value);
 /// <param name="HighKey">An Int64Range partition's highest key.</param>
 /// <param name="Name">A Named partition's name; else null.</param>
 public sealed record PartitionDto(
-    string Id, string Kind, string Scheme, string Status, string Health, string ReplicaSet, string? Reason = null,
-    string? LowKey = null, string? HighKey = null, string? Name = null);
+    string Id,
+    string Kind,
+    string Scheme,
+    string Status,
+    string Health,
+    string ReplicaSet,
+    string? Reason = null,
+    string? LowKey = null,
+    string? HighKey = null,
+    string? Name = null);
 
 public sealed record ReplicaDto(string Id, string NodeName, string Role, string Status, string Health, string Address, IReadOnlyList<ActionDto> Actions);
 
@@ -219,7 +261,15 @@ internal static class Dto
     public static ServiceDto Service(ServiceRow s) => new(s.Id, s.Name, s.TypeName, s.Kind, s.Status, Health(s.Health));
 
     public static PartitionDto Partition(PartitionRow p) => new(
-        p.Id.ToString(), p.Kind, p.PartitionKind, p.Status, Health(p.Health), p.ReplicaSet, LowKey: p.LowKey, HighKey: p.HighKey, Name: p.Name);
+        p.Id.ToString(),
+        p.Kind,
+        p.PartitionKind,
+        p.Status,
+        Health(p.Health),
+        p.ReplicaSet,
+        LowKey: p.LowKey,
+        HighKey: p.HighKey,
+        Name: p.Name);
 
     public static UpgradeDto Upgrade(UpgradeRow row, IReadOnlyList<ActionDto> actions)
     {

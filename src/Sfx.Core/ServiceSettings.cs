@@ -27,7 +27,13 @@ public enum SettingKind
 /// <param name="Key">What <see cref="ServiceSettings.UpdateAsync"/> takes it by, e.g. "quorum-loss-wait".</param>
 /// <param name="Value">The current value as text; empty when the cluster's default applies.</param>
 public sealed record ServiceSetting(
-    string Key, string Title, SettingKind Kind, string Value, IReadOnlyList<string>? Choices = null, int? Min = null, int? Max = null);
+    string Key,
+    string Title,
+    SettingKind Kind,
+    string Value,
+    IReadOnlyList<string>? Choices = null,
+    int? Min = null,
+    int? Max = null);
 
 /// <summary>A service's editable settings, for stateful or stateless services (they differ).</summary>
 public sealed record ServiceSettingSet(bool Stateful, IReadOnlyList<ServiceSetting> Settings);
@@ -181,7 +187,9 @@ public sealed class ServiceSettings(IServiceFabricClient client)
     /// empty (and nothing sent) when nothing changes.
     /// </summary>
     public async Task<IReadOnlyDictionary<string, string>> UpdateAsync(
-        string serviceId, IReadOnlyDictionary<string, string> values, CancellationToken cancellationToken)
+        string serviceId,
+        IReadOnlyDictionary<string, string> values,
+        CancellationToken cancellationToken)
     {
         var current = await GetAsync(serviceId, cancellationToken);
         var changes = Changes(current, values);

@@ -24,8 +24,15 @@ public sealed record ServiceRow(string Id, string Name, string TypeName, string 
 /// <param name="HighKey">For an Int64Range partition, its highest key.</param>
 /// <param name="Name">For a Named partition, its name.</param>
 public sealed record PartitionRow(
-    PartitionId Id, string Kind, string PartitionKind, string Status, HealthState Health, string ReplicaSet,
-    string? LowKey = null, string? HighKey = null, string? Name = null);
+    PartitionId Id,
+    string Kind,
+    string PartitionKind,
+    string Status,
+    HealthState Health,
+    string ReplicaSet,
+    string? LowKey = null,
+    string? HighKey = null,
+    string? Name = null);
 
 public sealed record ReplicaRow(string Id, string NodeName, string Role, string Status, HealthState Health, string Address);
 
@@ -33,7 +40,11 @@ public sealed record ReplicaRow(string Id, string NodeName, string Role, string 
 /// <param name="Status">Provisioning, Available, Unprovisioning or Failed.</param>
 /// <param name="StatusDetails">Why provisioning failed, when it did; empty otherwise.</param>
 public sealed record ApplicationTypeRow(
-    string Name, string Version, string Status, IReadOnlyDictionary<string, string> DefaultParameters, string StatusDetails = "");
+    string Name,
+    string Version,
+    string Status,
+    IReadOnlyDictionary<string, string> DefaultParameters,
+    string StatusDetails = "");
 
 /// <param name="Manifest">The service manifest that declares it.</param>
 public sealed record ServiceTypeRow(string Name, bool Stateful, string Manifest, string ManifestVersion);

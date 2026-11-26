@@ -20,8 +20,13 @@ public class ClusterUpgradeTests
     public void Maps_a_monitored_upgrade_and_its_policy()
     {
         var policy = new UpgradePolicy(
-            HealthCheckWait: TimeSpan.FromSeconds(30), UpgradeDomainTimeout: TimeSpan.FromHours(1), ReplicaSetCheckTimeout: TimeSpan.FromMinutes(5),
-            ForceRestart: true, ConsiderWarningAsError: true, MaxPercentUnhealthyNodes: 10, MaxPercentUnhealthyApplications: 20);
+            HealthCheckWait: TimeSpan.FromSeconds(30),
+            UpgradeDomainTimeout: TimeSpan.FromHours(1),
+            ReplicaSetCheckTimeout: TimeSpan.FromMinutes(5),
+            ForceRestart: true,
+            ConsiderWarningAsError: true,
+            MaxPercentUnhealthyNodes: 10,
+            MaxPercentUnhealthyApplications: 20);
 
         var d = ClusterOperations.ClusterUpgradeDescription("10.1.1951.9590", "2.0", UpgradeMode.Monitored, FailureAction.Manual, policy);
 
@@ -116,7 +121,11 @@ public class ClusterUpgradeTests
     {
         var session = Session();
         var target = Cluster("true");
-        var request = new ActionRequest(target, new() { ["codeVersion"] = "10.1", ["mode"] = "monitored-rollback" }, null, session.Sign("cluster.upgrade", target));
+        var request = new ActionRequest(target, new()
+        {
+            ["codeVersion"] = "10.1",
+            ["mode"] = "monitored-rollback",
+        }, null, session.Sign("cluster.upgrade", target));
 
         var ex = await Assert.ThrowsAsync<ActionException>(() => WebActions.RunAsync(session, "cluster.upgrade", request, default));
         Assert.Equal(409, ex.Status);
@@ -129,7 +138,10 @@ public class ClusterUpgradeTests
         var action = WebActions.For(session, "cluster", Cluster("false")).Single(a => a.Id == "cluster.upgrade");
 
         var ex = await Assert.ThrowsAsync<ActionException>(() => WebActions.RunAsync(
-            session, action.Id, new ActionRequest(new(action.Target), new() { ["codeVersion"] = "", ["mode"] = "monitored-rollback" }, null, action.Signature), default));
+            session,
+            action.Id,
+            new ActionRequest(new(action.Target), new() { ["codeVersion"] = "", ["mode"] = "monitored-rollback" }, null, action.Signature),
+            default));
         Assert.Equal("Choose a code version, a config version or both.", ex.Message);
         Assert.Equal(400, ex.Status);
     }
@@ -141,7 +153,9 @@ public class ClusterUpgradeTests
         var action = WebActions.For(session, "cluster", Cluster("false")).Single(a => a.Id == "cluster.upgrade");
         var inputs = new Dictionary<string, string>
         {
-            ["codeVersion"] = "10.1", ["mode"] = "monitored-rollback", ["policy.maxPercentUnhealthyServices"] = "10",
+            ["codeVersion"] = "10.1",
+            ["mode"] = "monitored-rollback",
+            ["policy.maxPercentUnhealthyServices"] = "10",
         };
 
         var ex = await Assert.ThrowsAsync<ActionException>(() =>
@@ -208,7 +222,9 @@ public class ClusterUpgradePolicyTests
     public void Reads_the_shared_settings_for_a_cluster_upgrade()
     {
         var policy = UpgradePolicy.Parse(
-            Inputs(("healthCheckWait", "30"), ("forceRestart", "true"), ("considerWarningAsError", "true")), monitored: true, cluster: true);
+            Inputs(("healthCheckWait", "30"), ("forceRestart", "true"), ("considerWarningAsError", "true")),
+            monitored: true,
+            cluster: true);
 
         Assert.Equal(new UpgradePolicy(HealthCheckWait: TimeSpan.FromSeconds(30), ForceRestart: true, ConsiderWarningAsError: true), policy);
     }

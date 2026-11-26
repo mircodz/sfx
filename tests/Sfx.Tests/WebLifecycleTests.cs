@@ -78,7 +78,11 @@ public sealed class WebLifecycleTests : IDisposable
     public async Task Creating_an_application_sends_only_the_parameters_that_differ_from_the_defaults()
     {
         var cluster = new FakeCluster()
-            .Paged("GetApplicationTypeInfoListByNameAsync", new ApplicationTypeInfo("ShopType", "1.0.0", new Dictionary<string, string> { ["Port"] = "8080", ["Count"] = "3" }))
+            .Paged("GetApplicationTypeInfoListByNameAsync", new ApplicationTypeInfo("ShopType", "1.0.0", new Dictionary<string, string>
+            {
+                ["Port"] = "8080",
+                ["Count"] = "3",
+            }))
             .OnCall("CreateApplicationAsync");
         var session = Session(cluster);
         var create = ApiLifecycle.Type(session, Type(), []).Actions.Single(a => a.Id == "create-application");
@@ -95,7 +99,11 @@ public sealed class WebLifecycleTests : IDisposable
 
     private static Dictionary<string, string> Application(string serviceTypes) => new()
     {
-        ["applicationId"] = "shop", ["name"] = "fabric:/shop", ["typeName"] = "ShopType", ["version"] = "1.0.0", ["serviceTypes"] = serviceTypes,
+        ["applicationId"] = "shop",
+        ["name"] = "fabric:/shop",
+        ["typeName"] = "ShopType",
+        ["version"] = "1.0.0",
+        ["serviceTypes"] = serviceTypes,
     };
 
     [Fact]
@@ -131,7 +139,12 @@ public sealed class WebLifecycleTests : IDisposable
         var create = WebActions.For(session, "application", Application("CounterType=Stateful")).Single(a => a.Id == "create-service");
         Dictionary<string, string> Inputs(string name, string type) => new()
         {
-            ["name"] = name, ["type"] = type, ["kind"] = "Stateful", ["count"] = "3", ["partitions"] = "1", ["persisted"] = "yes",
+            ["name"] = name,
+            ["type"] = type,
+            ["kind"] = "Stateful",
+            ["count"] = "3",
+            ["partitions"] = "1",
+            ["persisted"] = "yes",
         };
 
         var unnamed = await Assert.ThrowsAsync<ActionException>(() => Run(session, create, Inputs("fabric:/shop/", "CounterType")));
@@ -144,7 +157,15 @@ public sealed class WebLifecycleTests : IDisposable
     public void A_new_service_is_named_under_its_application()
     {
         var service = LifecycleActions.NewService(
-            new Args(Application("")), new Args(new Dictionary<string, string> { ["name"] = "Counter", ["type"] = "CounterType", ["kind"] = "Stateless", ["count"] = "-1", ["partitions"] = "2" }));
+            new Args(Application("")),
+            new Args(new Dictionary<string, string>
+            {
+                ["name"] = "Counter",
+                ["type"] = "CounterType",
+                ["kind"] = "Stateless",
+                ["count"] = "-1",
+                ["partitions"] = "2",
+            }));
 
         Assert.Equal(new NewService("fabric:/shop/Counter", "CounterType", false, -1, 2, true), service);
     }
@@ -152,12 +173,23 @@ public sealed class WebLifecycleTests : IDisposable
     // Service settings
 
     private static StatefulServiceDescription Counter() => new(
-        new ServiceName("fabric:/shop/Counter"), "CounterType", new SingletonPartitionSchemeDescription(), 3, 2, true,
-        defaultMoveCost: MoveCost.Low, quorumLossWaitDurationSeconds: 120);
+        new ServiceName("fabric:/shop/Counter"),
+        "CounterType",
+        new SingletonPartitionSchemeDescription(),
+        3,
+        2,
+        true,
+        defaultMoveCost: MoveCost.Low,
+        quorumLossWaitDurationSeconds: 120);
 
     private static Dictionary<string, string> CounterTarget() => new()
     {
-        ["serviceId"] = "shop~Counter", ["applicationId"] = "shop", ["name"] = "fabric:/shop/Counter", ["kind"] = "Stateful", ["count"] = "3", ["min"] = "2",
+        ["serviceId"] = "shop~Counter",
+        ["applicationId"] = "shop",
+        ["name"] = "fabric:/shop/Counter",
+        ["kind"] = "Stateful",
+        ["count"] = "3",
+        ["min"] = "2",
     };
 
     private (FakeCluster Cluster, UiSession Session, ActionDto Action) Settings()
@@ -220,7 +252,11 @@ public sealed class WebLifecycleTests : IDisposable
     // Upgrade plans
 
     private static UpgradeRow Upgrade(string state, string mode = "Monitored", string onFailure = "Manual", string kind = "application") =>
-        new(kind == "cluster" ? "cluster" : "fabric:/shop", kind, kind == "cluster" ? null : "shop", "1.0.0",
+        new(
+            kind == "cluster" ? "cluster" : "fabric:/shop",
+            kind,
+            kind == "cluster" ? null : "shop",
+            "1.0.0",
             new UpgradeReport(state, mode, "2.0.0", "UD2", "", null, "None", "", "", [], "UD1", [], [], onFailure));
 
     [Theory]
@@ -289,7 +325,13 @@ public sealed class WebLifecycleTests : IDisposable
 
     private static readonly NodeRow Node = new("_Node_1", "10.0.0.4", "FrontEnd", "Up", HealthState.Ok, "UD1", "fd:/1", false, "10.1", null);
     private static readonly ApplicationRow Shop = new("shop~orders", "fabric:/shop/orders", "OrdersType", "1.0.0", "Ready", HealthState.Ok);
-    private static readonly ServiceRow Counter2 = new("shop~orders~Counter", "fabric:/shop/orders/Counter", "CounterType", "Stateful", "Active", HealthState.Ok);
+    private static readonly ServiceRow Counter2 = new(
+        "shop~orders~Counter",
+        "fabric:/shop/orders/Counter",
+        "CounterType",
+        "Stateful",
+        "Active",
+        HealthState.Ok);
 
     private static readonly IReadOnlyList<SearchHit> Index =
     [
@@ -309,7 +351,11 @@ public sealed class WebLifecycleTests : IDisposable
                 new SearchHitDto("service", "fabric:/shop/orders/Counter", "CounterType", ApplicationId: "shop~orders", ServiceId: "shop~orders~Counter"),
             ],
             hits);
-        var node = Assert.Single(await ApiSearch.SearchAsync("frontend", _ => Task.FromResult(Index), (_, _) => throw new InvalidOperationException(), default));
+        var node = Assert.Single(await ApiSearch.SearchAsync(
+            "frontend",
+            _ => Task.FromResult(Index),
+            (_, _) => throw new InvalidOperationException(),
+            default));
         Assert.Equal(new SearchHitDto("node", "_Node_1", "FrontEnd, 10.0.0.4", Node: "_Node_1"), node);
     }
 
@@ -332,9 +378,19 @@ public sealed class WebLifecycleTests : IDisposable
 
         Assert.Equal(id, asked);
         Assert.Equal(
-            [new SearchHitDto("partition", id.ToString(), "fabric:/shop/orders/Counter", ApplicationId: "shop~orders", ServiceId: "shop~orders~Counter", PartitionId: id.ToString())],
+            [new SearchHitDto(
+                "partition",
+                id.ToString(),
+                "fabric:/shop/orders/Counter",
+                ApplicationId: "shop~orders",
+                ServiceId: "shop~orders~Counter",
+                PartitionId: id.ToString())],
             hits);
-        Assert.Empty(await ApiSearch.SearchAsync(id.ToString(), _ => throw new InvalidOperationException(), (_, _) => Task.FromResult<SearchHit?>(null), default));
+        Assert.Empty(await ApiSearch.SearchAsync(
+            id.ToString(),
+            _ => throw new InvalidOperationException(),
+            (_, _) => Task.FromResult<SearchHit?>(null),
+            default));
     }
 
     [Theory]
@@ -349,7 +405,13 @@ public sealed class WebLifecycleTests : IDisposable
     {
         var nodes = Enumerable.Range(1, 30).Select(i => new SearchHit("node", $"_Node_{i}", Node: Node with { Name = $"_Node_{i}" })).ToList();
 
-        Assert.Equal(ApiSearch.Limit, (await ApiSearch.SearchAsync("node", _ => Task.FromResult<IReadOnlyList<SearchHit>>(nodes), (_, _) => throw new InvalidOperationException(), default)).Count);
+        Assert.Equal(
+            ApiSearch.Limit,
+            (await ApiSearch.SearchAsync(
+                "node",
+                _ => Task.FromResult<IReadOnlyList<SearchHit>>(nodes),
+                (_, _) => throw new InvalidOperationException(),
+                default)).Count);
     }
 
     // Image store
@@ -385,7 +447,10 @@ public sealed class WebLifecycleTests : IDisposable
     [Fact]
     public void Inside_a_reserved_folder_nothing_can_be_deleted()
     {
-        var listing = new ImageStoreListing(@"Store\ShopType", [], [new ImageStoreFile(@"Store\ShopType\ApplicationManifest.1.0.0.xml", "ApplicationManifest.1.0.0.xml", 1, "3", null)]);
+        var listing = new ImageStoreListing(
+            @"Store\ShopType",
+            [],
+            [new ImageStoreFile(@"Store\ShopType\ApplicationManifest.1.0.0.xml", "ApplicationManifest.1.0.0.xml", 1, "3", null)]);
 
         Assert.Empty(ApiImageStore.Listing(Session(), listing, "Native", null, new Dictionary<string, ImageStorePackage>()).Files.Single().Actions);
     }
@@ -395,7 +460,12 @@ public sealed class WebLifecycleTests : IDisposable
     {
         var provisioned = new Dictionary<string, ImageStorePackage>
         {
-            ["ShopType_2.0.0"] = new("ShopType_2.0.0", "ShopType_2.0.0", "ShopType", "2.0.0", new ApplicationTypeRow("ShopType", "2.0.0", "Available", new Dictionary<string, string>())),
+            ["ShopType_2.0.0"] = new(
+                "ShopType_2.0.0",
+                "ShopType_2.0.0",
+                "ShopType",
+                "2.0.0",
+                new ApplicationTypeRow("ShopType", "2.0.0", "Available", new Dictionary<string, string>())),
         };
 
         var folder = ApiImageStore.Listing(Session(), Root, "Native", null, provisioned).Folders.Single(f => f.Name == "ShopType_2.0.0");
@@ -467,7 +537,8 @@ public sealed class WebLifecycleTests : IDisposable
         """;
 
     private static async Task<(IReadOnlyList<string> Files, IReadOnlyDictionary<string, string> Fields)> ReceiveAsync(
-        string folder, params (string Name, string? FileName, string Content)[] parts)
+        string folder,
+        params (string Name, string? FileName, string Content)[] parts)
     {
         using var form = new MultipartFormDataContent();
         foreach (var (name, fileName, content) in parts)
@@ -521,7 +592,9 @@ public sealed class WebLifecycleTests : IDisposable
 
         Assert.Equal(400, ex.Status);
         Assert.Equal("MyAppPkg has no ApplicationManifest.xml at its root, so it isn't an application package.", ex.Message);
-        Assert.Equal("Choose a package to upload: a package folder, or an .sfpkg or .zip file.", Assert.Throws<ActionException>(() => ApiImageStore.Open(files, [])).Message);
+        Assert.Equal(
+            "Choose a package to upload: a package folder, or an .sfpkg or .zip file.",
+            Assert.Throws<ActionException>(() => ApiImageStore.Open(files, [])).Message);
     }
 
     [Fact]
@@ -595,11 +668,14 @@ public sealed class WebLifecycleTests : IDisposable
         Assert.Equal(SettleChecks.Failed, SettleChecks.TypeProvisioned(null, "T", "1", TimeSpan.FromMinutes(3)).State);
         Assert.Equal((SettleChecks.Running, "Provisioning T 1."), SettleChecks.TypeProvisioned(Row("Provisioning"), "T", "1", TimeSpan.Zero));
         Assert.Equal((SettleChecks.Done, "T 1 is available."), SettleChecks.TypeProvisioned(Row("Available"), "T", "1", TimeSpan.Zero));
-        Assert.Equal((SettleChecks.Failed, "Provisioning failed: bad manifest."), SettleChecks.TypeProvisioned(Row("Failed", "bad manifest"), "T", "1", TimeSpan.Zero));
+        Assert.Equal(
+            (SettleChecks.Failed, "Provisioning failed: bad manifest."),
+            SettleChecks.TypeProvisioned(Row("Failed", "bad manifest"), "T", "1", TimeSpan.Zero));
 
         var before = new HashSet<(string, string)> { ("T", "1") };
         Assert.Equal(SettleChecks.Running, SettleChecks.NewTypeProvisioned(before, [Row("Available")], TimeSpan.FromSeconds(5)).State);
-        Assert.Equal((SettleChecks.Done, "U 2 is available."),
+        Assert.Equal(
+            (SettleChecks.Done, "U 2 is available."),
             SettleChecks.NewTypeProvisioned(before, [Row("Available"), new("U", "2", "Available", new Dictionary<string, string>())], TimeSpan.Zero));
     }
 

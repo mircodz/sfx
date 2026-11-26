@@ -28,15 +28,17 @@ public sealed partial class Views
             .Sorting("STATE");
 
     public static IResourceView DescribeRepairTask(RepairTaskRow task) =>
-        new DescribeView("repair task", task.Id,
-        [
-            Tab("Overview", _ => Task.FromResult(Lines.Fields(Inspect.Fields(task.Task, "History", "Target", "Impact")
-                .Append(new Field("Nodes", task.Targets))
-                .Append(new Field("Impact", task.Impact))))),
-            Tab("History", _ => Task.FromResult(Lines.Fields(Inspect.Fields(task.Task.History ?? new())
-                .Where(f => !f.Value.StartsWith("0001-01-01", StringComparison.Ordinal))))),
-            Tab("Raw", _ => Task.FromResult(Lines.Json(task.Task))),
-        ]);
+        new DescribeView(
+            "repair task",
+            task.Id,
+            [
+                Tab("Overview", _ => Task.FromResult(Lines.Fields(Inspect.Fields(task.Task, "History", "Target", "Impact")
+                    .Append(new Field("Nodes", task.Targets))
+                    .Append(new Field("Impact", task.Impact))))),
+                Tab("History", _ => Task.FromResult(Lines.Fields(Inspect.Fields(task.Task.History ?? new())
+                    .Where(f => !f.Value.StartsWith("0001-01-01", StringComparison.Ordinal))))),
+                Tab("Raw", _ => Task.FromResult(Lines.Json(task.Task))),
+            ]);
 
     private static StyledText RepairState(string state) => state switch
     {

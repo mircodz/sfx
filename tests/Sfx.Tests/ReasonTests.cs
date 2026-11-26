@@ -16,7 +16,10 @@ public class ReasonTests
     [Fact]
     public void Uses_the_unhealthy_event_behind_an_event_evaluation()
     {
-        var health = Node([Wrap(new EventHealthEvaluation(HealthState.Warning, "Unhealthy event: SourceId='Watchdog'.", false,
+        var health = Node([Wrap(new EventHealthEvaluation(
+            HealthState.Warning,
+            "Unhealthy event: SourceId='Watchdog'.",
+            false,
             Event(HealthState.Warning, "Disk is 95% full.")))]);
 
         Assert.Equal("Disk is 95% full.", HealthReasons.From(health));
@@ -25,8 +28,7 @@ public class ReasonTests
     [Fact]
     public void Falls_back_to_the_evaluation_when_the_event_says_nothing()
     {
-        var health = Node([Wrap(new EventHealthEvaluation(HealthState.Error, "Unhealthy event: SourceId='Watchdog'.", false,
-            Event(HealthState.Error, "  ")))]);
+        var health = Node([Wrap(new EventHealthEvaluation(HealthState.Error, "Unhealthy event: SourceId='Watchdog'.", false, Event(HealthState.Error, "  ")))]);
 
         Assert.Equal("Unhealthy event: SourceId='Watchdog'.", HealthReasons.From(health));
     }
@@ -35,17 +37,24 @@ public class ReasonTests
     public void Follows_nested_evaluations_to_the_first_leaf()
     {
         var health = Node(
-        [
-            Wrap(new NodesHealthEvaluation(HealthState.Error, "1 of 3 nodes are unhealthy.", 0, 3,
             [
-                Wrap(new NodeHealthEvaluation(HealthState.Error, "Node _Node_1 is unhealthy.", new NodeName("_Node_1"),
-                [
-                    Wrap(new EventHealthEvaluation(HealthState.Error, "Unhealthy event.", false, Event(HealthState.Error, "Lease lost."))),
-                ])),
-                Wrap(new NodeHealthEvaluation(HealthState.Warning, "Node _Node_2 is unhealthy.", new NodeName("_Node_2"), [])),
-            ])),
-            Wrap(new EventHealthEvaluation(HealthState.Warning, "Second.", false, Event(HealthState.Warning, "Not this one."))),
-        ]);
+                Wrap(new NodesHealthEvaluation(
+                    HealthState.Error,
+                    "1 of 3 nodes are unhealthy.",
+                    0,
+                    3,
+                    [
+                        Wrap(new NodeHealthEvaluation(
+                            HealthState.Error,
+                            "Node _Node_1 is unhealthy.",
+                            new NodeName("_Node_1"),
+                            [
+                                Wrap(new EventHealthEvaluation(HealthState.Error, "Unhealthy event.", false, Event(HealthState.Error, "Lease lost."))),
+                            ])),
+                        Wrap(new NodeHealthEvaluation(HealthState.Warning, "Node _Node_2 is unhealthy.", new NodeName("_Node_2"), [])),
+                    ])),
+                Wrap(new EventHealthEvaluation(HealthState.Warning, "Second.", false, Event(HealthState.Warning, "Not this one."))),
+            ]);
 
         Assert.Equal("Lease lost.", HealthReasons.From(health));
     }

@@ -139,11 +139,14 @@ public class ImageStoreTests
             .OnCall("DeleteImageStoreContentAsync");
         var store = new ImageStore(cluster.Client);
 
-        Assert.Equal("Choose what to delete: the image store's root can't be deleted.",
+        Assert.Equal(
+            "Choose what to delete: the image store's root can't be deleted.",
             (await Assert.ThrowsAsync<RefusedException>(() => store.DeleteAsync(" / ", default))).Message);
-        Assert.StartsWith("Store is the cluster's own copy",
+        Assert.StartsWith(
+            "Store is the cluster's own copy",
             (await Assert.ThrowsAsync<RefusedException>(() => store.DeleteAsync(@"Store\ShopType", default))).Message);
-        Assert.Equal("ShopType 2.0.0 is still being provisioned from ShopType_2.0.0; wait for it to finish.",
+        Assert.Equal(
+            "ShopType 2.0.0 is still being provisioned from ShopType_2.0.0; wait for it to finish.",
             (await Assert.ThrowsAsync<RefusedException>(() => store.DeleteAsync("ShopType_2.0.0/Code", default))).Message);
 
         await store.DeleteAsync("ShopType_1.0.0", default);
@@ -253,7 +256,11 @@ public class ImageStoreTests
     public async Task Reads_disk_usage_or_nothing_when_the_cluster_cannot_say()
     {
         var cluster = new FakeCluster().On("GetImageStoreInfoAsync", new ImageStoreInfo(
-            new DiskInfo("1000", "400"), new UsageInfo("10", "2"), null, null, new UsageInfo("300", "30")));
+            new DiskInfo("1000", "400"),
+            new UsageInfo("10", "2"),
+            null,
+            null,
+            new UsageInfo("300", "30")));
 
         var usage = await new ImageStore(cluster.Client).GetUsageAsync(default);
 

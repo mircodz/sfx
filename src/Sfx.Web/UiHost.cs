@@ -8,12 +8,25 @@ public sealed record ConnectingDto(string Context, IReadOnlyList<string> Message
 /// <param name="ReadOnly">After folder rules: a read-only folder makes every context in it read-only.</param>
 /// <param name="Label">From the nearest folder that sets one.</param>
 public sealed record ContextDto(
-    string Name, string Endpoint, IReadOnlyList<string> Auth, bool ReadOnly, bool Power, bool Saved, string? Folder, string? Label, string? Color);
+    string Name,
+    string Endpoint,
+    IReadOnlyList<string> Auth,
+    bool ReadOnly,
+    bool Power,
+    bool Saved,
+    string? Folder,
+    string? Label,
+    string? Color);
 
 public sealed record FolderDto(string Path, string? Label, string? Color, bool ReadOnly);
 
 /// <param name="ConfigPath">Where contexts are saved: ~/.sfx/config.toml, or $SFX_CONFIG.</param>
-public sealed record ContextsDto(string Current, IReadOnlyList<ContextDto> Contexts, IReadOnlyList<FolderDto> Folders, ConnectingDto? Connecting, string ConfigPath);
+public sealed record ContextsDto(
+    string Current,
+    IReadOnlyList<ContextDto> Contexts,
+    IReadOnlyList<FolderDto> Folders,
+    ConnectingDto? Connecting,
+    string ConfigPath);
 
 /// <summary>
 /// What `sfx ui` is connected to, and switching it. Connecting runs in the background so sign-in (e.g. a device

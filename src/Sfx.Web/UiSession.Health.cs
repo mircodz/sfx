@@ -19,7 +19,9 @@ public sealed partial class UiSession
     /// health changes; ones whose reason can't be had are left out.
     /// </summary>
     internal async Task<IReadOnlyDictionary<string, string>> GetReasonsAsync(
-        string kind, IEnumerable<(string Id, string Health)> entities, CancellationToken cancellationToken)
+        string kind,
+        IEnumerable<(string Id, string Health)> entities,
+        CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
         var pending = new List<(string Id, Task<string?> Reason)>();

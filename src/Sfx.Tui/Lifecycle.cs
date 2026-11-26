@@ -46,25 +46,39 @@ public sealed partial class Views
             .Describing(t => DescribeApplicationType(t.Type))
             .Acting(ApplicationTypeActions().Select(Unwrap), host)
             .Offering(
-            [
-                new AppAction("page.provision", "Provision a package from this machine", () => host.Command("provision "))
-                {
-                    Group = "Application types",
-                    Keys = [Provision],
-                    When = () => host.Allows(ActionRisk.Confirm, power: false),
-                },
-            ])
+                [
+                    new AppAction("page.provision", "Provision a package from this machine", () => host.Command("provision "))
+                    {
+                        Group = "Application types",
+                        Keys = [Provision],
+                        When = () => host.Allows(ActionRisk.Confirm, power: false),
+                    },
+                ])
             .Column("NAME", Constraint.Fill(2), t => Plain(t.Type.Name), t => t.Type.Name)
             .Column("VERSION", Constraint.Length(14), t => Plain(t.Type.Version), t => t.Type.Version)
             .Column("STATUS", Constraint.Length(14), t => TypeStatus(t.Type.Status), t => t.Type.Status)
-            .Column("APPS", Constraint.Length(5), t => t.Applications == 0 ? Muted("0") : Plain(t.Applications.ToString(CultureInfo.InvariantCulture)),
-                t => t.Applications, Justify.Right)
-            .Column("PARAMS", Constraint.Length(7), t => Plain(t.Type.DefaultParameters.Count.ToString(CultureInfo.InvariantCulture)),
-                t => t.Type.DefaultParameters.Count, Justify.Right)
+            .Column(
+                "APPS",
+                Constraint.Length(5),
+                t => t.Applications == 0 ? Muted("0") : Plain(t.Applications.ToString(CultureInfo.InvariantCulture)),
+                t => t.Applications,
+                Justify.Right)
+            .Column(
+                "PARAMS",
+                Constraint.Length(7),
+                t => Plain(t.Type.DefaultParameters.Count.ToString(CultureInfo.InvariantCulture)),
+                t => t.Type.DefaultParameters.Count,
+                Justify.Right)
             .Column("DETAILS", Constraint.Fill(2), t => Muted(t.Type.StatusDetails), t => t.Type.StatusDetails);
 
     private static EntityAction<ApplicationTypeUse> Unwrap(EntityAction<ApplicationTypeRow> action) =>
-        new(action.Title, action.Risk, use => action.Run(use.Type), action.Keys, action.Commands, action.Power,
+        new(
+            action.Title,
+            action.Risk,
+            use => action.Run(use.Type),
+            action.Keys,
+            action.Commands,
+            action.Power,
             action.AppliesTo is { } applies ? use => applies(use.Type) : null);
 
     private static StyledText TypeStatus(string status) => status switch
@@ -83,43 +97,54 @@ public sealed partial class Views
     }
 
     public IResourceView DescribeApplicationType(ApplicationTypeRow type) =>
-        new DescribeView("application type", $"{type.Name} {type.Version}",
-        [
-            Tab("Service types", async ct => Lines.Table(
-                ["NAME", "KIND", "MANIFEST", "VERSION"],
-                (await queries.GetServiceTypesAsync(type.Name, type.Version, ct))
-                    .Select(s => (IReadOnlyList<string>)[s.Name, s.Stateful ? "Stateful" : "Stateless", s.Manifest, s.ManifestVersion])
-                    .ToList())),
-            Tab("Parameters", _ => Task.FromResult(Lines.Fields(
-                type.DefaultParameters.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase).Select(p => new Field(p.Key, p.Value))))),
-            Tab("Applications", async ct => Lines.Table(
-                ["NAME", "VERSION", "STATUS"],
-                (await queries.GetApplicationsAsync(ct))
-                    .Where(a => a.TypeName == type.Name)
-                    .Select(a => (IReadOnlyList<string>)[a.Name, a.TypeVersion, a.Status])
-                    .ToList())),
-            Tab("Manifest", async ct => Lines.Text(await _inspect.GetApplicationManifestAsync(type.Name, type.Version, ct))),
-        ], actions: Bind(ApplicationTypeActions(), type, "Application type"));
+        new DescribeView(
+            "application type",
+            $"{type.Name} {type.Version}",
+            [
+                Tab("Service types", async ct => Lines.Table(
+                    ["NAME", "KIND", "MANIFEST", "VERSION"],
+                    (await queries.GetServiceTypesAsync(type.Name, type.Version, ct))
+                        .Select(s => (IReadOnlyList<string>)[s.Name, s.Stateful ? "Stateful" : "Stateless", s.Manifest, s.ManifestVersion])
+                        .ToList())),
+                Tab("Parameters", _ => Task.FromResult(Lines.Fields(
+                    type.DefaultParameters.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase).Select(p => new Field(p.Key, p.Value))))),
+                Tab("Applications", async ct => Lines.Table(
+                    ["NAME", "VERSION", "STATUS"],
+                    (await queries.GetApplicationsAsync(ct))
+                        .Where(a => a.TypeName == type.Name)
+                        .Select(a => (IReadOnlyList<string>)[a.Name, a.TypeVersion, a.Status])
+                        .ToList())),
+                Tab("Manifest", async ct => Lines.Text(await _inspect.GetApplicationManifestAsync(type.Name, type.Version, ct))),
+            ],
+            actions: Bind(ApplicationTypeActions(), type, "Application type"));
 
     public IReadOnlyList<EntityAction<ApplicationTypeRow>> ApplicationTypeActions() =>
     [
-        new("Create an application of this type", ActionRisk.Confirm, CreateApplication, [Create], ["create", "new"],
-            AppliesTo: t => t.Status == Available),
+        new("Create an application of this type", ActionRisk.Confirm, CreateApplication, [Create], ["create", "new"], AppliesTo: t => t.Status == Available),
 
-        new("Unprovision this type version", ActionRisk.Destructive,
-            t => host.Run(new Operation($"Unprovision {t.Name} {t.Version}", t.Version, ActionRisk.Destructive,
+        new(
+            "Unprovision this type version",
+            ActionRisk.Destructive,
+            t => host.Run(new Operation(
+                $"Unprovision {t.Name} {t.Version}",
+                t.Version,
+                ActionRisk.Destructive,
                 (ct, _) => Lifecycle.UnprovisionAsync(t.Name, t.Version, ct),
                 "Its packages leave the cluster's store; applications on this version must be upgraded or deleted first.")
             {
-                Track = async (_, ct) => Tracking.Gone((await queries.GetApplicationTypesAsync(ct)).Any(other => other.Name == t.Name && other.Version == t.Version)),
+                Track = async (
+                    _,
+                    ct) => Tracking.Gone((await queries.GetApplicationTypesAsync(ct)).Any(other => other.Name == t.Name && other.Version == t.Version)),
             }),
-            [Delete], ["unprovision"],
+            [Delete],
+            ["unprovision"],
             AppliesTo: t => t.Status is Available or "Failed"),
     ];
 
     /// <summary>The create form: the name, the version, and every parameter of the type with its default.</summary>
     private void CreateApplication(ApplicationTypeRow type) =>
-        host.Edit($"Create an application of {type.Name} {type.Version}",
+        host.Edit(
+            $"Create an application of {type.Name} {type.Version}",
             _ => Task.FromResult(CreateApplicationFields(type)),
             fields => CreateApplicationOperation(type, fields),
             unchanged: true);
@@ -142,7 +167,10 @@ public sealed partial class Views
         var name = FullName(fields.First(f => f.Key == "name").Value);
         var parameters = fields.Where(f => f.Key.StartsWith(ParameterPrefix, StringComparison.Ordinal) && f.IsChanged)
             .ToDictionary(f => f.Key[ParameterPrefix.Length..], f => f.Value);
-        return new Operation($"Create {name} ({type.Name} {type.Version})", name, ActionRisk.Confirm,
+        return new Operation(
+            $"Create {name} ({type.Name} {type.Version})",
+            name,
+            ActionRisk.Confirm,
             (ct, _) => Lifecycle.CreateApplicationAsync(name, type.Name, type.Version, parameters, ct),
             parameters.Count == 0 ? "Every parameter takes the type's default." : null)
         {
@@ -196,7 +224,10 @@ public sealed partial class Views
     internal Operation ProvisionLocalOperation(string path, string typeName, string typeVersion, string storePath)
     {
         var progress = new OperationProgress();
-        return new Operation($"Provision {typeName} {typeVersion}", typeName, ActionRisk.Confirm,
+        return new Operation(
+            $"Provision {typeName} {typeVersion}",
+            typeName,
+            ActionRisk.Confirm,
             async (ct, _) =>
             {
                 await Lifecycle.UploadAndProvisionAsync(path, null, Reporting(progress, "uploading"), ct);
@@ -215,7 +246,10 @@ public sealed partial class Views
         host.Load("reading the application types", queries.GetApplicationTypesAsync, before =>
         {
             var known = before.Select(Tracking.Key).ToHashSet();
-            host.Run(new Operation($"Provision the package at {storePath}", ImageStore.NameOf(storePath), ActionRisk.Confirm,
+            host.Run(new Operation(
+                $"Provision the package at {storePath}",
+                ImageStore.NameOf(storePath),
+                ActionRisk.Confirm,
                 (ct, _) => Lifecycle.ProvisionAsync(storePath, ct),
                 "Registers the application type in the package; :types shows it once it's available.")
             {
@@ -225,7 +259,8 @@ public sealed partial class Views
 
     /// <summary>Upload progress as the activity strip shows it: how much of how much.</summary>
     private static IProgress<UploadProgress> Reporting(OperationProgress progress, string verb) =>
-        new Reporter<UploadProgress>(u => progress.Report(u.Fraction,
+        new Reporter<UploadProgress>(u => progress.Report(
+            u.Fraction,
             u.BytesTotal > 0 ? $"{verb} {Bytes(u.BytesDone)} of {Bytes(u.BytesTotal)}" : $"{verb} {u.FilesDone} of {u.FilesTotal} files"));
 
     /// <summary>Reports right away, on the reporting thread, so reports keep their order.</summary>
@@ -245,23 +280,39 @@ public sealed partial class Views
 
     public IReadOnlyList<EntityAction<ApplicationRow>> ApplicationLifecycleActions() =>
     [
-        new("Edit parameters, or upgrade", ActionRisk.Confirm, a => UpgradeApplication(a, otherVersion: false), [Edit], ["edit", "params"],
+        new(
+            "Edit parameters, or upgrade",
+            ActionRisk.Confirm,
+            a => UpgradeApplication(a, otherVersion: false),
+            [Edit],
+            ["edit", "params"],
             AppliesTo: a => IsUserApp(a) && !IsUpgrading(a)),
 
-        new("Upgrade to another version", ActionRisk.Confirm, a => UpgradeApplication(a, otherVersion: true), [Upgrade], ["upgrade"],
+        new(
+            "Upgrade to another version",
+            ActionRisk.Confirm,
+            a => UpgradeApplication(a, otherVersion: true),
+            [Upgrade],
+            ["upgrade"],
             AppliesTo: a => IsUserApp(a) && !IsUpgrading(a)),
 
-        new("Steer the running upgrade", ActionRisk.Confirm, a => ApplicationUpgradeControls(a.Id, a.Name), [Upgrade],
+        new("Steer the running upgrade", ActionRisk.Confirm, a => ApplicationUpgradeControls(a.Id, a.Name), [Upgrade], AppliesTo: IsUpgrading),
+
+        new(
+            "Change how the running upgrade proceeds",
+            ActionRisk.Confirm,
+            a => ChangeApplicationUpgradePlan(a.Id, a.Name),
+            Commands: ["upgrade-mode"],
             AppliesTo: IsUpgrading),
 
-        new("Change how the running upgrade proceeds", ActionRisk.Confirm, a => ChangeApplicationUpgradePlan(a.Id, a.Name), Commands: ["upgrade-mode"],
+        new(
+            "Resume the upgrade into the next domain",
+            ActionRisk.Confirm,
+            a => ResumeApplicationUpgrade(a.Id, a.Name),
+            Commands: ["resume"],
             AppliesTo: IsUpgrading),
 
-        new("Resume the upgrade into the next domain", ActionRisk.Confirm, a => ResumeApplicationUpgrade(a.Id, a.Name), Commands: ["resume"],
-            AppliesTo: IsUpgrading),
-
-        new("Roll back the running upgrade", ActionRisk.Confirm, a => RollbackApplicationUpgrade(a.Id, a.Name), Commands: ["rollback"],
-            AppliesTo: IsUpgrading),
+        new("Roll back the running upgrade", ActionRisk.Confirm, a => RollbackApplicationUpgrade(a.Id, a.Name), Commands: ["rollback"], AppliesTo: IsUpgrading),
     ];
 
     /// <summary>What the upgrade form was opened with; the review needs it.</summary>
@@ -283,7 +334,8 @@ public sealed partial class Views
     private void UpgradeApplication(ApplicationRow app, bool otherVersion)
     {
         UpgradeFormState? state = null;
-        host.Edit(otherVersion ? $"Upgrade {app.Name}" : $"Edit {app.Name}",
+        host.Edit(
+            otherVersion ? $"Upgrade {app.Name}" : $"Edit {app.Name}",
             async ct =>
             {
                 var versions = (await queries.GetApplicationTypesAsync(ct)).Where(t => t.Name == app.TypeName && t.Status == Available).ToList();
@@ -326,12 +378,15 @@ public sealed partial class Views
         [
             new FormField("version", "Version", target)
             {
-                Kind = FormFieldKind.Choice, Choices = versions, Note = $"now {app.TypeVersion}",
+                Kind = FormFieldKind.Choice,
+                Choices = versions,
+                Note = $"now {app.TypeVersion}",
                 Hint = "the same version changes only parameters: services restart domain by domain",
             },
             new FormField("plan", "Plan", UpgradePlan.All[0].Title)
             {
-                Kind = FormFieldKind.Choice, Choices = UpgradePlan.All.Select(p => p.Title).ToList(),
+                Kind = FormFieldKind.Choice,
+                Choices = UpgradePlan.All.Select(p => p.Title).ToList(),
                 Hint = string.Join("; ", UpgradePlan.All.Select(p => $"{p.Title.ToLowerInvariant()}: {p.Hint}")),
             },
             .. names.Select(name => new FormField(ParameterPrefix + name, name, state.Current.GetValueOrDefault(name) ?? "")
@@ -379,7 +434,10 @@ public sealed partial class Views
         {
             details.Add(StyledText.Of($"dropped, {version} doesn't define them: {string.Join(", ", merged.Dropped)}").Fg(Theme.Current.Warning));
         }
-        return new Operation(ApplicationLifecycle.Describe(app.Name, request), app.Name, ActionRisk.Confirm,
+        return new Operation(
+            ApplicationLifecycle.Describe(app.Name, request),
+            app.Name,
+            ActionRisk.Confirm,
             (ct, _) => Lifecycle.UpgradeAsync(app.Id, request, ct),
             version == app.TypeVersion
                 ? "Runs as an upgrade to the same version: services restart domain by domain."
@@ -441,14 +499,21 @@ public sealed partial class Views
         {
             yield return new FormField(PolicyPrefix + key, label, DefaultChoice)
             {
-                Kind = FormFieldKind.Choice, Choices = [DefaultChoice, "true", "false"], Section = section,
+                Kind = FormFieldKind.Choice,
+                Choices = [DefaultChoice, "true", "false"],
+                Section = section,
             };
         }
         foreach (var (key, label) in cluster ? ClusterLimits : ApplicationLimits)
         {
             yield return new FormField(PolicyPrefix + key, label)
             {
-                Kind = FormFieldKind.Number, Integer = true, Min = 0, Max = 100, Section = section, Hint = "0 to 100",
+                Kind = FormFieldKind.Number,
+                Integer = true,
+                Min = 0,
+                Max = 100,
+                Section = section,
+                Hint = "0 to 100",
             };
         }
     }
@@ -481,15 +546,18 @@ public sealed partial class Views
 
     private void ApplicationUpgradeControls(string id, string name) =>
         host.Pick($"{name} is upgrading", _ => Task.FromResult<IReadOnlyList<Choice>>(
-        [
-            new("Resume into the next domain", "manual upgrades wait for this", () => ResumeApplicationUpgrade(id, name)),
-            new("Change how it proceeds", "monitored, manual, automatic…", () => ChangeApplicationUpgradePlan(id, name)),
-            new("Roll back", "domains already upgraded go back", () => RollbackApplicationUpgrade(id, name)),
-        ]));
+            [
+                new("Resume into the next domain", "manual upgrades wait for this", () => ResumeApplicationUpgrade(id, name)),
+                new("Change how it proceeds", "monitored, manual, automatic…", () => ChangeApplicationUpgradePlan(id, name)),
+                new("Roll back", "domains already upgraded go back", () => RollbackApplicationUpgrade(id, name)),
+            ]));
 
     private void ChangeApplicationUpgradePlan(string id, string name) =>
         PickPlan($"Continue the upgrade of {name} as", plan =>
-            host.Run(Op($"Continue the upgrade of {name}: {plan.Title.ToLowerInvariant()}", name, ActionRisk.Confirm,
+            host.Run(Op(
+                $"Continue the upgrade of {name}: {plan.Title.ToLowerInvariant()}",
+                name,
+                ActionRisk.Confirm,
                 ct => Lifecycle.ChangeUpgradePlanAsync(id, plan, ct))));
 
     private void ResumeApplicationUpgrade(string id, string name) =>
@@ -500,13 +568,16 @@ public sealed partial class Views
                 host.Warn($"the upgrade of {name} isn't waiting to start a domain");
                 return;
             }
-            host.Run(Op($"Resume the upgrade of {name} into domain {domain}", name, ActionRisk.Confirm,
-                ct => Lifecycle.ResumeUpgradeAsync(id, domain, ct)));
+            host.Run(Op($"Resume the upgrade of {name} into domain {domain}", name, ActionRisk.Confirm, ct => Lifecycle.ResumeUpgradeAsync(id, domain, ct)));
         });
 
     private void RollbackApplicationUpgrade(string id, string name) =>
-        host.Run(Op($"Roll back the upgrade of {name}", name, ActionRisk.Confirm,
-            ct => Lifecycle.RollbackUpgradeAsync(id, ct), "Domains already upgraded go back to the previous version.") with
+        host.Run(Op(
+            $"Roll back the upgrade of {name}",
+            name,
+            ActionRisk.Confirm,
+            ct => Lifecycle.RollbackUpgradeAsync(id, ct),
+            "Domains already upgraded go back to the previous version.") with
         {
             Track = async (_, ct) => RolledBack(UpgradeReport.From(await _inspect.GetApplicationUpgradeAsync(id, ct))),
             TrackFor = TimeSpan.FromHours(1),
@@ -550,14 +621,20 @@ public sealed partial class Views
 
     public IReadOnlyList<EntityAction<ServiceRow>> ServiceLifecycleActions(ApplicationRow app) =>
     [
-        new("Edit settings", ActionRisk.Confirm, EditServiceSettings, [Edit], ["edit", "settings"],
+        new(
+            "Edit settings",
+            ActionRisk.Confirm,
+            EditServiceSettings,
+            [Edit],
+            ["edit", "settings"],
             AppliesTo: s => IsUserApp(app) && s.Kind is nameof(ServiceKind.Stateful) or nameof(ServiceKind.Stateless)),
     ];
 
     private void CreateService(ApplicationRow app)
     {
         IReadOnlyList<ServiceTypeRow> types = [];
-        host.Edit($"Create a service in {app.Name}",
+        host.Edit(
+            $"Create a service in {app.Name}",
             async ct =>
             {
                 types = await queries.GetServiceTypesAsync(app.TypeName, app.TypeVersion, ct);
@@ -577,7 +654,8 @@ public sealed partial class Views
         [
             new FormField("name", "Name", first.Name.EndsWith("Type", StringComparison.Ordinal) && first.Name.Length > 4 ? first.Name[..^4] : first.Name)
             {
-                Required = true, Hint = "under the application's name, or a full fabric:/ name",
+                Required = true,
+                Hint = "under the application's name, or a full fabric:/ name",
             },
             type,
             new FormField("kind", "Kind", first.Stateful ? "Stateful" : "Stateless")
@@ -588,12 +666,19 @@ public sealed partial class Views
             },
             new FormField("count", "Replicas or instances", first.Stateful ? "3" : "1")
             {
-                Kind = FormFieldKind.Number, Integer = true, Min = -1, Required = true,
+                Kind = FormFieldKind.Number,
+                Integer = true,
+                Min = -1,
+                Required = true,
                 Hint = "target replicas when stateful; instances when stateless (-1: one on every node)",
             },
             new FormField("partitions", "Partitions", "1")
             {
-                Kind = FormFieldKind.Number, Integer = true, Min = 1, Required = true, Note = "1: singleton, more: Int64 ranges",
+                Kind = FormFieldKind.Number,
+                Integer = true,
+                Min = 1,
+                Required = true,
+                Note = "1: singleton, more: Int64 ranges",
             },
             new FormField("persisted", "Persisted state", first.Stateful ? "true" : "false") { Kind = FormFieldKind.Flag, Note = "stateful services only" },
         ];
@@ -622,7 +707,9 @@ public sealed partial class Views
             : count == -1 ? "an instance on every node" : $"{count} instance{(count == 1 ? "" : "s")}";
         return new Operation($"Create {name}", name, ActionRisk.Confirm, (ct, _) => Lifecycle.CreateServiceAsync(app.Id, service, ct))
         {
-            Details = Facts(("Type", $"{type.Name} ({(stateful ? "stateful" : "stateless")})"), ("Size", shape),
+            Details = Facts(
+                ("Type", $"{type.Name} ({(stateful ? "stateful" : "stateless")})"),
+                ("Size", shape),
                 ("Partitions", partitions == 1 ? "1 (singleton)" : $"{partitions} (Int64 ranges)")),
             Track = async (_, ct) => Tracking.Created((await queries.GetServicesAsync(app.Id, ct)).Any(s => s.Name == name)),
         };
@@ -639,7 +726,8 @@ public sealed partial class Views
     private void EditServiceSettings(ServiceRow service)
     {
         ServiceSettingSet? current = null;
-        host.Edit($"Edit {service.Name}",
+        host.Edit(
+            $"Edit {service.Name}",
             async ct =>
             {
                 current = await Settings.GetAsync(service.Id, ct);
@@ -691,7 +779,10 @@ public sealed partial class Views
             throw new RefusedException("those are the values it has already");
         }
         var scales = changes.Keys.Any(key => key is "count" or "min-replicas" or "min-instances");
-        return new Operation(ServiceSettings.Describe(service.Name, current.Settings, changes), service.Name, ActionRisk.Confirm,
+        return new Operation(
+            ServiceSettings.Describe(service.Name, current.Settings, changes),
+            service.Name,
+            ActionRisk.Confirm,
             (ct, _) => Settings.UpdateAsync(service.Id, changes, ct),
             scales ? "Replicas or instances are added or dropped to match." : null)
         {

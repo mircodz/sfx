@@ -68,8 +68,10 @@ public static partial class DefaultServices
     /// <param name="upgraded">What the upgrade sets.</param>
     /// <param name="targetDefaults">The defaults of the version it upgrades to; also every parameter that version has.</param>
     public static IReadOnlyList<string> ChangedParameters(
-        IReadOnlyDictionary<string, string> current, IReadOnlyDictionary<string, string> currentDefaults,
-        IReadOnlyDictionary<string, string> upgraded, IReadOnlyDictionary<string, string> targetDefaults) =>
+        IReadOnlyDictionary<string, string> current,
+        IReadOnlyDictionary<string, string> currentDefaults,
+        IReadOnlyDictionary<string, string> upgraded,
+        IReadOnlyDictionary<string, string> targetDefaults) =>
         targetDefaults.Keys
             .Where(name => (current.GetValueOrDefault(name) ?? currentDefaults.GetValueOrDefault(name)) is { } before
                 && before != (upgraded.GetValueOrDefault(name) ?? targetDefaults[name]))

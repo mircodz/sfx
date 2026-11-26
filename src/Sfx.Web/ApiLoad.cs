@@ -15,8 +15,15 @@ public sealed record NodeLoadDto(string Node, double Load, double? Capacity);
 /// </param>
 /// <param name="MaxNode">The name of the node with the most load, likewise.</param>
 public sealed record LoadMetricDto(
-    string Name, double ClusterLoad, double? ClusterCapacity, bool? Balanced, IReadOnlyList<NodeLoadDto> Nodes,
-    string? MinNode = null, double? MinLoad = null, string? MaxNode = null, double? MaxLoad = null);
+    string Name,
+    double ClusterLoad,
+    double? ClusterCapacity,
+    bool? Balanced,
+    IReadOnlyList<NodeLoadDto> Nodes,
+    string? MinNode = null,
+    double? MinLoad = null,
+    string? MaxNode = null,
+    double? MaxLoad = null);
 
 public sealed record LoadDto(IReadOnlyList<LoadMetricDto> Metrics);
 
@@ -33,7 +40,9 @@ internal static class ApiLoad
     /// <param name="capacities">What the manifest declares, so a total capacity of 0 counts when every node type declares it.</param>
     /// <param name="nodeNames">Node names by id, for the least and most loaded nodes; an id not in it is shown as is.</param>
     public static IReadOnlyList<LoadSummaryDto> Summaries(
-        ClusterLoadInfo load, NodeCapacities? capacities = null, IReadOnlyDictionary<string, string>? nodeNames = null) =>
+        ClusterLoadInfo load,
+        NodeCapacities? capacities = null,
+        IReadOnlyDictionary<string, string>? nodeNames = null) =>
         UserMetrics(load)
             .Select(m =>
             {
@@ -61,13 +70,17 @@ internal static class ApiLoad
     /// most loaded nodes, from the session's node names (no call when they're known) unless <paramref name="nodes"/> has them.
     /// </summary>
     public static async Task<IReadOnlyList<LoadSummaryDto>> SummariesAsync(
-        UiSession s, ClusterLoadInfo load, IReadOnlyList<NodeRow>? nodes, CancellationToken ct)
+        UiSession s,
+        ClusterLoadInfo load,
+        IReadOnlyList<NodeRow>? nodes,
+        CancellationToken ct)
     {
         var capacities = s.GetDeclaredCapacitiesAsync(ct);
         var names = nodes is not null
             ? NamesById(nodes)
             : await s.GetNodeNamesAsync(
-                UserMetrics(load).SelectMany(m => new[] { NodeId(m.MinNodeLoadNodeId), NodeId(m.MaxNodeLoadNodeId) }).OfType<string>(), ct);
+                UserMetrics(load).SelectMany(m => new[] { NodeId(m.MinNodeLoadNodeId), NodeId(m.MaxNodeLoadNodeId) }).OfType<string>(),
+                ct);
         return Summaries(load, await capacities, names);
     }
 
@@ -103,16 +116,23 @@ internal static class ApiLoad
             });
             perNode = loads
                 .SelectMany(n => (n.Load?.NodeLoadMetricInformation ?? []).Select(m => (Metric: m.Name ?? "", Load: new NodeLoadDto(
-                    n.Node.Name, m.CurrentNodeLoad ?? Api.Number(m.NodeLoad),
+                    n.Node.Name,
+                    m.CurrentNodeLoad ?? Api.Number(m.NodeLoad),
                     Api.Capacity(m.NodeCapacity, capacities.Declares(n.Node.NodeType, m.Name ?? ""))))))
                 .ToLookup(m => m.Metric, m => m.Load);
         }
 
         return new LoadDto((await SummariesAsync(s, await cluster, nodes, ct))
             .Select(m => new LoadMetricDto(
-                m.Name, m.ClusterLoad, m.ClusterCapacity, m.Balanced,
+                m.Name,
+                m.ClusterLoad,
+                m.ClusterCapacity,
+                m.Balanced,
                 perNode[m.Name].OrderBy(n => n.Node, StringComparer.Ordinal).ToList(),
-                m.MinNode, m.MinLoad, m.MaxNode, m.MaxLoad))
+                m.MinNode,
+                m.MinLoad,
+                m.MaxNode,
+                m.MaxLoad))
             .ToList());
     }
 
