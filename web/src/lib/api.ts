@@ -26,6 +26,7 @@ import type {
     ServiceSettingsInfo,
     StoreListing,
 } from "./types";
+import { observe, requestSwitch, shownConnection } from "./connection";
 
 // sfx ui opens /?token=…; keep the token for this tab and strip only it from the address bar.
 const tokenKey = "sfx-token";
@@ -47,14 +48,20 @@ export class ApiError extends Error {
     }
 }
 
+const sessionHeader = "X-Sfx-Session";
+
+/** The token, and the connection this tab shows so a change can't land on a cluster it isn't showing. */
+const headers = () => ({ "X-Sfx-Token": sessionStorage.getItem(tokenKey) ?? "", [sessionHeader]: shownConnection() });
+
 /** No Content-Type: the browser sets the multipart boundary itself. */
 async function upload<T>(path: string, form: FormData): Promise<T> {
     let response: Response;
     try {
-        response = await fetch(`/api${path}`, { method: "POST", headers: { "X-Sfx-Token": sessionStorage.getItem(tokenKey) ?? "" }, body: form });
+        response = await fetch(`/api${path}`, { method: "POST", headers: headers(), body: form });
     } catch {
         throw new ApiError("sfx ui isn't answering. Check that it's still running.", 0);
     }
+    observe(response.headers.get(sessionHeader));
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new ApiError(data.error ?? `The upload failed (${response.status}).`, response.status);
     return data as T;
@@ -65,15 +72,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     try {
         response = await fetch(`/api${path}`, {
             method,
-            headers: {
-                "X-Sfx-Token": sessionStorage.getItem(tokenKey) ?? "",
-                ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-            },
+            headers: { ...headers(), ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
             body: body === undefined ? undefined : JSON.stringify(body),
         });
     } catch {
         throw new ApiError("sfx ui isn't answering. Check that it's still running.", 0);
     }
+    observe(response.headers.get(sessionHeader));
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
         throw new ApiError(data.error ?? `The request failed (${response.status}).`, response.status);
@@ -87,7 +92,10 @@ const seg = encodeURIComponent;
 export const api = {
     session: () => get<Session>("/session"),
     contexts: () => get<Contexts>("/contexts"),
-    connect: (name: string) => request<void>("POST", `/contexts/${seg(name)}/connect`),
+    connect: (name: string) => {
+        requestSwitch(name);
+        return request<void>("POST", `/contexts/${seg(name)}/connect`);
+    },
     dismissConnect: () => request<void>("POST", "/contexts/dismiss"),
     setPower: (on: boolean) => request<Session>("POST", "/session/power", { on }),
     cluster: () => get<Cluster>("/cluster"),

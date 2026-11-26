@@ -6,6 +6,8 @@ export type DomainState = "Done" | "Upgrading" | "Verifying" | "Pending" | "Fail
 export type Status = Health | DomainState | "In progress" | "Rolling back" | "Cancelled" | "Complete" | "Paused";
 
 export interface Session {
+    /** The connection: new on every switch, even back to the same context. */
+    id: string;
     context: string;
     endpoint: string;
     readOnly: boolean;

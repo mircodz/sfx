@@ -39,6 +39,9 @@ public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterCo
     private UiSession _current = new(initial, log, version, Labelled(store, initial.Context));
     private Connecting? _connecting;
 
+    // Every connection of this run by id, to tell a tab which context it's still showing.
+    private readonly Dictionary<string, string> _shown = [];
+
     private sealed class Connecting(string context)
     {
         public string Context => context;
@@ -110,7 +113,7 @@ public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterCo
 
                 lock (_lock)
                 {
-                    _current = new UiSession(session, log, version, resolved);
+                    Use(new UiSession(session, log, version, resolved));
                     connecting.Done = true;
                 }
             }
@@ -122,6 +125,38 @@ public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterCo
                 }
             }
         });
+    }
+
+    internal void Use(UiSession session)
+    {
+        lock (_lock)
+        {
+            _shown.TryAdd(_current.Id, _current.Context.Name);
+            _current = session;
+        }
+    }
+
+    /// <summary>
+    /// Refuses a change from a tab showing an earlier connection than <paramref name="session"/> (it sends the one it
+    /// shows as <see cref="WebServer.SessionHeader"/>), which would otherwise land on a cluster the tab isn't showing.
+    /// </summary>
+    public void Expect(UiSession session, HttpContext context)
+    {
+        var tab = context.Request.Headers[WebServer.SessionHeader].ToString();
+        if (tab == session.Id)
+        {
+            return;
+        }
+        string? shown;
+        lock (_lock)
+        {
+            shown = _shown.GetValueOrDefault(tab);
+        }
+        var current = session.Context.Name;
+        var message = shown is null || shown.Equals(current, StringComparison.OrdinalIgnoreCase)
+            ? $"sfx ui reconnected to {current} since this tab loaded it. Reload to continue."
+            : $"This tab is on {shown} but sfx ui switched to {current}. Reload to continue.";
+        throw new ActionException(message, StatusCodes.Status409Conflict);
     }
 
     /// <summary>Forgets a failed attempt once the browser has shown it.</summary>

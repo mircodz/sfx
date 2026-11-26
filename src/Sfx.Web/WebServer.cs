@@ -24,6 +24,9 @@ public static class WebServer
 {
     public const string TokenHeader = "X-Sfx-Token";
 
+    /// <summary>The connection (<see cref="UiSession.Id"/>): the tab sends the one it shows, every answer carries the current one.</summary>
+    public const string SessionHeader = "X-Sfx-Session";
+
     public static async Task<int> RunAsync(UiHost host, WebOptions options, CancellationToken cancellationToken)
     {
         // A short configured token would be guessable; anything under 16 characters gets a random one instead.
@@ -55,6 +58,8 @@ public static class WebServer
                 return;
             }
 
+            // So a tab notices a switch made elsewhere (another tab) on its next poll.
+            context.Response.Headers[SessionHeader] = host.Current.Id;
             try
             {
                 await next(context);

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Sfx.Core;
 using Sfx.Core.Auth;
 using Sfx.Web;
@@ -67,6 +68,49 @@ public class UiHostTests
         Assert.False(dev.ReadOnly);
         Assert.True(dev.Power);
         Assert.True(host.Resolve(store.Find("prod-weu")!).Context.ReadOnly);
+    }
+
+    private static UiSession Connected(string context) => new(
+        new ClusterSession(new ClusterContext(context, "localhost", [], new AuthOptions()), new Uri("http://localhost:19080"), new ClusterQueries(null!)),
+        new ActionLog(Path.Combine(Path.GetTempPath(), $"sfx-host-{Guid.NewGuid():N}.log")),
+        "0.0.0");
+
+    private static HttpContext From(string? session)
+    {
+        var context = new DefaultHttpContext();
+        if (session is not null)
+        {
+            context.Request.Headers[WebServer.SessionHeader] = session;
+        }
+        return context;
+    }
+
+    [Fact]
+    public void Changes_need_the_connection_the_tab_shows()
+    {
+        var (host, _) = Host(Config);
+        var dev = host.Current;
+
+        host.Expect(dev, From(dev.Id));
+
+        var prod = Connected("prod-weu");
+        host.Use(prod);
+        var ex = Assert.Throws<ActionException>(() => host.Expect(host.Current, From(dev.Id)));
+        Assert.Equal(409, ex.Status);
+        Assert.Equal("This tab is on dev but sfx ui switched to prod-weu. Reload to continue.", ex.Message);
+        Assert.Equal(409, Assert.Throws<ActionException>(() => host.Expect(host.Current, From(null))).Status);
+        host.Expect(host.Current, From(prod.Id));
+    }
+
+    [Fact]
+    public void Reconnecting_to_the_same_context_is_a_new_connection()
+    {
+        var (host, _) = Host(Config);
+        var before = host.Current;
+        host.Use(Connected("dev"));
+
+        var ex = Assert.Throws<ActionException>(() => host.Expect(host.Current, From(before.Id)));
+        Assert.Equal("sfx ui reconnected to dev since this tab loaded it. Reload to continue.", ex.Message);
     }
 
     [Fact]

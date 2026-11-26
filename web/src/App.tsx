@@ -21,7 +21,7 @@ import { Upgrades } from "./views/Upgrades";
 import { Types } from "./views/Types";
 import { ImageStore } from "./views/ImageStore";
 import { Contexts } from "./views/Contexts";
-import { SessionContext } from "./lib/session";
+import { SessionContext, useFollowSwitches } from "./lib/session";
 import { OperationsContext, useOperationsPoll } from "./lib/operations";
 import "./views/views.css";
 import { Gallery } from "./gallery/Gallery";
@@ -76,6 +76,7 @@ export function App() {
         else localStorage.removeItem("sfx-sidebar");
     };
     const notify = useCallback((text: string, ok: boolean) => setOutcome({ text, ok }), []);
+    useFollowSwitches(session, bump, notify);
     // When a change actually finishes, say so and reload what's on screen.
     const operations = useOperationsPoll(generation, (op) => {
         notify(op.state === "done" ? `${op.title}: done.` : `${op.title}: ${op.detail?.replace(/\.$/, "") ?? "failed"}.`, op.state === "done");

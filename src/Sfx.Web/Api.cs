@@ -27,8 +27,9 @@ internal static class Api
 
         api.MapGet("/session", (UiSession s, CancellationToken ct) => SessionInfoAsync(s, ct));
 
-        api.MapPost("/session/power", async (UiSession s, PowerRequest request, CancellationToken ct) =>
+        api.MapPost("/session/power", async (UiSession s, PowerRequest request, HttpContext http, CancellationToken ct) =>
         {
+            host.Expect(s, http);
             if (s.ReadOnly)
             {
                 throw new ActionException("This context is read-only.", StatusCodes.Status403Forbidden);
@@ -285,7 +286,11 @@ internal static class Api
             .Select(e => new ActivityDto(e.Time, e.User, e.Context, e.Action, e.Outcome, e.Succeeded))
             .ToList());
 
-        api.MapPost("/actions/{id}", (UiSession s, string id, ActionRequest request, CancellationToken ct) => WebActions.RunAsync(s, id, request, ct));
+        api.MapPost("/actions/{id}", (UiSession s, string id, ActionRequest request, HttpContext http, CancellationToken ct) =>
+        {
+            host.Expect(s, http);
+            return WebActions.RunAsync(s, id, request, ct);
+        });
         ApiClusterUpgrades.Map(api);
         ApiOperations.Map(api);
         ApiReasons.Map(api);
@@ -295,7 +300,7 @@ internal static class Api
         ApiOverview.Map(api);
         ApiLifecycle.Map(api);
         ApiSearch.Map(api);
-        ApiImageStore.Map(api);
+        ApiImageStore.Map(api, host);
     }
 
     public sealed record PowerRequest(bool On);
@@ -305,6 +310,7 @@ internal static class Api
         var imageStore = s.ImageStoreBrowsableAsync(ct);
         var services = await s.GetSystemServicesAsync(ct);
         return new(
+            s.Id,
             s.Context.Name,
             s.Cluster.Endpoint.ToString(),
             s.ReadOnly,
