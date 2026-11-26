@@ -15,7 +15,7 @@ namespace Sfx.Tui;
 /// the status line or the <c>:</c> and <c>/</c> prompt, with the activity strip on its right. Keys, <c>:</c>
 /// commands, the palette, help and the footer's shortcuts all come from one <see cref="Keymap"/>.
 /// </summary>
-internal sealed class Shell : IActionHost
+internal sealed class Shell
 {
     private const string General = "General";
     private const string Navigation = "Navigation";
@@ -71,7 +71,7 @@ internal sealed class Shell : IActionHost
         _readOnly = readOnly;
         _session = session;
         _power = session.Context.Power;
-        _views = new Views(session.Queries, this);
+        _views = new Views(session.Queries, new SessionHost(this, session));
         _connector = connector;
         _store = store;
         _log = new ActionLog(SfxHost.ActionLogPath(store));
@@ -166,6 +166,12 @@ internal sealed class Shell : IActionHost
 
     /// <summary>Every key and command, the page's included.</summary>
     internal Keymap Keymap => _keymap;
+
+    /// <summary>The current context's pages and actions, for tests.</summary>
+    internal Views Views => _views;
+
+    /// <summary>The footer's message, for tests.</summary>
+    internal string? Message => Status.Message?.Text.PlainText;
 
     public Task NotifyAsync(string message)
     {
@@ -401,7 +407,22 @@ internal sealed class Shell : IActionHost
     public bool Allows(ActionRisk risk, bool power) =>
         (risk == ActionRisk.None || !_session.Context.ReadOnly) && (!power || _power);
 
-    public void Run(Operation operation)
+    /// <summary>
+    /// Whether <paramref name="session"/>, the one an action was started on, is still the one in use; if not, says
+    /// nothing was done. Checked again once each dialog is answered, as the context may have been switched meanwhile.
+    /// </summary>
+    private bool StillOn(ClusterSession session)
+    {
+        if (session == _session)
+        {
+            return true;
+        }
+
+        Warn($"You switched to {_session.Context.Name}; this was for {session.Context.Name}. Nothing was done.");
+        return false;
+    }
+
+    private void Run(ClusterSession session, Operation operation)
     {
         if (_batch is not null)
         {
@@ -409,44 +430,57 @@ internal sealed class Shell : IActionHost
             return;
         }
 
-        if (_session.Context.ReadOnly)
+        if (!StillOn(session))
         {
-            Warn($"{_session.Context.Name} is read-only");
             return;
         }
 
-        Confirm(operation, back: null);
+        if (session.Context.ReadOnly)
+        {
+            Warn($"{session.Context.Name} is read-only");
+            return;
+        }
+
+        Confirm(session, operation, back: null);
     }
 
     /// <summary>Asks before anything that changes the cluster; <paramref name="back"/> runs when the answer is no.</summary>
-    private void Confirm(Operation operation, Action? back)
+    private void Confirm(ClusterSession session, Operation operation, Action? back)
     {
         if (operation.Risk == ActionRisk.None)
         {
-            Execute(operation, new HashSet<char>());
+            Execute(session, operation, new HashSet<char>());
             return;
         }
 
-        ConfirmDialog.Show(_app, Confirmations.For(operation), result =>
+        ConfirmDialog.Show(_app, Confirmations.For(session.Context.Name, operation), result =>
         {
-            if (result.Confirmed)
+            if (!result.Confirmed)
             {
-                Execute(operation, Confirmations.Chosen(result));
+                if (session == _session)
+                {
+                    back?.Invoke();
+                }
             }
-            else
+            else if (StillOn(session))
             {
-                back?.Invoke();
+                Execute(session, operation, Confirmations.Chosen(result));
             }
         }, DialogWidth(60));
     }
 
     private int DialogWidth(int percent) => Math.Max(44, _app.Size.Width * percent / 100);
 
-    public void Batch(string title, Action queue, string? note = null, Action? started = null)
+    private void Batch(ClusterSession session, string title, Action queue, string? note, Action? started)
     {
-        if (_session.Context.ReadOnly)
+        if (!StillOn(session))
         {
-            Warn($"{_session.Context.Name} is read-only");
+            return;
+        }
+
+        if (session.Context.ReadOnly)
+        {
+            Warn($"{session.Context.Name} is read-only");
             return;
         }
 
@@ -468,12 +502,12 @@ internal sealed class Shell : IActionHost
             return;
         }
 
-        ConfirmDialog.Show(_app, Confirmations.ForBatch(title, operations, note), result =>
+        ConfirmDialog.Show(_app, Confirmations.ForBatch(session.Context.Name, title, operations, note), result =>
         {
-            if (result.Confirmed)
+            if (result.Confirmed && StillOn(session))
             {
                 started?.Invoke();
-                ExecuteAll(title, operations, Confirmations.Chosen(result));
+                ExecuteAll(session, title, operations, Confirmations.Chosen(result));
             }
         }, DialogWidth(60));
     }
@@ -482,9 +516,8 @@ internal sealed class Shell : IActionHost
     /// Runs the operation off the UI thread, as a task in the activity strip; the outcome goes to the action log.
     /// Once the cluster has accepted it, a change it carries out over time is followed until it's done.
     /// </summary>
-    private void Execute(Operation operation, IReadOnlySet<char> options)
+    private void Execute(ClusterSession session, Operation operation, IReadOnlySet<char> options)
     {
-        var session = _session;
         var title = Titled(operation, options);
         var task = _activity.Start(session.Context.Name, title);
         operation.Progress?.Attach(state => task.Report(state.Fraction, state.Detail));
@@ -557,9 +590,8 @@ internal sealed class Shell : IActionHost
     }
 
     /// <summary>Runs operations one after another as one task, and stops at the first that fails.</summary>
-    private void ExecuteAll(string title, IReadOnlyList<Operation> operations, IReadOnlySet<char> options)
+    private void ExecuteAll(ClusterSession session, string title, IReadOnlyList<Operation> operations, IReadOnlySet<char> options)
     {
-        var session = _session;
         var task = _activity.Start(session.Context.Name, title);
         _ = Task.Run(async () =>
         {
@@ -610,11 +642,16 @@ internal sealed class Shell : IActionHost
         }
     }
 
-    public void Pick(string title, Func<CancellationToken, Task<IReadOnlyList<Choice>>> load)
+    private void Pick(ClusterSession session, string title, Func<CancellationToken, Task<IReadOnlyList<Choice>>> load)
     {
         if (_batch is not null)
         {
             _batchRefused = true;
+            return;
+        }
+
+        if (!StillOn(session))
+        {
             return;
         }
 
@@ -636,12 +673,12 @@ internal sealed class Shell : IActionHost
                 var choices = await load(CancellationToken.None);
                 Post(() =>
                 {
-                    if (_app.TopOverlay is not null)
+                    if (_app.TopOverlay is not null || !StillOn(session))
                     {
                         Done();
                         return;
                     }
-                    ShowPick(choices, Done);
+                    ShowPick(session, choices, Done);
                 });
             }
             catch (Exception ex)
@@ -651,9 +688,18 @@ internal sealed class Shell : IActionHost
         });
     }
 
-    private void ShowPick(IReadOnlyList<Choice> choices, Action done)
+    private void ShowPick(ClusterSession session, IReadOnlyList<Choice> choices, Action done)
     {
-        var palette = new CommandPalette(choices.Select(choice => new Command(choice.Title, choice.Pick, choice.Subtitle ?? "")));
+        var palette = new CommandPalette(choices.Select(choice => new Command(
+            choice.Title,
+            () =>
+            {
+                if (StillOn(session))
+                {
+                    choice.Pick();
+                }
+            },
+            choice.Subtitle ?? "")));
         var overlay = new Overlay(palette)
         {
             Placement = OverlayPlacement.Top,
@@ -674,7 +720,7 @@ internal sealed class Shell : IActionHost
         _app.PushOverlay(overlay);
     }
 
-    public void Ask(string label, string initial, Func<string, string?>? validate, Action<string> submit)
+    private void Ask(ClusterSession session, string label, string initial, Func<string, string?>? validate, Action<string> submit)
     {
         if (_batch is not null)
         {
@@ -682,14 +728,26 @@ internal sealed class Shell : IActionHost
             return;
         }
 
-        _line.Ask(label, initial, validate, text => submit(text.Trim()));
+        if (!StillOn(session))
+        {
+            return;
+        }
+
+        _line.Ask(label, initial, validate, text =>
+        {
+            if (StillOn(session))
+            {
+                submit(text.Trim());
+            }
+        });
     }
 
-    public void Edit(
+    private void Edit(
+        ClusterSession session,
         string title,
         Func<CancellationToken, Task<IReadOnlyList<FormField>>> load,
         Func<IReadOnlyList<FormField>, Operation> review,
-        bool unchanged = false)
+        bool unchanged)
     {
         if (_batch is not null)
         {
@@ -697,9 +755,14 @@ internal sealed class Shell : IActionHost
             return;
         }
 
-        if (_session.Context.ReadOnly)
+        if (!StillOn(session))
         {
-            Warn($"{_session.Context.Name} is read-only");
+            return;
+        }
+
+        if (session.Context.ReadOnly)
+        {
+            Warn($"{session.Context.Name} is read-only");
             return;
         }
 
@@ -716,9 +779,9 @@ internal sealed class Shell : IActionHost
                     {
                         Status.Dismiss();
                     }
-                    if (_app.TopOverlay is null)
+                    if (_app.TopOverlay is null && StillOn(session))
                     {
-                        ShowForm(title, fields, review, unchanged);
+                        ShowForm(session, title, fields, review, unchanged);
                     }
                 });
             }
@@ -733,10 +796,20 @@ internal sealed class Shell : IActionHost
     /// The form, then its review: the confirmation lists what changed, and no goes back to the form. A review that
     /// refuses what was typed says why and opens the form again, as it was.
     /// </summary>
-    private void ShowForm(string title, IReadOnlyList<FormField> fields, Func<IReadOnlyList<FormField>, Operation> review, bool unchanged)
+    private void ShowForm(
+        ClusterSession session,
+        string title,
+        IReadOnlyList<FormField> fields,
+        Func<IReadOnlyList<FormField>, Operation> review,
+        bool unchanged)
     {
         var dialog = FormDialog.Show(_app, $" {title} ", fields, _ =>
         {
+            if (!StillOn(session))
+            {
+                return;
+            }
+
             Operation operation;
             try
             {
@@ -745,15 +818,15 @@ internal sealed class Shell : IActionHost
             catch (Exception ex) when (ex is RefusedException or FormatException or InvalidOperationException or ArgumentException)
             {
                 Error($"{title}: {ex.Message}");
-                ShowForm(title, fields, review, unchanged);
+                ShowForm(session, title, fields, review, unchanged);
                 return;
             }
-            Confirm(operation, back: () => ShowForm(title, fields, review, unchanged));
+            Confirm(session, operation, back: () => ShowForm(session, title, fields, review, unchanged));
         }, width: Math.Min(_app.Size.Width - 4, Math.Max(60, _app.Size.Width * 60 / 100)));
         dialog.Form.AllowEmptySubmit = unchanged;
     }
 
-    public void Load<T>(string title, Func<CancellationToken, Task<T>> load, Action<T> then)
+    private void Load<T>(ClusterSession session, string title, Func<CancellationToken, Task<T>> load, Action<T> then)
     {
         if (_batch is not null)
         {
@@ -763,7 +836,6 @@ internal sealed class Shell : IActionHost
 
         var loading = StyledText.Of(title + "…");
         Status.Show(loading, StatusLevel.Info, Timeout.InfiniteTimeSpan);
-        var session = _session;
         _ = Task.Run(async () =>
         {
             try
@@ -788,8 +860,8 @@ internal sealed class Shell : IActionHost
         });
     }
 
-    public void Open(string title, Func<CancellationToken, Task<IReadOnlyList<IResourceView>>> load, bool replace = false) =>
-        Load(title, load, pages =>
+    private void Open(ClusterSession session, string title, Func<CancellationToken, Task<IReadOnlyList<IResourceView>>> load, bool replace) =>
+        Load(session, title, load, pages =>
         {
             if (pages.Count == 0)
             {
@@ -988,14 +1060,7 @@ internal sealed class Shell : IActionHost
                     {
                         Status.Dismiss();
                     }
-                    _session = session;
-                    _power = session.Context.Power;
-                    _views = new Views(session.Queries, this);
-                    _summary.Content = StyledText.Empty();
-                    _summaryAt = default;
-                    _store.Active = context.Name;
-                    _store.Save();
-                    ShowRoot(_views.Nodes());
+                    Use(session);
                 });
             }
             catch (Exception) when (connecting.IsCancellationRequested)
@@ -1013,6 +1078,19 @@ internal sealed class Shell : IActionHost
                 });
             }
         });
+    }
+
+    /// <summary>Switches to a connected session; internal so tests can switch without a cluster.</summary>
+    internal void Use(ClusterSession session)
+    {
+        _session = session;
+        _power = session.Context.Power;
+        _views = new Views(session.Queries, new SessionHost(this, session));
+        _summary.Content = StyledText.Empty();
+        _summaryAt = default;
+        _store.Active = session.Context.Name;
+        _store.Save();
+        ShowRoot(_views.Nodes());
     }
 
     private void RefreshIf(ClusterSession session)
@@ -1221,6 +1299,40 @@ internal sealed class Shell : IActionHost
             _updatedItem.Text = Styles.Muted($"updated {at:HH:mm:ss}{every}");
             _updatedItem.ShortText = Styles.Muted($"{at:HH:mm:ss}");
         }
+    }
+
+    /// <summary>
+    /// What one session's pages offer their actions: whatever they start runs on, and is logged against, that session,
+    /// or not at all once the context has been switched.
+    /// </summary>
+    private sealed class SessionHost(Shell shell, ClusterSession session) : IActionHost
+    {
+        public void Run(Operation operation) => shell.Run(session, operation);
+
+        public void Batch(string title, Action queue, string? note = null, Action? started = null) => shell.Batch(session, title, queue, note, started);
+
+        public void Pick(string title, Func<CancellationToken, Task<IReadOnlyList<Choice>>> load) => shell.Pick(session, title, load);
+
+        public void Ask(string label, string initial, Func<string, string?>? validate, Action<string> submit) =>
+            shell.Ask(session, label, initial, validate, submit);
+
+        public void Edit(
+            string title,
+            Func<CancellationToken, Task<IReadOnlyList<FormField>>> load,
+            Func<IReadOnlyList<FormField>, Operation> review,
+            bool unchanged = false) =>
+            shell.Edit(session, title, load, review, unchanged);
+
+        public void Load<T>(string title, Func<CancellationToken, Task<T>> load, Action<T> then) => shell.Load(session, title, load, then);
+
+        public void Open(string title, Func<CancellationToken, Task<IReadOnlyList<IResourceView>>> load, bool replace = false) =>
+            shell.Open(session, title, load, replace);
+
+        public void Warn(string message) => shell.Warn(message);
+
+        public void Command(string text) => shell.Command(text);
+
+        public bool Allows(ActionRisk risk, bool power) => shell.Allows(risk, power);
     }
 
     /// <summary>

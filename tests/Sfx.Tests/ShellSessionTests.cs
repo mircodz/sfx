@@ -1,4 +1,5 @@
 using Cellar.Widgets;
+using Microsoft.ServiceFabric.Common;
 using Sfx.Core;
 using Sfx.Core.Auth;
 using Sfx.Tui;
@@ -26,13 +27,39 @@ public sealed class ShellSessionTests : IDisposable
         Directory.Delete(_dir, recursive: true);
     }
 
-    private static ClusterSession Session(ClusterContext context) =>
-        new(context, new Uri(context.Endpoint), new ClusterQueries(null!));
+    private static readonly ServiceRow Service = new("App~Svc", "fabric:/App/Svc", "SvcType", "Stateful", "Active", HealthState.Ok);
 
-    private Shell Shell(bool readOnly = false)
+    private static readonly PartitionRow Partition = new(PartitionId.Parse(Guid.NewGuid().ToString()), "Stateful", "Singleton", "Ready", HealthState.Ok, "3/2");
+
+    private string LogPath => Path.Combine(_dir, "actions.log");
+
+    private ClusterSession Session(string name, FakeCluster? cluster = null)
     {
-        var context = _store.Find("dev")! with { ReadOnly = readOnly };
-        return new Shell(_app, Session(context), new ClusterConnector(BuiltInAuth.Providers), _store, TimeSpan.Zero, readOnly);
+        var context = _store.Find(name)!;
+        return new(context, new Uri(context.Endpoint), new ClusterQueries(cluster?.Client!));
+    }
+
+    private Shell Shell(bool readOnly = false, FakeCluster? cluster = null)
+    {
+        var session = Session("dev", cluster);
+        session = session with { Context = session.Context with { ReadOnly = readOnly } };
+        return new Shell(_app, session, new ClusterConnector(BuiltInAuth.Providers), _store, TimeSpan.Zero, readOnly);
+    }
+
+    /// <summary>Starts resetting the partition's load and returns its confirmation, which has opened.</summary>
+    private ConfirmDialog ResetLoad(Shell shell)
+    {
+        shell.Views.PartitionActions(Service).Single(a => a.Title == "Reset partition load").Run(Partition);
+        return Assert.IsType<ConfirmDialog>(_app.TopOverlay?.Content);
+    }
+
+    private static async Task Until(Func<bool> done)
+    {
+        for (var i = 0; i < 200 && !done(); i++)
+        {
+            await Task.Delay(25);
+        }
+        Assert.True(done());
     }
 
     [Fact]
@@ -61,5 +88,47 @@ public sealed class ShellSessionTests : IDisposable
         (await page.LoadAsync(CancellationToken.None))();
 
         Assert.All(page.Table.Rows, row => Assert.True(row.Context.ReadOnly));
+    }
+
+    [Fact]
+    public void The_confirmation_says_which_cluster_it_is_for()
+    {
+        Assert.StartsWith("dev: Reset the load of partition", ResetLoad(Shell(cluster: new FakeCluster())).Headline);
+    }
+
+    [Fact]
+    public void Confirming_after_a_switch_does_nothing_and_says_so()
+    {
+        var dev = new FakeCluster().OnCall("ResetPartitionLoadAsync");
+        var prod = new FakeCluster().OnCall("ResetPartitionLoadAsync");
+        var shell = Shell(cluster: dev);
+        var dialog = ResetLoad(shell);
+
+        shell.Use(Session("prod", prod));
+        Assert.True(dialog.Confirm());
+
+        Assert.Equal("You switched to prod; this was for dev. Nothing was done.", shell.Message);
+        Assert.Empty(dev.CallsTo("ResetPartitionLoadAsync"));
+        Assert.Empty(prod.CallsTo("ResetPartitionLoadAsync"));
+        Assert.False(File.Exists(LogPath));
+    }
+
+    [Fact]
+    public async Task An_action_still_running_at_a_switch_is_logged_against_its_own_cluster()
+    {
+        using var gate = new ManualResetEventSlim();
+        var dev = new FakeCluster().OnCall("ResetPartitionLoadAsync", _ => gate.Wait(TimeSpan.FromSeconds(5)));
+        var shell = Shell(cluster: dev);
+        Assert.True(ResetLoad(shell).Confirm());
+        await Until(() => dev.CallsTo("ResetPartitionLoadAsync").Count == 1);
+
+        shell.Use(Session("prod", new FakeCluster()));
+        gate.Set();
+        await Until(() => File.Exists(LogPath) && File.ReadAllText(LogPath).Length > 0);
+
+        var line = Assert.Single(File.ReadAllLines(LogPath));
+        Assert.Contains("dev", line);
+        Assert.Contains("127.0.0.1:1", line);
+        Assert.DoesNotContain("prod", line);
     }
 }

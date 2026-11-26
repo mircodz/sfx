@@ -222,7 +222,7 @@ public class ConfirmDialogTests
     [Fact]
     public void Plain_confirmation_runs_on_y_with_the_options_toggled_on()
     {
-        var (dialog, results) = Dialog(Confirmations.For(Op(ActionRisk.Confirm, new OperationOption('i', "ignore constraints"))));
+        var (dialog, results) = Dialog(Confirmations.For("dev", Op(ActionRisk.Confirm, new OperationOption('i', "ignore constraints"))));
 
         dialog.OnEvent(Key('i'));
         dialog.OnEvent(Key('y'));
@@ -235,7 +235,7 @@ public class ConfirmDialogTests
     [Fact]
     public void Destructive_confirmation_needs_the_exact_target_and_toggles_take_alt()
     {
-        var (dialog, results) = Dialog(Confirmations.For(Op(ActionRisk.Destructive, new OperationOption('f', "force"))));
+        var (dialog, results) = Dialog(Confirmations.For("dev", Op(ActionRisk.Destructive, new OperationOption('f', "force"))));
 
         Assert.Equal(ConfirmRisk.Destructive, dialog.Risk);
         // y is just a character here, not a yes.
@@ -259,7 +259,7 @@ public class ConfirmDialogTests
     [Fact]
     public void Escape_cancels()
     {
-        var (dialog, results) = Dialog(Confirmations.For(Op(ActionRisk.Destructive)));
+        var (dialog, results) = Dialog(Confirmations.For("dev", Op(ActionRisk.Destructive)));
 
         dialog.OnEvent(new KeyEvent(Cellar.Terminal.Key.Escape, default, KeyModifiers.None));
 
@@ -273,7 +273,7 @@ public class ConfirmDialogTests
             .Select(i => new Operation($"Remove replica {i}", $"{i}", i == 3 ? ActionRisk.Destructive : ActionRisk.Confirm, (_, _) => Task.CompletedTask))
             .ToList();
 
-        var dialog = Confirmations.ForBatch("Remove replica: 10 marked rows", operations, "1 marked row is left out: it doesn't apply to it.");
+        var dialog = Confirmations.ForBatch("dev", "Remove replica: 10 marked rows", operations, "1 marked row is left out: it doesn't apply to it.");
         var details = dialog.Details.Select(line => line.PlainText).ToList();
 
         Assert.Equal(ConfirmRisk.Destructive, dialog.Risk);
@@ -290,7 +290,7 @@ public class ConfirmDialogTests
     {
         var operation = new Operation("Restart node a", "a", ActionRisk.Confirm, (_, _) => Task.CompletedTask);
 
-        Assert.Equal(ConfirmRisk.Normal, Confirmations.ForBatch("Restart node: 2 marked rows", [operation, operation], null).Risk);
+        Assert.Equal(ConfirmRisk.Normal, Confirmations.ForBatch("dev", "Restart node: 2 marked rows", [operation, operation], null).Risk);
     }
 }
 
