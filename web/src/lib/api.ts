@@ -28,34 +28,15 @@ import type {
 } from "./types";
 import { observe, requestSwitch, shownConnection } from "./connection";
 
-// The link sfx ui prints is /?token=…; keep the token for this tab and strip only it from the address bar. The one it
-// opens is /?launch=…, a code good once for a minute that's traded for the token, as a browser's command line is
-// visible to other users.
+// sfx ui opens /?token=…; keep the token for this tab and strip only it from the address bar.
 const tokenKey = "sfx-token";
 const params = new URLSearchParams(location.search);
 const fromUrl = params.get("token");
-const launch = params.get("launch");
-if (fromUrl) sessionStorage.setItem(tokenKey, fromUrl);
-if (fromUrl || launch) {
+if (fromUrl) {
+    sessionStorage.setItem(tokenKey, fromUrl);
     params.delete("token");
-    params.delete("launch");
     const rest = params.toString();
     history.replaceState(null, "", `${location.pathname}${rest ? `?${rest}` : ""}${location.hash}`);
-}
-
-/** Why the launch code couldn't be traded, said instead of a bare 401. */
-let launchError: string | undefined;
-const launched = launch && !fromUrl ? trade(launch) : Promise.resolve();
-
-async function trade(code: string) {
-    try {
-        const response = await fetch("/api/launch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
-        const data = await response.json().catch(() => ({}));
-        if (response.ok && data.token) sessionStorage.setItem(tokenKey, data.token);
-        else launchError = data.error;
-    } catch {
-        // Not answering: every request says so.
-    }
 }
 
 export class ApiError extends Error {
@@ -73,7 +54,6 @@ const sessionHeader = "X-Sfx-Session";
 const headers = () => ({ "X-Sfx-Token": sessionStorage.getItem(tokenKey) ?? "", [sessionHeader]: shownConnection() });
 
 async function send<T>(path: string, init: RequestInit, failed: string): Promise<T> {
-    await launched;
     let response: Response;
     try {
         response = await fetch(`/api${path}`, { ...init, headers: { ...headers(), ...init.headers } });
@@ -83,8 +63,7 @@ async function send<T>(path: string, init: RequestInit, failed: string): Promise
     observe(response.headers.get(sessionHeader));
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-        const message = response.status === 401 && launchError ? launchError : data.error;
-        throw new ApiError(message ?? `${failed} (${response.status}).`, response.status);
+        throw new ApiError(data.error ?? `${failed} (${response.status}).`, response.status);
     }
     return data as T;
 }

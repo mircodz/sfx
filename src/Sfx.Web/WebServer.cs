@@ -27,14 +27,17 @@ public static class WebServer
     /// <summary>The connection (<see cref="UiSession.Id"/>): the tab sends the one it shows, every answer carries the current one.</summary>
     public const string SessionHeader = "X-Sfx-Session";
 
-    /// <summary>Trades a launch code for the token; the one API path that doesn't need the token.</summary>
-    public const string LaunchPath = "/api/launch";
+    /// <summary>How long the page the browser is opened on stays; the browser reads it at once.</summary>
+    private static readonly TimeSpan LaunchPageLifetime = TimeSpan.FromSeconds(60);
 
-    public static async Task<int> RunAsync(UiHost host, WebOptions options, CancellationToken cancellationToken)
+    public static Task<int> RunAsync(UiHost host, WebOptions options, CancellationToken cancellationToken) =>
+        RunAsync(host, options, Open, cancellationToken);
+
+    /// <param name="open">Opens a file in the browser; what's passed shows on a command line.</param>
+    internal static async Task<int> RunAsync(UiHost host, WebOptions options, Action<string> open, CancellationToken cancellationToken)
     {
         // A short configured token would be guessable; anything under 16 characters gets a random one instead.
         var token = options.Token is { Length: >= 16 } configured ? configured : Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24));
-        var codes = new LaunchCodes(token, TimeProvider.System);
 
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { ContentRootPath = AppContext.BaseDirectory });
         builder.Logging.ClearProviders();
@@ -56,8 +59,7 @@ public static class WebServer
         app.UseWhen(c => c.Request.Path.StartsWithSegments("/api"), api => api.Use(async (context, next) =>
         {
             var sent = context.Request.Headers[TokenHeader].ToString();
-            if (!context.Request.Path.Equals(LaunchPath, StringComparison.OrdinalIgnoreCase)
-                && !CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(sent), System.Text.Encoding.UTF8.GetBytes(token)))
+            if (!CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(sent), System.Text.Encoding.UTF8.GetBytes(token)))
             {
                 await Error(context, StatusCodes.Status401Unauthorized, "Open sfx ui from the link it printed; that link carries the access token.");
                 return;
@@ -104,7 +106,6 @@ public static class WebServer
             }
         }));
 
-        app.MapPost(LaunchPath, (LaunchRequest request) => Launch(codes, request));
         Api.Map(app, host);
         app.MapFallback("/api/{**rest}", context => Error(context, StatusCodes.Status404NotFound, "No such endpoint."));
         // A plain MapFallback skips paths that look like files, which is every asset.
@@ -123,24 +124,18 @@ public static class WebServer
         var port = new Uri(app.Urls.First()).Port;
         var session = host.Current;
         Console.WriteLine($"sfx ui for {session.Context.Name} ({session.Cluster.Endpoint}){(session.ReadOnly ? ", read-only" : "")}; switch contexts in the browser");
-        // The printed link keeps the token, so it works for as long as sfx ui runs. The opened one has a launch code
-        // instead: a browser's command line is visible to other users (ps), and the code is spent once it's loaded.
-        Console.WriteLine($"  http://127.0.0.1:{port}/?token={token}");
+        var url = $"http://127.0.0.1:{port}/?token={Uri.EscapeDataString(token)}";
+        Console.WriteLine($"  {url}");
         Console.WriteLine("Press Ctrl+C to stop.");
-        if (options.OpenBrowser)
+        using var page = options.OpenBrowser ? LaunchPage.Write(url, LaunchPageLifetime) : null;
+        if (page is not null)
         {
-            Open($"http://127.0.0.1:{port}/?launch={codes.Issue()}");
+            open(page.Path);
         }
 
         await app.WaitForShutdownAsync(cancellationToken);
         return 0;
     }
-
-    internal static IResult Launch(LaunchCodes codes, LaunchRequest request) => codes.Redeem(request.Code) is { } token
-        ? Results.Ok(new LaunchDto(token))
-        : Results.Json(
-            new { error = "This link has expired or was already used. Open sfx ui from the link it printed in the terminal." },
-            statusCode: StatusCodes.Status401Unauthorized);
 
     private static bool IsLocalHost(string host) =>
         host is "localhost" or "127.0.0.1" or "[::1]" or "::1";
@@ -186,11 +181,11 @@ public static class WebServer
         await stream.CopyToAsync(context.Response.Body, context.RequestAborted);
     }
 
-    private static void Open(string url)
+    private static void Open(string path)
     {
         try
         {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
         catch (Exception)
         {
