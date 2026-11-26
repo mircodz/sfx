@@ -4,7 +4,6 @@ using Microsoft.ServiceFabric.Common.Exceptions;
 
 namespace Sfx.Core;
 
-/// <summary>How many entities of one kind are in each health state.</summary>
 /// <param name="Kind">Node, Application, Service, Partition or Replica.</param>
 public sealed record HealthCount(string Kind, long Healthy, long Warning, long Error);
 

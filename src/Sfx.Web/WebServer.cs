@@ -16,9 +16,9 @@ namespace Sfx.Web;
 public sealed record WebOptions(int Port = 0, bool OpenBrowser = true, string? Token = null);
 
 /// <summary>
-/// <c>sfx ui</c>: serves the browser UI and its API on 127.0.0.1 for one connected cluster.
-/// The API acts with the user's cluster credentials, so it only answers requests that carry the token printed at start
-/// (other sites can't read or send it) and only for a localhost Host header (so DNS rebinding can't reach it).
+/// <c>sfx ui</c> on 127.0.0.1. The API acts with the user's cluster credentials, so it only answers requests carrying
+/// the token printed at start (other sites can't read or send it) with a localhost Host header (so DNS rebinding can't
+/// reach it).
 /// </summary>
 public static class WebServer
 {

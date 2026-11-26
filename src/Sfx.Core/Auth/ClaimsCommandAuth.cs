@@ -97,8 +97,7 @@ public sealed class TokenCommand(string fileName, IReadOnlyList<string> argument
         }
         catch (IOException)
         {
-            // The command exited (or closed its input) before reading the request: what it said and its exit code
-            // explain that better than a broken pipe, so carry on and report those.
+            // The command exited or closed stdin early; its output and exit code explain that better than a broken pipe.
         }
         await process.WaitForExitAsync(cancellationToken);
 

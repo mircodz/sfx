@@ -3,7 +3,7 @@ import { api } from "../lib/api";
 import type { ActionInput, Node } from "../lib/types";
 import { Checkbox, ChoiceField, Field, Select } from "../ui/Form";
 
-/** One of an action's simple inputs, as the server described it. Forms with more (versions, parameters) have editors. */
+/** A simple input as the server describes it; richer forms (versions, parameters) have editors. */
 export function ActionInputField({
     input,
     target,
@@ -35,7 +35,7 @@ export function ActionInputField({
     }
 }
 
-/** "Let the cluster choose", then every other node grouped by type; nodes that aren't up can't be picked. */
+/** Nodes that aren't up can't be picked. */
 export function NodePicker({ label, exclude, value, onChange }: { label: string; exclude?: string; value: string; onChange: (value: string) => void }) {
     const [nodes, setNodes] = useState<Node[] | null>(null);
     useEffect(() => {

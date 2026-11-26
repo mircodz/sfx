@@ -8,9 +8,8 @@ export type Resource<T> = { data?: T; error?: string; loading: boolean; at?: Dat
 const refreshMs = 10_000;
 
 /**
- * Loads `load()` and keeps it fresh: again 10 seconds after each load finishes (so slow loads never pile up), only
- * while the browser tab is visible (and at once when it becomes visible again after missing a refresh), after every
- * change, and whenever `key` changes. Keeps showing the last data while it reloads.
+ * Reloads 10 s after each load finishes (so slow loads never pile up), only while the tab is visible, after every
+ * change, and when `key` changes. Keeps the last data on screen while reloading.
  */
 export function useResource<T>(key: string, load: () => Promise<T>, poll = true): Resource<T> {
     const { generation } = useContext(RefreshContext);
@@ -43,7 +42,7 @@ export function useResource<T>(key: string, load: () => Promise<T>, poll = true)
         };
     }, [key, generation, tick, poll]);
 
-    // Back on a tab that skipped a refresh while hidden: refresh now rather than up to 10 seconds later.
+    // Back on a tab that skipped a refresh while hidden: refresh now, not up to 10 s later.
     useEffect(() => {
         const onVisible = () => {
             if (document.visibilityState === "visible" && due.current) setTick((t) => t + 1);

@@ -9,7 +9,7 @@ import { Notice } from "../ui/Notice";
 import { ActionInputField, defaultInputs } from "./inputs";
 import { errorText, subject, useRun } from "./run";
 
-/** Confirms an action without a form: what happens, what it causes, its few inputs, and the typed name if destructive. */
+/** For actions without a form; destructive ones need the name typed. */
 export function ConfirmAction({ action, onClose }: { action: Action; onClose: () => void }) {
     const run = useRun();
     const [inputs, setInputs] = useState(() => defaultInputs(action.inputs));

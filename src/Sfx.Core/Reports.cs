@@ -125,7 +125,6 @@ public static class ClusterSettings
         XDocument.Parse(manifest).Root?.Attribute("Version")?.Value is { Length: > 0 } version ? version : null;
 }
 
-/// <summary>One line of the action log.</summary>
 public sealed record ActionLogEntry(DateTimeOffset Time, string User, string Context, string Endpoint, string Action, string Outcome)
 {
     /// <summary>"ok" when an action ran; "done" when the browser saw the cluster finish what it asked for.</summary>

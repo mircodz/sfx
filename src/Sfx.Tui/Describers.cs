@@ -3,7 +3,7 @@ using Sfx.Core;
 
 namespace Sfx.Tui;
 
-/// <summary>The describe page of each kind of entity; its actions are the same as on the entity's table row.</summary>
+/// <summary>Describe pages; each offers the same actions as the entity's table row.</summary>
 public sealed partial class Views
 {
     public const int ClusterHealthTab = 1;

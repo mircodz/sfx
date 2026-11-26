@@ -31,7 +31,6 @@ public sealed class NodeCapacities(IReadOnlyDictionary<string, IReadOnlyDictiona
                     .ToDictionary(c => c.Key, c => double.Parse((string)c.Last().Attribute("Value")!, NumberStyles.Float, CultureInfo.InvariantCulture))));
     }
 
-    /// <summary>Whether nodes of <paramref name="nodeType"/> declare a capacity for <paramref name="metric"/>.</summary>
     public bool Declares(string nodeType, string metric) => byNodeType.TryGetValue(nodeType, out var metrics) && metrics.ContainsKey(metric);
 
     /// <summary>Whether every node type declares a capacity for <paramref name="metric"/>, so the cluster's total is a real limit.</summary>

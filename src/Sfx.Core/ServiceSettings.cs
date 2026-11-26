@@ -23,7 +23,6 @@ public enum SettingKind
     Flag,
 }
 
-/// <summary>One editable service setting and its current value.</summary>
 /// <param name="Key">What <see cref="ServiceSettings.UpdateAsync"/> takes it by, e.g. "quorum-loss-wait".</param>
 /// <param name="Value">The current value as text; empty when the cluster's default applies.</param>
 public sealed record ServiceSetting(

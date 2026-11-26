@@ -16,7 +16,7 @@ import { Empty, Section } from "../ui/Section";
 import { SearchBox, Toolbar } from "../ui/Toolbar";
 import "./Contexts.css";
 
-/** "prod/europe" as the reader sees it. */
+/** "prod/europe" as "prod / europe". */
 export const folderLabel = (path: string) => path.split("/").join(" / ");
 
 /** A folder's settings with what it inherits: the nearest label and color, and read-only from any parent. */
@@ -31,8 +31,8 @@ function matches(c: ClusterContext, q: string) {
 }
 
 /**
- * Every saved cluster, by folder, searchable: with a hundred clusters a menu doesn't do. Picking one connects in
- * the background (showing sign-in prompts here) and, once connected, opens its overview.
+ * Searchable, since with a hundred clusters a menu doesn't do. Picking one connects in the background (sign-in
+ * prompts show here), then opens its overview.
  */
 export function Contexts() {
     const contexts = useResource("contexts", api.contexts, false);
@@ -43,7 +43,7 @@ export function Contexts() {
     const target = useRef<string | null>(null);
     const connecting = contexts.data?.connecting;
 
-    // While connecting, ask every second how it's going; stop once it's done or failed.
+    // While connecting, poll every second until it's done or failed.
     useEffect(() => {
         if (!connecting || connecting.error) return;
         const id = setInterval(contexts.reload, 1000);

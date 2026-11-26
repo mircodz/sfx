@@ -34,7 +34,7 @@ public interface IResourceView
     /// <summary>Groups the rows by a column (null: ungroups); false if there's no such column.</summary>
     bool GroupBy(string? column) => false;
 
-    /// <summary>How many rows are marked for an action on several at once.</summary>
+    /// <summary>How many rows are marked for a batch action.</summary>
     int MarkCount => 0;
 
     void ClearMarks()

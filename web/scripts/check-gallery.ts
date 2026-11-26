@@ -1,10 +1,9 @@
-// Renders the component gallery (#/gallery) in light and dark, at desktop and phone widths, plus every dialog and
-// panel, and compares each screenshot with its baseline in tests/gallery/. A difference fails and leaves the new
-// image next to the baseline as <name>.actual.png to look at; accept it with --update.
+// Screenshots #/gallery (light and dark, desktop and phone, every dialog and panel) against tests/gallery/. A
+// difference fails and leaves <name>.actual.png next to the baseline; accept it with --update.
 //
 // Run: bun run build && bun run gallery [--update]
-// Baselines depend on the OS's fonts and the Chrome version, so they're checked on the machine that made them; set
-// CHROME to a Chrome or Chromium binary if it isn't in the usual place.
+// Baselines depend on the OS's fonts and Chrome version, so check on the machine that made them. Set CHROME if
+// Chrome or Chromium isn't in the usual place.
 
 import { existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
@@ -58,7 +57,7 @@ const shots: Shot[] = [
     ]),
 ];
 
-// Anything that moves or blinks would make screenshots differ from run to run.
+// Anything that moves or blinks makes screenshots differ between runs.
 const still = `*, *::before, *::after { animation: none !important; transition: none !important; caret-color: transparent !important; }`;
 
 let failed = 0;

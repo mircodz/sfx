@@ -5,9 +5,8 @@ namespace Sfx.Web;
 /// <summary>A search result, with the ids the browser routes by.</summary>
 /// <param name="Kind">node, application, service or partition.</param>
 /// <param name="Sub">A node's type and address, an application's type and version, a service's type, or a partition's service.</param>
-/// <param name="Node">A node's name.</param>
-/// <param name="ApplicationId">The application's id (e.g. "orders" or "shop~orders"), for an application, service or partition.</param>
-/// <param name="ServiceId">The service's id (e.g. "orders~Counter"), for a service or partition.</param>
+/// <param name="ApplicationId">E.g. "orders" or "shop~orders"; set for an application, service or partition.</param>
+/// <param name="ServiceId">E.g. "orders~Counter"; set for a service or partition.</param>
 public sealed record SearchHitDto(
     string Kind,
     string Title,
@@ -17,7 +16,7 @@ public sealed record SearchHitDto(
     string? ServiceId = null,
     string? PartitionId = null);
 
-/// <summary>GET /api/search?q=: nodes, applications and services by name, type or address; a partition by its id.</summary>
+/// <summary>Nodes, applications and services by name, type or address; a partition by its id.</summary>
 internal static class ApiSearch
 {
     public const int Limit = 20;
@@ -29,7 +28,7 @@ internal static class ApiSearch
             (id, ct) => s.Overview.FindPartitionAsync(id, ct),
             ct));
 
-    /// <summary>A partition id is looked up directly (one hit or none); other text searches the index, best first.</summary>
+    /// <summary>A partition id is looked up directly; other text searches the index, best first.</summary>
     internal static async Task<IReadOnlyList<SearchHitDto>> SearchAsync(
         string? query,
         Func<CancellationToken, Task<IReadOnlyList<SearchHit>>> index,

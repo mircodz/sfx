@@ -68,7 +68,6 @@ public static class Tracking
             : OperationState.Running("waiting for the node to restart");
     }
 
-    /// <summary>Something deleted is no longer listed.</summary>
     public static OperationState Gone(bool stillListed) =>
         stillListed ? OperationState.Running("still there") : OperationState.Finished("gone");
 
@@ -127,7 +126,6 @@ public static class Tracking
         };
     }
 
-    /// <summary>Something created is listed now.</summary>
     public static OperationState Created(bool listed) =>
         listed ? OperationState.Finished("created") : OperationState.Running("not listed yet");
 }

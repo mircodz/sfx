@@ -121,7 +121,7 @@ public static class SfxHost
         return 0;
     }
 
-    /// <summary>Where every change made through sfx is recorded, next to the contexts file.</summary>
+    /// <summary>Where every change made through sfx is recorded.</summary>
     public static string ActionLogPath(ContextStore store) =>
         Path.Combine(Path.GetDirectoryName(Path.GetFullPath(store.Path))!, "actions.log");
 

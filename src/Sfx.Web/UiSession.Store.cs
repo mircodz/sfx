@@ -2,7 +2,6 @@ using Sfx.Core;
 
 namespace Sfx.Web;
 
-/// <summary>The image store, service settings and search, with what's cached for them.</summary>
 public sealed partial class UiSession
 {
     private static readonly TimeSpan FolderSizeLifetime = TimeSpan.FromSeconds(60);
@@ -17,7 +16,7 @@ public sealed partial class UiSession
 
     private Cached<IReadOnlyList<ImageStorePackage>>? _storePackages;
 
-    /// <summary>The top-level folders holding a package (a call per top-level folder), asked at most every 30 seconds.</summary>
+    /// <summary>Top-level folders holding a package; cached because it costs a call per folder.</summary>
     internal Task<IReadOnlyList<ImageStorePackage>> GetStorePackagesAsync(CancellationToken cancellationToken) =>
         LazyInitializer.EnsureInitialized(ref _storePackages, () => new Cached<IReadOnlyList<ImageStorePackage>>(
             TimeSpan.FromSeconds(30),
@@ -27,10 +26,7 @@ public sealed partial class UiSession
     private readonly Lock _sizesLock = new();
     private readonly Dictionary<string, (DateTime At, Task<long?> Load)> _folderSizes = [];
 
-    /// <summary>
-    /// A folder's size, asked at most once a minute per folder; null when the cluster can't say. A missing folder is a
-    /// <see cref="NotFoundException"/>, and isn't kept.
-    /// </summary>
+    /// <summary>Null when the cluster can't say; a missing folder is a <see cref="NotFoundException"/> and isn't kept.</summary>
     internal Task<long?> GetFolderSizeAsync(string path, CancellationToken cancellationToken)
     {
         var key = ImageStore.Normalize(path);
@@ -63,7 +59,7 @@ public sealed partial class UiSession
         return load.WaitAsync(cancellationToken);
     }
 
-    /// <summary>A folder's size if it was asked for within the last minute; null otherwise.</summary>
+    /// <summary>A size loaded within the last minute, without asking the cluster; null otherwise.</summary>
     internal long? KnownFolderSize(string path)
     {
         lock (_sizesLock)
@@ -76,7 +72,7 @@ public sealed partial class UiSession
         }
     }
 
-    /// <summary>After a change, packages and sizes are asked again rather than served from before it.</summary>
+    /// <summary>Called after a change so packages and sizes aren't served from before it.</summary>
     private void ForgetStore()
     {
         _storePackages?.Invalidate();
@@ -89,8 +85,8 @@ public sealed partial class UiSession
     private Task<bool?>? _imageStoreBrowsable;
 
     /// <summary>
-    /// Whether the image store can be browsed through the cluster: false only when listing its root is refused because
-    /// it isn't the native store. Any other failure counts as yes, and is asked again next time.
+    /// False only when listing the root is refused because it isn't the native store; any other failure counts as yes
+    /// and is asked again next time.
     /// </summary>
     internal async Task<bool> ImageStoreBrowsableAsync(CancellationToken cancellationToken)
     {
@@ -123,7 +119,7 @@ public sealed partial class UiSession
 
     private StaleCache<IReadOnlyList<SearchHit>>? _searchIndex;
 
-    /// <summary>Every node, application and service to search; refreshed in the background after 30 seconds.</summary>
+    /// <summary>Every node, application and service to search, refreshed in the background.</summary>
     internal Task<IReadOnlyList<SearchHit>> GetSearchIndexAsync(CancellationToken cancellationToken) =>
         LazyInitializer.EnsureInitialized(ref _searchIndex, () => new StaleCache<IReadOnlyList<SearchHit>>(
             TimeSpan.FromSeconds(30),

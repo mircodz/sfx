@@ -2,7 +2,6 @@ using Sfx.Core;
 
 namespace Sfx.Web;
 
-/// <summary>Operations started from the browser, followed until the cluster has actually made the change.</summary>
 public sealed partial class UiSession
 {
     private const int KeptOperations = 50;
@@ -13,7 +12,7 @@ public sealed partial class UiSession
     private readonly Lock _operationsLock = new();
     private readonly List<OperationDto> _operations = [];
 
-    /// <summary>The last operations, newest first.</summary>
+    /// <summary>Newest first.</summary>
     internal IReadOnlyList<OperationDto> GetOperations()
     {
         lock (_operationsLock)
@@ -23,8 +22,8 @@ public sealed partial class UiSession
     }
 
     /// <summary>
-    /// Records an action that ran, and watches the cluster in the background until it settles, fails or times out.
-    /// Actions with nothing to wait for are done right away.
+    /// Watches the cluster in the background until the action settles, fails or times out; one with nothing to wait for
+    /// is done right away.
     /// </summary>
     internal OperationDto Track(string actionId, string title, Args target, Args inputs)
     {
@@ -40,7 +39,7 @@ public sealed partial class UiSession
         return Track(actionId, title, probe);
     }
 
-    /// <summary>Records an action that ran, followed with <paramref name="probe"/>; done right away when that's null.</summary>
+    /// <summary>Done right away when <paramref name="probe"/> is null.</summary>
     internal OperationDto Track(string actionId, string title, OperationProbe? probe)
     {
         ForgetUpgrades();
@@ -59,8 +58,8 @@ public sealed partial class UiSession
     }
 
     /// <summary>
-    /// Records an operation the caller drives itself (an upload), with <see cref="Progress"/> and then <see cref="WatchAsync"/>
-    /// or <see cref="Finish"/>; returns its id.
+    /// For an operation the caller drives itself (an upload), with <see cref="Progress"/> and then
+    /// <see cref="WatchAsync"/> or <see cref="Finish"/>.
     /// </summary>
     internal string Begin(string actionId, string title, string detail)
     {
@@ -72,7 +71,7 @@ public sealed partial class UiSession
     /// <summary>How far a running operation is; <paramref name="progress"/> null once it can't be counted.</summary>
     internal void Progress(string id, string detail, double? progress) => Update(id, SettleChecks.Running, detail, null, progress);
 
-    /// <summary>Ends an operation the caller drives, and logs how it ended.</summary>
+    /// <summary>Ends a caller-driven operation and logs how it ended.</summary>
     internal void Finish(string id, string title, string state, string detail)
     {
         ForgetStore();
@@ -92,7 +91,6 @@ public sealed partial class UiSession
         }
     }
 
-    /// <summary>Polls <paramref name="probe"/> until the operation settles, fails or times out, then logs how it ended.</summary>
     internal async Task WatchAsync(string id, string title, OperationProbe probe)
     {
         // Not tied to any request: the operation outlives the one that started it.
@@ -132,7 +130,7 @@ public sealed partial class UiSession
     {
         lock (_operationsLock)
         {
-            // Gone when 50 newer ones pushed it out; nothing left to update then.
+            // Gone once 50 newer ones pushed it out.
             var index = _operations.FindIndex(o => o.Id == id);
             if (index >= 0)
             {
@@ -141,7 +139,7 @@ public sealed partial class UiSession
         }
     }
 
-    /// <summary>Whether Azure's Service Fabric resource provider manages this cluster; read from the cluster manifest once.</summary>
+    /// <summary>Whether Azure's Service Fabric resource provider manages this cluster; read once from the manifest.</summary>
     internal Task<bool> IsAzureManagedAsync(CancellationToken cancellationToken) => ClusterUpgrades.IsAzureManagedAsync(cancellationToken);
 
     /// <summary>The cluster target's "azureManaged": "true", "false", or "unknown" when the manifest couldn't be read.</summary>

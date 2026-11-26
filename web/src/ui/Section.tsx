@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import "./Section.css";
 
-/** A labelled block of a page, with an optional aside on the right (a count, a link, a toggle). Sections don't nest. */
+/** Sections don't nest. */
 export function Section({ label, aside, children }: { label: ReactNode; aside?: ReactNode; children: ReactNode }) {
     return (
         <section className="section">
@@ -14,7 +14,7 @@ export function Section({ label, aside, children }: { label: ReactNode; aside?: 
     );
 }
 
-/** A group's label inside a list (a node type, an application), with its count on the right. */
+/** A group's label inside a list: a node type, an application. */
 export function GroupHeading({ label, aside }: { label: ReactNode; aside?: ReactNode }) {
     return (
         <h3 className="group-heading">

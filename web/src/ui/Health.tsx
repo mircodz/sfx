@@ -22,10 +22,7 @@ function parentsOf(evaluations: Evaluation[]) {
 
 const siblingsShown = 5;
 
-/**
- * The chain of health evaluations behind a state, children indented under their parent. Beyond 5 siblings under one
- * parent, the rest wait behind "Show N more": a cluster can list hundreds.
- */
+/** Beyond 5 siblings under one parent, the rest wait behind "Show N more": a cluster can list hundreds. */
 export function Evaluations({ evaluations }: { evaluations: Evaluation[] }) {
     const [expanded, setExpanded] = useState<Set<number>>(new Set());
     const parents = parentsOf(evaluations);
@@ -72,10 +69,7 @@ export function Evaluations({ evaluations }: { evaluations: Evaluation[] }) {
     return <div className="evaluations">{rows}</div>;
 }
 
-/**
- * Errors and warnings, collapsed behind their counts; with `href`, a link to where they're shown in full (the Health
- * tab) instead. Renders nothing when there are none.
- */
+/** Collapsed behind their counts; with `href`, a link to the Health tab instead. */
 export function ErrorsAndWarnings({ evaluations, href }: { evaluations: Evaluation[]; href?: string }) {
     if (evaluations.length === 0) return null;
     // Count problems, not every step of the chain explaining them: only evaluations nothing else hangs under.
@@ -101,7 +95,7 @@ export function ErrorsAndWarnings({ evaluations, href }: { evaluations: Evaluati
 
 const rank = (h: string) => ({ Error: 0, Warning: 1, Unknown: 2 } as Record<string, number>)[h] ?? 3;
 
-/** The Health tab: errors and warnings expanded, then the health events, unhealthy ones first. */
+/** The Health tab: errors and warnings expanded, then events, unhealthy first. */
 export function HealthPanel({ health }: { health: HealthReport }) {
     const [all, setAll] = useState(false);
     // An expired report that isn't removed counts as an error, whatever state it was reported with.

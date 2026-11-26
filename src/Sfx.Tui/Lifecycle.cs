@@ -9,13 +9,12 @@ using static Sfx.Tui.Styles;
 
 namespace Sfx.Tui;
 
-/// <summary>A provisioned application type version, and how many applications use it.</summary>
 public sealed record ApplicationTypeUse(ApplicationTypeRow Type, int Applications);
 
 /// <summary>
 /// Application lifecycle: provisioning types (from this machine or the image store), creating and upgrading
-/// applications, steering running upgrades, and creating services and changing their settings. Each is a form, then
-/// a review of what changes, then the change, followed in the activity strip until it's done.
+/// applications, and creating and editing services. Each is a form, a review of the changes, then the change,
+/// followed in the activity strip until done.
 /// </summary>
 public sealed partial class Views
 {
@@ -34,8 +33,6 @@ public sealed partial class Views
     private static bool IsUserApp(ApplicationRow app) => app.Id != ClusterQueries.SystemApplicationId;
 
     private static bool IsUpgrading(ApplicationRow app) => app.Status == "Upgrading";
-
-    // Application types
 
     public IResourceView ApplicationTypes() =>
         new ResourceView<ApplicationTypeUse>("application types", "types", ApplicationTypeUsesAsync, t => t.Type.Name + ":" + t.Type.Version)
@@ -199,8 +196,6 @@ public sealed partial class Views
                 available.Select(t => new Choice($"{t.Name} {t.Version}", $"{t.DefaultParameters.Count} parameters", () => CreateApplication(t))).ToList()));
         });
 
-    // Provisioning
-
     /// <summary>
     /// <c>:provision path</c>: reads the package's type and version, then (once confirmed) uploads it to the image store,
     /// provisions it, and follows it until the type is available.
@@ -275,8 +270,6 @@ public sealed partial class Views
         var width = facts.Max(f => f.Label.Length) + 2;
         return facts.Select(f => StyledText.Of(f.Label.PadRight(width)).Fg(Theme.Current.Muted).Append(f.Value).Fg(Theme.Current.Foreground)).ToList();
     }
-
-    // Applications
 
     public IReadOnlyList<EntityAction<ApplicationRow>> ApplicationLifecycleActions() =>
     [
@@ -449,8 +442,6 @@ public sealed partial class Views
         };
     }
 
-    // Upgrade plans and policies, for application and cluster upgrades alike
-
     private static UpgradePlan PlanOf(IReadOnlyList<FormField> fields)
     {
         var title = fields.First(f => f.Key == "plan").Value;
@@ -542,8 +533,6 @@ public sealed partial class Views
         return policy;
     }
 
-    // Running application upgrades
-
     private void ApplicationUpgradeControls(string id, string name) =>
         host.Pick($"{name} is upgrading", _ => Task.FromResult<IReadOnlyList<Choice>>(
             [
@@ -593,8 +582,6 @@ public sealed partial class Views
     private void PickPlan(string title, Action<UpgradePlan> pick) =>
         host.Pick(title, _ => Task.FromResult<IReadOnlyList<Choice>>(
             UpgradePlan.All.Select(plan => new Choice(plan.Title, plan.Hint, () => pick(plan))).ToList()));
-
-    // Services
 
     /// <summary>The services page's own actions: creating one, in an application that isn't the system's.</summary>
     private IEnumerable<AppAction> ServicePageActions(ApplicationRow app) =>

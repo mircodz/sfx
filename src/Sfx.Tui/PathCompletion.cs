@@ -54,7 +54,6 @@ public static class PathCompletion
         return Path.GetFullPath(path, directory ?? Directory.GetCurrentDirectory());
     }
 
-    /// <summary>Whether a file name is an application package: .sfpkg or .zip.</summary>
     public static bool IsPackage(string name) =>
         PackageExtensions.Any(extension => name.EndsWith(extension, StringComparison.OrdinalIgnoreCase));
 }

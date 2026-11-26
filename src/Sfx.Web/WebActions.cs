@@ -8,7 +8,7 @@ public sealed record ActionChoice(string Value, string Label, string? Hint = nul
 
 /// <param name="Kind">How the browser asks for it: text, number, choice, flag, node (a node that's up, or none to let the
 /// cluster choose), version (a provisioned version of the app's type) or parameters (the app's parameters).</param>
-/// <param name="Default">The value it starts with; for text, what's typed in already (e.g. "fabric:/").</param>
+/// <param name="Default">Initial value; for text, what's typed in already (e.g. "fabric:/").</param>
 public sealed record ActionInputDto(string Name, string Label, string Kind, IReadOnlyList<ActionChoice>? Choices = null, string? Default = null);
 
 /// <param name="Risk">"confirm" asks first; "destructive" also has the user type <paramref name="ConfirmText"/>.</param>
@@ -58,16 +58,16 @@ internal sealed class Args(IReadOnlyDictionary<string, string> values)
 
 internal enum Risk { Confirm, Destructive }
 
-/// <param name="Describe">What happens, for the confirmation and the action log, given the target and inputs.</param>
+/// <param name="Describe">The change, as shown for confirmation and written to the action log.</param>
 /// <param name="ConfirmText">What to type to confirm a destructive action.</param>
 /// <param name="Run">Makes the change; null when <paramref name="Start"/> does.</param>
 /// <param name="Prepare">
-/// Checks the inputs against the cluster and describes the change, for actions that can't say what they do without
-/// asking it; used instead of <paramref name="Describe"/>. Refusing here logs nothing.
+/// Replaces <paramref name="Describe"/> for actions that must ask the cluster to say what they do; it checks the inputs
+/// too, and refusing here logs nothing.
 /// </param>
 /// <param name="Start">
-/// Makes the change and returns how to follow it (null: done once requested), for actions that need to look at the
-/// cluster before they change it; used instead of <paramref name="Run"/> and <see cref="OperationWatcher"/>.
+/// Replaces <paramref name="Run"/> and <see cref="OperationWatcher"/> for actions that must look at the cluster before
+/// changing it; returns how to follow the change (null: done once requested).
 /// </param>
 internal sealed record ActionDef(
     string Id,

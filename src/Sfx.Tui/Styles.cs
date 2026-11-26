@@ -39,7 +39,6 @@ internal static class Styles
         _ => Theme.Current.Foreground,
     };
 
-    /// <summary>A folder's label, bold in the folder's color.</summary>
     public static StyledText FolderLabel(string label, string? color) => StyledText.Of(label).Bold().Fg(FolderColor(color));
 
     /// <summary>"512 B", "3.4 KB", "1.2 GB": bytes in 1024s, one decimal below 10.</summary>

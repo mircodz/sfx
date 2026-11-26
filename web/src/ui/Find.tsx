@@ -10,7 +10,7 @@ import "./Find.css";
 const icons: Record<SearchHit["kind"], string> = { node: "server", application: "apps", service: "box", partition: "layout-grid" };
 const plurals: Record<SearchHit["kind"], string> = { node: "Nodes", application: "Applications", service: "Services", partition: "Partitions" };
 
-/** Where a hit opens: its own page, at its place under its application and service. */
+/** Its own page, under its application and service. */
 export function hitHref(hit: SearchHit): string | null {
     if (hit.kind === "node" && hit.node) return href.node(hit.node);
     if (hit.kind === "application" && hit.applicationId) return href.app(hit.applicationId);
@@ -19,10 +19,7 @@ export function hitHref(hit: SearchHit): string | null {
     return null;
 }
 
-/**
- * Find anything on the cluster by name, type or address, or a partition by its id; opens it where it lives.
- * Typing searches on the server after a short pause; arrows move, Enter opens, Esc closes.
- */
+/** By name, type, address or partition id; searches the server after a short pause. Arrows move, Enter opens, Esc closes. */
 export function Find({ onClose }: { onClose: () => void }) {
     const { props, close } = useModal(onClose);
     const [query, setQuery] = useState("");

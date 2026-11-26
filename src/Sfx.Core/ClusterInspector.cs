@@ -22,8 +22,6 @@ public sealed class ClusterInspector(IServiceFabricClient client)
 {
     private const string SystemApplicationTypeName = "System";
 
-    // Nodes
-
     public Task<NodeInfo> GetNodeAsync(string node, CancellationToken cancellationToken) =>
         Required(() => client.Nodes.GetNodeInfoAsync(new NodeName(node), cancellationToken: cancellationToken), $"There's no node {node} on this cluster.");
 
@@ -32,8 +30,6 @@ public sealed class ClusterInspector(IServiceFabricClient client)
 
     public Task<NodeLoadInfo> GetNodeLoadAsync(string node, CancellationToken cancellationToken) =>
         client.Nodes.GetNodeLoadInfoAsync(new NodeName(node), cancellationToken: cancellationToken);
-
-    // Applications
 
     public Task<ApplicationInfo> GetApplicationAsync(string applicationId, CancellationToken cancellationToken) =>
         Required(
@@ -66,8 +62,6 @@ public sealed class ClusterInspector(IServiceFabricClient client)
 
     public Task<ApplicationUpgradeProgressInfo> GetApplicationUpgradeAsync(string applicationId, CancellationToken cancellationToken) =>
         client.Applications.GetApplicationUpgradeAsync(applicationId, cancellationToken: cancellationToken);
-
-    // Services
 
     public Task<ServiceInfo> GetServiceAsync(string applicationId, string serviceId, CancellationToken cancellationToken) =>
         Required(
@@ -113,8 +107,6 @@ public sealed class ClusterInspector(IServiceFabricClient client)
         return (await client.ServiceTypes.GetServiceManifestAsync(app.TypeName, app.TypeVersion, manifestName, cancellationToken: cancellationToken)).Manifest;
     }
 
-    // Partitions and replicas
-
     public Task<ServicePartitionInfo> GetPartitionAsync(PartitionId partitionId, CancellationToken cancellationToken) =>
         Required(
             () => client.Partitions.GetPartitionInfoAsync(partitionId, cancellationToken: cancellationToken),
@@ -135,8 +127,6 @@ public sealed class ClusterInspector(IServiceFabricClient client)
 
     public async Task<HealthReport> GetReplicaHealthAsync(PartitionId partitionId, string replicaId, CancellationToken cancellationToken) =>
         HealthReport.From(await client.Replicas.GetReplicaHealthAsync(partitionId, ReplicaId.Parse(replicaId), cancellationToken: cancellationToken));
-
-    // Cluster
 
     public Task<ClusterVersion> GetClusterVersionAsync(CancellationToken cancellationToken) =>
         client.Cluster.GetClusterVersionAsync(cancellationToken: cancellationToken);

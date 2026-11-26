@@ -11,14 +11,14 @@ public sealed partial class UiSession
     private Cached<NodeCapacities>? _capacities;
     private Cached<IReadOnlyDictionary<string, string>>? _nodeNames;
 
-    /// <summary>Cluster load per metric, from one call, shared by every tab for 15 seconds.</summary>
+    /// <summary>Cluster load per metric from one call, shared by every tab.</summary>
     public Task<LoadDto> GetLoadAsync(CancellationToken cancellationToken) =>
         LazyInitializer.EnsureInitialized(ref _load, () => new Cached<LoadDto>(
             TimeSpan.FromSeconds(15),
             ct => ApiLoad.LoadAsync(this, includeNodes: false, ct)))
             .GetAsync(cancellationToken);
 
-    /// <summary>Cluster load with each node's; one walk of the nodes serves every tab for a minute.</summary>
+    /// <summary>Cluster load with each node's; one walk of the nodes serves every tab.</summary>
     public Task<LoadDto> GetNodeLoadAsync(CancellationToken cancellationToken) =>
         LazyInitializer.EnsureInitialized(ref _nodeLoad, () => new Cached<LoadDto>(
             TimeSpan.FromSeconds(60),
@@ -26,8 +26,8 @@ public sealed partial class UiSession
             .GetAsync(cancellationToken);
 
     /// <summary>
-    /// The capacities the cluster manifest declares, which tell a capacity of 0 (nothing may be placed) from an unset one.
-    /// Asked every 5 minutes; when the manifest can't be read, no capacity of 0 counts as a limit.
+    /// The manifest's declared capacities tell a capacity of 0 (nothing may be placed) from an unset one. If it can't
+    /// be read, no capacity of 0 counts as a limit.
     /// </summary>
     public Task<NodeCapacities> GetDeclaredCapacitiesAsync(CancellationToken cancellationToken) =>
         LazyInitializer.EnsureInitialized(ref _capacities, () => new Cached<NodeCapacities>(TimeSpan.FromMinutes(5), async ct =>
@@ -44,8 +44,8 @@ public sealed partial class UiSession
             .GetAsync(cancellationToken);
 
     /// <summary>
-    /// Node names by id, for what the cluster reports by id only. A node keeps its id, so the list is asked at most every
-    /// 5 minutes, and sooner when an id isn't in it (a node added since). When it can't be had, ids aren't resolved.
+    /// Node names by id, for what the cluster reports by id only. A node keeps its id, so the list is re-asked early
+    /// only when an id is missing (a node added since). If it can't be had, ids aren't resolved.
     /// </summary>
     internal async Task<IReadOnlyDictionary<string, string>> GetNodeNamesAsync(IEnumerable<string> ids, CancellationToken cancellationToken)
     {

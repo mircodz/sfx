@@ -4,15 +4,15 @@ using Sfx.Core;
 
 namespace Sfx.Web;
 
-/// <summary>Every replica in the cluster, found by walking applications, services and partitions.</summary>
+/// <summary>Every replica in the cluster, by walking applications, services and partitions.</summary>
 internal static class ClusterReplicas
 {
     private const int Parallelism = 16;
 
     /// <summary>
-    /// The whole walk. An application, service or partition that can't be listed is skipped and the walk goes on, so one
-    /// transient error doesn't lose the other 60,000 replicas; when most at one level fail, the cluster isn't answering and
-    /// the walk fails (the caller then keeps what it had).
+    /// An application, service or partition that can't be listed is skipped, so one transient error doesn't lose the
+    /// other 60,000 replicas; when most at one level fail, the cluster isn't answering and the walk throws (the caller
+    /// keeps what it had).
     /// </summary>
     public static async Task<IReadOnlyList<ClusterReplicaDto>> LoadAsync(ClusterQueries queries, CancellationToken cancellationToken)
     {
@@ -67,10 +67,7 @@ internal static class ClusterReplicas
         return Sort(replicas);
     }
 
-    /// <summary>
-    /// The replicas of one service: its partitions, then each one's replicas, <see cref="Bounded.Parallelism"/> at a time.
-    /// Names come from the ids ("orders~Counter" is fabric:/orders/Counter), so there's nothing else to ask.
-    /// </summary>
+    /// <summary>Names come from the ids ("orders~Counter" is fabric:/orders/Counter), so there's nothing else to ask.</summary>
     public static async Task<IReadOnlyList<ClusterReplicaDto>> LoadServiceAsync(
         ClusterQueries queries,
         string applicationId,

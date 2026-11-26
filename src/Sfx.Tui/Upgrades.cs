@@ -5,7 +5,6 @@ using static Sfx.Tui.Styles;
 
 namespace Sfx.Tui;
 
-/// <summary>Upgrades of the cluster and its applications, side by side.</summary>
 public sealed partial class Views
 {
     private UpgradeQueries? _upgrades;

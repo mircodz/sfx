@@ -1,7 +1,4 @@
-/*
- * The shell: the top bar across, then the sidebar and the page beside it. The page is fluid up to a width where
- * lines stay readable.
- */
+/* The page is fluid up to a width where lines stay readable. */
 
 .app {
     display: grid;
@@ -112,10 +109,7 @@
     color: var(--text-muted);
 }
 
-/*
- * Icons only: folded by choice, or on a narrower window. Only the labels go; padding, row height and alignment stay
- * the same, so the icons don't move when it folds.
- */
+/* Only the labels go; padding, row height and alignment stay, so the icons don't move when it folds. */
 .sidebar-collapsed .sidebar-label {
     display: none;
 }
@@ -149,7 +143,7 @@
     }
 }
 
-/* A phone: the pages become a strip under the top bar. */
+/* On a phone the pages become a strip under the top bar. */
 @media (max-width: 640px) {
     .app {
         grid-template-columns: minmax(0, 1fr);

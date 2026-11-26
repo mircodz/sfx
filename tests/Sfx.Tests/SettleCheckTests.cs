@@ -10,8 +10,6 @@ public class SettleCheckTests
     private const string Done = SettleChecks.Done;
     private const string Failed = SettleChecks.Failed;
 
-    // Replica moves
-
     [Fact]
     public void A_secondary_is_moving_while_it_is_still_on_its_node()
     {
@@ -52,8 +50,6 @@ public class SettleCheckTests
         Assert.Equal((Running, "Waiting for a new primary."), SettleChecks.ReplicaMove("Primary", "1", "_Node_0", null, none));
     }
 
-    // Scaling
-
     [Fact]
     public void Scaling_counts_partitions_at_the_requested_size()
     {
@@ -77,8 +73,6 @@ public class SettleCheckTests
         Assert.Equal((Done, "An instance on every node."), SettleChecks.ScaleProgress(-1, [("Ready", 2)], stateful: false));
     }
 
-    // Nodes
-
     [Theory]
     [InlineData("Disabled", "Disabled", Done, "Node is Disabled.")]
     [InlineData("Disabled", "Disabling", Running, "Node is Disabling.")]
@@ -99,8 +93,6 @@ public class SettleCheckTests
         Assert.Equal((Running, "Waiting for the node to restart."), SettleChecks.NodeRestart("Up", null, since));
         Assert.Equal((Running, "Node is Down."), SettleChecks.NodeRestart("Down", null, since));
     }
-
-    // Upgrades
 
     [Fact]
     public void An_upgrade_is_this_one_when_it_started_after_the_request()

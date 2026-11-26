@@ -4,10 +4,7 @@ import { IconButton } from "./Button";
 import { Icon } from "./Icon";
 import "./Form.css";
 
-/**
- * A labelled control with help or an error underneath. A changed field gets an accent edge and a revert button;
- * `children` gets the control's id so the label points at it.
- */
+/** `children` gets the control's id so the label points at it. */
 export function Field({
     label,
     help,
@@ -38,7 +35,7 @@ export function Field({
     );
 }
 
-/** A labelled set of mutually exclusive choices, with the picked one's explanation underneath. */
+/** Mutually exclusive choices, with the picked one's explanation underneath. */
 export function ChoiceField<T extends string>({
     label,
     choices,
@@ -75,7 +72,7 @@ export function Checkbox({ label, checked, onChange, disabled }: { label: ReactN
     );
 }
 
-/** A native select styled like the text inputs, with our chevron instead of each OS's own arrow. */
+/** Native, with our chevron instead of each OS's own arrow. */
 export function Select({ id, value, onChange, disabled, children }: { id?: string; value: string; onChange: (value: string) => void; disabled?: boolean; children: ReactNode }) {
     return (
         <span className="select">

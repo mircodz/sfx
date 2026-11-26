@@ -29,7 +29,7 @@ const clusterDefaults: UpgradeDefaults = {
     },
 };
 
-/** Upgrades the cluster's code, configuration or both, among the provisioned versions. Not offered on Azure-managed clusters. */
+/** Not offered on Azure-managed clusters. */
 export function ClusterUpgradeEditor({ action, onClose }: { action: Action; onClose: () => void }) {
     const options = useResource("cluster-upgrade-options", api.clusterUpgradeOptions, false);
     const o = options.data;

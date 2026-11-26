@@ -6,18 +6,17 @@ export function count<T>(items: T[], pred: (t: T) => boolean) {
     return items.filter(pred).length;
 }
 
-/** Whole numbers as they are; fractions with enough digits that a small load doesn't read as 0. */
-/** A load metric as people say it: the built-in ones without their "servicefabric:/_" prefix. */
 export function metricName(name: string) {
     return name.replace(/^servicefabric:\/_/, "");
 }
 
+/** Fractions keep enough digits that a small load doesn't read as 0. */
 export function number(n: number) {
     if (Number.isInteger(n)) return n.toLocaleString();
     return n.toLocaleString(undefined, Math.abs(n) < 1 ? { maximumSignificantDigits: 2 } : { maximumFractionDigits: 1 });
 }
 
-/** Natural order for names with numbers in them: _Node_2 before _Node_10. */
+/** _Node_2 before _Node_10. */
 export const natural = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
 export function duration(seconds: number) {
@@ -46,7 +45,7 @@ export function when(iso: string) {
     return isToday(d) ? time : `${d.toLocaleDateString([], { day: "numeric", month: "short" })} ${time}`;
 }
 
-/** "Today", "Yesterday", "18 Nov": headings for a timeline. */
+/** Timeline headings: "Today", "Yesterday", "18 Nov". */
 export function day(iso: string) {
     const d = new Date(iso);
     if (isToday(d)) return "Today";
@@ -60,12 +59,12 @@ function isToday(d: Date) {
     return d.toDateString() === new Date().toDateString();
 }
 
-/** A child's name without its parent's: "fabric:/orders/Counter" under "fabric:/orders" is "Counter". */
+/** "fabric:/orders/Counter" under "fabric:/orders" is "Counter". */
 export function shortName(name: string, parent: string) {
     return name.startsWith(parent + "/") ? name.slice(parent.length + 1) : name;
 }
 
-/** First letter lowercased unless it's an acronym or a name: "Restart" + "Replica 12" reads "Restart replica 12". */
+/** Leaves acronyms and names alone: "Restart" + "Replica 12" reads "Restart replica 12". */
 export function lowerFirst(text: string) {
     return /^[A-Z][a-z]/.test(text) ? text[0].toLowerCase() + text.slice(1) : text;
 }
@@ -77,7 +76,7 @@ export function partitionKey(p: { scheme: string; lowKey?: string | null; highKe
     return p.scheme;
 }
 
-/** "12.4 MB": sizes in the units people read (1 KB = 1024 bytes, as the image store and file managers count). */
+/** 1 KB = 1024 bytes, as the image store and file managers count. */
 export function bytes(n: number) {
     const units = ["bytes", "KB", "MB", "GB", "TB"];
     let i = 0;

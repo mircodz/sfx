@@ -2,14 +2,13 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import type { Operation } from "./types";
 
-/** The operations of this connection, kept fresh while any is running. */
 export const OperationsContext = createContext<Operation[]>([]);
 
 export const useOperations = () => useContext(OperationsContext);
 
 /**
- * Polls operations: every 3 seconds while one is running, every 15 otherwise (an action elsewhere, e.g. from another
- * tab, starts one). Calls `onSettled` once for each operation that finishes while watched.
+ * Polls every 3 s while an operation runs, else every 15 s (another tab may start one). Calls `onSettled` once per
+ * operation that finishes while watched.
  */
 export function useOperationsPoll(generation: number, onSettled: (op: Operation) => void) {
     const [ops, setOps] = useState<Operation[]>([]);

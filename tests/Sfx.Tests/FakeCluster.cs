@@ -27,7 +27,6 @@ public sealed class FakeCluster
 
     public FakeCluster On(string method, object? value) => On(method, _ => value);
 
-    /// <summary>Answers an async method by failing with <paramref name="exception"/>.</summary>
     public FakeCluster Throws(string method, Exception exception) => On(method, _ => throw exception);
 
     /// <summary>Answers an async method returning a plain Task, doing <paramref name="action"/> first.</summary>

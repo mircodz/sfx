@@ -3,10 +3,7 @@ import type { ReactNode } from "react";
 import { Button } from "./Button";
 import "./ShowMore.css";
 
-/**
- * The first `step` items of a long list, then more on request, so a cluster with thousands of something stays
- * fast. Search and filters still cover everything.
- */
+/** Paged so a cluster with thousands of something stays fast; search and filters still cover everything. */
 export function useLimited<T>(items: T[], step = 200): { visible: T[]; more: ReactNode } {
     const [limit, setLimit] = useState(step);
     const visible = items.length > limit ? items.slice(0, limit) : items;
@@ -23,7 +20,7 @@ export function useLimited<T>(items: T[], step = 200): { visible: T[]; more: Rea
     return { visible, more };
 }
 
-/** `useLimited` as a component, for lists rendered where hooks can't be called (e.g. inside a `Load` callback). */
+/** For lists rendered where hooks can't be called, e.g. inside a `Load` callback. */
 export function Limited<T>({ items, step = 200, children }: { items: T[]; step?: number; children: (item: T) => ReactNode }) {
     const { visible, more } = useLimited(items, step);
     return (

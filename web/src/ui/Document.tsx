@@ -6,7 +6,7 @@ import { IconButton } from "./Button";
 import { Load } from "./Load";
 import "./Document.css";
 
-/** Saves text as a file. The object URL lives only for the click, so nothing piles up while the page refreshes. */
+/** The object URL lives only for the click, so nothing piles up while the page refreshes. */
 function download(text: string, filename: string) {
     const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
     const a = document.createElement("a");
@@ -17,7 +17,7 @@ function download(text: string, filename: string) {
 }
 
 export function Code({ text, format, wrap }: { text: string; format: string; wrap: boolean }) {
-    // Highlighting a large manifest takes a moment: once per document, not on every render.
+    // Highlighting a large manifest is slow: once per document, not per render.
     const html = useMemo(() => highlight(text, format), [text, format]);
     const className = `document-code ${wrap ? "wrap" : ""}`;
     return html === null ? (
@@ -28,7 +28,7 @@ export function Code({ text, format, wrap }: { text: string; format: string; wra
     );
 }
 
-/** A manifest or raw entity, loaded when shown, with copy, download and line wrapping. */
+/** A manifest or raw entity, loaded when shown. */
 export function Document({ cacheKey, load, name }: { cacheKey: string; load: () => Promise<Text>; name: string }) {
     const doc = useResource(cacheKey, load, false);
     const [copied, setCopied] = useState(false);

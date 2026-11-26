@@ -8,7 +8,7 @@ import { ProgressBar } from "../ui/Meter";
 import { Empty, Section } from "../ui/Section";
 import { Limited } from "../ui/ShowMore";
 
-/** Load per metric: the cluster's total against its capacity, then each node, busiest first. */
+/** Per metric: the cluster's total against its capacity, then each node. */
 export function LoadView() {
     const load = useResource("load:nodes", () => api.load(true));
     return (

@@ -84,8 +84,6 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host)
             .Column("HEALTH", Constraint.Length(8), r => Health(r.Health), r => r.Health)
             .Column("ADDRESS", Constraint.Fill(2), r => Muted(r.Address), r => r.Address);
 
-    // What's deployed on a node: applications → service packages → code packages.
-
     public IResourceView DeployedApplications(NodeRow node) =>
         new ResourceView<DeployedApplicationRow>("deployed applications", node.Name, ct => _deployed.GetApplicationsAsync(node.Name, ct), a => a.Id)
             {

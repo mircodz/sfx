@@ -16,7 +16,6 @@ public sealed partial class Views
 
     private ClusterUpgrades ClusterUpgrades => _clusterUpgrades ??= new ClusterUpgrades(queries.Client);
 
-    /// <summary>What a cluster upgrade is started from: the versions it can go to, and the upgrade before it.</summary>
     internal sealed record ClusterUpgradeStart(ClusterUpgradeOptions Options, UpgradeReport? Last);
 
     /// <summary><c>u</c> on the cluster: the controls of the running upgrade, or the form to start one.</summary>
@@ -146,7 +145,6 @@ public sealed partial class Views
             TrackFor = TimeSpan.FromHours(4),
         });
 
-    /// <summary>The cluster's upgrade actions, on its page.</summary>
     private IReadOnlyList<EntityAction<string>> ClusterUpgradeActions() =>
     [
         new("Upgrade the cluster, or steer its running upgrade", ActionRisk.Confirm, UpgradeCluster, [Upgrade], ["upgrade"]),

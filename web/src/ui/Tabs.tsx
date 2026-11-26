@@ -7,13 +7,13 @@ import "./Tabs.css";
 
 export type TabDef<T extends string> = { id: T; label: ReactNode; hidden?: boolean };
 
-/** The selected tab lives in the URL (?tab=health), so links and reloads keep it. The first tab is the default. */
+/** Lives in the URL (?tab=health) so links and reloads keep it; the first tab is the default. */
 export function useTab<T extends string>(tabs: readonly T[]): [T, (tab: T) => void] {
     const [value, set] = useQueryParam<T>("tab", tabs[0]);
     return [tabs.includes(value) ? value : tabs[0], set];
 }
 
-/** Tabs and the panel of the selected one; arrow keys move between tabs. */
+/** Arrow keys move between tabs. */
 export function Tabs<T extends string>({
     tabs,
     value,

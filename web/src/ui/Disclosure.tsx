@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { Icon } from "./Icon";
 import "./Disclosure.css";
 
-/** A labelled toggle that shows or hides what's under it; closed unless `initiallyOpen`. */
 export function Disclosure({
     label,
     aside,

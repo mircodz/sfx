@@ -1,4 +1,4 @@
-// The contexts this browser switched to last, newest first, for the top of the Contexts page.
+// Contexts this browser switched to last, newest first, for the top of the Contexts page.
 
 const key = "sfx-recent-contexts";
 const keep = 5;

@@ -12,10 +12,7 @@ const phases: Record<string, string> = {
     Retry: "Retrying an unhealthy check",
 };
 
-/**
- * One upgrade, in sections divided by hairlines: progress and domains, what holds it up, then a footer with where it
- * stands on the left and its controls on the right, like every other card's actions.
- */
+/** Controls on the right of the footer, like every other card's actions. */
 export function UpgradeCard({ upgrade: u, actions = true }: { upgrade: Upgrade; actions?: boolean }) {
     const p = upgradeProgress(u);
     const phase = phases[u.healthCheckPhase];

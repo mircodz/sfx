@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import "./MetricCard.css";
 
-/** A number with its label; links somewhere when given an href. */
 export function MetricCard({ label, value, note, href }: { label: string; value: ReactNode; note?: ReactNode; href?: string }) {
     const body = (
         <>

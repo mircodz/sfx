@@ -20,7 +20,7 @@ import { CodePackages } from "./CodePackages";
 import { nodeFacts } from "./Nodes";
 import { Split } from "../ui/Split";
 
-/** Up, but also disabling or disabled nodes, still run what's on them; only down ones (or unknown) don't. */
+/** Disabling and disabled nodes still run what's on them; only down (or unknown) ones don't. */
 export const hosting = (status: string) => !["Down", "Invalid", "Unknown"].includes(status);
 
 const tabs = ["overview", "packages", "health", "events", "details"] as const;

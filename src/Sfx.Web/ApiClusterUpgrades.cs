@@ -13,7 +13,7 @@ public sealed record ClusterUpgradeOptionsDto(
     bool AzureManaged,
     string? Note);
 
-/// <summary>GET /api/cluster/upgrade-options; the upgrade itself is the "cluster.upgrade" action, over <see cref="Core.ClusterUpgrades"/>.</summary>
+/// <summary>The upgrade itself is the "cluster.upgrade" action.</summary>
 internal static class ApiClusterUpgrades
 {
     public static void Map(IEndpointRouteBuilder api)

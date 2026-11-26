@@ -1,5 +1,5 @@
-// Syntax highlighting for manifests (XML) and raw entities (JSON), as escaped HTML.
-// Small on purpose: these are the only two formats sfx shows, and they're well-formed.
+// Highlights XML manifests and JSON entities as escaped HTML.
+// Minimal on purpose: sfx shows only these two formats, and they're well-formed.
 
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 

@@ -5,7 +5,7 @@ import "./Menu.css";
 
 export type MenuItem = { id: string; label: string; danger?: boolean; onPick: () => void };
 
-/** A "…" button opening a list of items; danger items come last, after a divider. Arrows move, Esc closes. */
+/** Danger items come last, after a divider. Arrows move, Esc closes. */
 export function Menu({ label, items }: { label: string; items: MenuItem[] }) {
     const [open, setOpen] = useState(false);
     const anchor = useRef<HTMLDivElement>(null);

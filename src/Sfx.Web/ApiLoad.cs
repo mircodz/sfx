@@ -10,10 +10,10 @@ public sealed record NodeLoadDto(string Node, double Load, double? Capacity);
 /// <param name="Balanced">Whether the resource balancer found the metric balanced on its last run.</param>
 /// <param name="Nodes">Each node's load; empty unless asked for with <c>?nodes=true</c>.</param>
 /// <param name="MinNode">
-/// The name of the node with the least load (its id when the node isn't known); null when the cluster doesn't say, or
-/// when no node has any of this load.
+/// The least loaded node's name (its id when the node isn't known); null when the cluster doesn't say or no node has
+/// any of this load.
 /// </param>
-/// <param name="MaxNode">The name of the node with the most load, likewise.</param>
+/// <param name="MaxNode">The most loaded node's name, likewise.</param>
 public sealed record LoadMetricDto(
     string Name,
     double ClusterLoad,
@@ -28,15 +28,15 @@ public sealed record LoadMetricDto(
 public sealed record LoadDto(IReadOnlyList<LoadMetricDto> Metrics);
 
 /// <summary>
-/// GET /api/load: each load metric across the cluster, from one call. With <c>?nodes=true</c> also its load on every node
-/// that may host replicas (up, enabling, disabling or disabled), which is a call per node.
+/// Each load metric from one call; <c>?nodes=true</c> adds its load on every node that may host replicas (up, enabling,
+/// disabling or disabled), a call per node.
 /// </summary>
 internal static class ApiLoad
 {
     public static void Map(RouteGroupBuilder api) =>
         api.MapGet("/load", (UiSession s, bool? nodes, CancellationToken ct) => nodes is true ? s.GetNodeLoadAsync(ct) : s.GetLoadAsync(ct));
 
-    /// <summary>The cluster's load metrics, with users' metrics only ("__" ones are the cluster's), those with a capacity first.</summary>
+    /// <summary>Users' load metrics only, those with a capacity first.</summary>
     /// <param name="capacities">What the manifest declares, so a total capacity of 0 counts when every node type declares it.</param>
     /// <param name="nodeNames">Node names by id, for the least and most loaded nodes; an id not in it is shown as is.</param>
     public static IReadOnlyList<LoadSummaryDto> Summaries(
@@ -65,10 +65,7 @@ internal static class ApiLoad
             .ThenBy(m => m.Name, StringComparer.Ordinal)
             .ToList();
 
-    /// <summary>
-    /// <see cref="Summaries"/> with what it needs from the session: declared capacities, and the names of the least and
-    /// most loaded nodes, from the session's node names (no call when they're known) unless <paramref name="nodes"/> has them.
-    /// </summary>
+    /// <summary>Node names come from <paramref name="nodes"/> when given, else from the session's cached names.</summary>
     public static async Task<IReadOnlyList<LoadSummaryDto>> SummariesAsync(
         UiSession s,
         ClusterLoadInfo load,

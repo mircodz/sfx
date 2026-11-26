@@ -4,10 +4,7 @@ import { Fields } from "./Fields";
 import { Empty } from "./Section";
 import "./Meter.css";
 
-/**
- * A 0-100 bar; past `warnAbove` it turns amber. `relative` is a share of the largest, not of a capacity: grey, so it
- * doesn't read as how full something is.
- */
+/** `relative` is a share of the largest, not of a capacity: grey, so it doesn't read as how full something is. */
 export function ProgressBar({ pct, label, warnAbove, relative }: { pct: number; label: string; warnAbove?: number; relative?: boolean }) {
     const warn = warnAbove !== undefined && pct > warnAbove;
     return (
@@ -17,7 +14,7 @@ export function ProgressBar({ pct, label, warnAbove, relative }: { pct: number; 
     );
 }
 
-/** Load: metrics with a capacity as meters, the others as plain facts. */
+/** Metrics with a capacity as meters, the others as plain facts. */
 export function Meters({ metrics }: { metrics: Metric[] }) {
     if (metrics.length === 0) return <Empty>No load reported.</Empty>;
     const capped = metrics.filter((m) => m.capacity);

@@ -13,8 +13,8 @@ import type { Policy } from "./PolicyFields";
 const scaleSettings = ["InstanceCount", "TargetReplicaSetSize", "MinReplicaSetSize"];
 
 /**
- * Changes an application's parameters or version, as a rolling upgrade. Parameters that feed default services are
- * locked when the cluster wouldn't accept the change, saying why, rather than letting the upgrade be refused.
+ * As a rolling upgrade. Parameters that feed default services are locked, saying why, when the cluster wouldn't
+ * accept the change, rather than letting the upgrade be refused.
  */
 export function ApplicationEditor({ action, app, onClose }: { action: Action; app: ApplicationDetail; onClose: () => void }) {
     const current = app.application.typeVersion;

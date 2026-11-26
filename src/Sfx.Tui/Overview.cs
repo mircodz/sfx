@@ -174,7 +174,6 @@ public sealed partial class Views
             },
             open);
 
-    /// <summary>Goes to the node a replica is on.</summary>
     private void OpenNode(string name) =>
         host.Open($"opening {name}", async ct =>
         {
@@ -205,7 +204,6 @@ internal sealed class SearchPicker : Widget
         Refresh();
     }
 
-    /// <summary>Whether what's searched is still loading.</summary>
     public Func<bool>? Loading { get; init; }
 
     /// <summary>Called once a result is opened.</summary>

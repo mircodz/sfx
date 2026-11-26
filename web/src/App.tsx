@@ -76,7 +76,7 @@ export function App() {
         else localStorage.removeItem("sfx-sidebar");
     };
     const notify = useCallback((text: string, ok: boolean) => setOutcome({ text, ok }), []);
-    // When a change actually finishes: say so, and load what's on screen again.
+    // When a change actually finishes, say so and reload what's on screen.
     const operations = useOperationsPoll(generation, (op) => {
         notify(op.state === "done" ? `${op.title}: done.` : `${op.title}: ${op.detail?.replace(/\.$/, "") ?? "failed"}.`, op.state === "done");
         bump();
@@ -92,8 +92,8 @@ export function App() {
         if (generation > 0) reloadSession();
     }, [generation, reloadSession]);
 
-    // As in the terminal: "c" opens the contexts, "/" finds the page's filter box; not while typing or in a dialog.
-    // ⌘K or ctrl+K finds anything on the cluster, from anywhere (ctrl+F stays the browser's own find).
+    // As in the terminal: "c" opens contexts, "/" the page's filter box, not while typing or in a dialog. ⌘K or ctrl+K
+    // finds anything from anywhere (ctrl+F stays the browser's own find).
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {

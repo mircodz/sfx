@@ -3,15 +3,15 @@ using Sfx.Core;
 namespace Sfx.Web;
 
 /// <summary>
-/// GET /api/overview: the cluster at a glance, in a handful of calls however large it is: health with counts per entity
-/// kind (no per-entity states), load per metric, and only the upgrades under way.
+/// A fixed handful of calls however large the cluster: health counts per entity kind (no per-entity states), load per
+/// metric, and only running upgrades.
 /// </summary>
 internal static class ApiOverview
 {
     public static void Map(RouteGroupBuilder api) => api.MapGet("/overview", async (UiSession s, CancellationToken ct) =>
     {
         var o = await s.GetOverviewAsync(ct);
-        // Actions depend on the session's power and read-only setting, so they're added per request rather than cached.
+        // Actions depend on the session's power and read-only setting, so they're added per request, not cached.
         return new OverviewDto(
             s.Context.Name,
             s.Cluster.Endpoint.ToString(),
@@ -22,7 +22,7 @@ internal static class ApiOverview
             o.RunningUpgrades.Select(u => Dto.Upgrade(u, Api.UpgradeActions(s, u))).ToList());
     });
 
-    /// <summary>What the overview shows, before actions are added.</summary>
+    /// <summary>The cached overview, without actions.</summary>
     internal sealed record Overview(
         string CodeVersion,
         HealthDto Health,

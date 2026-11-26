@@ -1,4 +1,4 @@
-// Checks the UI's style rules that a machine can check, so they hold without anyone remembering them.
+// The style rules a machine can check, so they hold without anyone remembering them.
 // Run: bun run check
 
 import { Glob } from "bun";

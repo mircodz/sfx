@@ -23,7 +23,6 @@ internal sealed class FakeTerminal : ITerminal
     public void Dispose() { }
 }
 
-/// <summary>The shell's keys and commands, as its keymap declares them.</summary>
 public sealed class ShellKeymapTests : IDisposable
 {
     private readonly string _dir = Directory.CreateTempSubdirectory("sfx-shell-").FullName;

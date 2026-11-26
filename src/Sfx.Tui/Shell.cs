@@ -124,8 +124,7 @@ internal sealed class Shell : IActionHost
         _main.Add(ClusterPage, _navigator);
         _main.Add(ContextsPage, _contexts.Widget);
         _main.Show(ClusterPage);
-        // The switcher hands focus to whichever page it shows, but only once it has it: without this the contexts
-        // table never gets focus, and a table ignores keys without it.
+        // The switcher only passes focus to its page once it has focus itself; a table ignores keys without it.
         _main.HasFocus = true;
 
         app.Root = new Stack(Direction.Vertical)

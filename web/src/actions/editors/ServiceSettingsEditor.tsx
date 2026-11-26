@@ -8,10 +8,7 @@ import { Load } from "../../ui/Load";
 import { ChangePanel } from "../ChangePanel";
 import type { Change } from "../ChangePanel";
 
-/**
- * Every setting a service can change without being recreated (replica counts, waits, placement, move cost, DNS
- * name), in one form and one update. The server checks each value again; this catches what it can as you type.
- */
+/** Every setting a service can change without being recreated, in one update. */
 export function ServiceSettingsEditor({ action, appId, serviceId, onClose }: { action: Action; appId: string; serviceId: string; onClose: () => void }) {
     const info = useResource(`service-settings:${serviceId}`, () => api.serviceSettings(appId, serviceId), false);
     return (
@@ -79,7 +76,6 @@ function SettingsForm({ action, settings, onClose }: { action: Action; settings:
     );
 }
 
-/** What the setting takes, and its bounds. */
 function help(s: ServiceSettingInfo, v: string) {
     const bounds = s.min != null && s.max != null ? ` from ${s.min} to ${s.max}` : s.min != null ? `, at least ${s.min}` : s.max != null ? `, at most ${s.max}` : "";
     if (s.kind === "seconds") {
@@ -93,7 +89,7 @@ function help(s: ServiceSettingInfo, v: string) {
     return undefined;
 }
 
-/** A first check while typing; the server has the last word (it parses every value again). */
+/** A first check while typing; the server parses every value again. */
 export function check(s: ServiceSettingInfo, v: string): string | null {
     if (v.trim() === "") return null;
     if (s.kind === "seconds") {

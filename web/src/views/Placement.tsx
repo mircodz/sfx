@@ -10,10 +10,7 @@ import "./Placement.css";
 /** P primary, S active secondary, s idle secondary (still building), I instance, ? anything else. */
 const letter = (role: string) => (role === "Primary" ? "P" : role === "Instance" ? "I" : role === "ActiveSecondary" ? "S" : role === "IdleSecondary" ? "s" : "?");
 
-/**
- * Where a service's replicas are: partitions as rows, nodes as columns, each cell the replica's role. Shows
- * imbalance, partitions short of replicas, and what a node going down would cost.
- */
+/** Shows imbalance, partitions short of replicas, and what a node going down would cost. */
 export function Placement({ appId, serviceId }: { appId: string; serviceId: string }) {
     const replicas = useResource(`service-replicas:${serviceId}`, () => api.serviceReplicas(appId, serviceId));
     return (

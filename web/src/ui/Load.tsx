@@ -5,7 +5,7 @@ import "./Load.css";
 
 type Shape = "page" | "dashboard" | "rows" | "lines";
 
-/** Placeholder shapes in the content's layout while it first loads; no spinner, no animation. */
+/** Placeholders in the content's layout on first load; no spinner, no animation. */
 export function Skeleton({ shape = "rows" }: { shape?: Shape }) {
     return (
         <div aria-busy="true" aria-label="Loading">
@@ -43,10 +43,7 @@ export function Skeleton({ shape = "rows" }: { shape?: Shape }) {
     );
 }
 
-/**
- * Renders a resource: placeholders while it first loads, then the content. A failed reload keeps the last data and
- * says how old it is, rather than blanking the page.
- */
+/** A failed reload keeps the last data and says how old it is, rather than blanking the page. */
 export function Load<T>({
     resource,
     shape = "page",
@@ -76,7 +73,7 @@ export function Load<T>({
     );
 }
 
-/** A failure as a sentence: what it means first when the cluster can't be reached, and a full stop. */
+/** Leads network failures with "Can't reach the cluster." and ends with a full stop. */
 export function sentence(error: string) {
     const text = /[.!?]$/.test(error.trim()) ? error.trim() : `${error.trim()}.`;
     return /refused|timed out|unreachable|no such host|name or service not known|network/i.test(text) && !/^can't reach/i.test(text) ? `Can't reach the cluster. ${text}` : text;

@@ -8,7 +8,7 @@ import { TimelineRow } from "../ui/Timeline";
 
 const active = (state: string) => !["Completed", "Invalid"].includes(state);
 
-/** Repair tasks: reboots, patching and other infrastructure work on nodes, active ones first. */
+/** Reboots, patching and other infrastructure work on nodes. */
 export function Repairs() {
     const repairs = useResource("repairs", api.repairs);
     return (

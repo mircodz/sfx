@@ -6,7 +6,6 @@ using Cellar.Widgets;
 
 namespace Sfx.Tui;
 
-/// <summary>A tab of a describe page: a title and how to load its lines.</summary>
 public sealed record DescribeTab(string Title, Func<CancellationToken, Task<IReadOnlyList<StyledText>>> Load);
 
 /// <summary>
@@ -91,7 +90,6 @@ public sealed class DescribeView : IResourceView
         }
     }
 
-    /// <summary>The tab being read.</summary>
     public TextViewer Active => _viewers[_tabsWidget.ActiveIndex];
 
     public async Task<Action> LoadAsync(CancellationToken cancellationToken)

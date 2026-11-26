@@ -5,10 +5,7 @@ import "./HealthBar.css";
 const order: Health[] = ["Error", "Warning", "Unknown", "Healthy"];
 const tone: Record<Health, string> = { Error: "danger", Warning: "warning", Unknown: "neutral", Healthy: "success" };
 
-/**
- * How many of something are in each health state, as one stacked bar and the counts in words. Takes either the
- * states themselves or counts per state (what the cluster's health statistics give, however many there are).
- */
+/** Takes the states themselves or counts per state (what the cluster's health statistics give). */
 export function HealthBar({ label, healths, counts: given, href }: { label: string; healths?: Health[]; counts?: Partial<Record<Health, number>>; href?: string }) {
     const tally: Partial<Record<Health, number>> = given ?? {};
     if (!given) for (const h of healths ?? []) tally[h] = (tally[h] ?? 0) + 1;

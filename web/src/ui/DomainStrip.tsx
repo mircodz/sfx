@@ -3,7 +3,7 @@ import { domainState } from "../lib/upgrades";
 import type { Upgrade } from "../lib/types";
 import "./DomainStrip.css";
 
-/** An upgrade's domains in a row, colored by state, the current one outlined; then its nodes and what they wait on. */
+/** Domains colored by state, the current one outlined; then its nodes and what they wait on. */
 export function DomainStrip({ upgrade: u }: { upgrade: Upgrade }) {
     return (
         <>

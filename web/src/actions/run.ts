@@ -4,7 +4,7 @@ import { useNotice } from "../lib/notice";
 import { RefreshContext } from "../lib/resource";
 import type { Action } from "../lib/types";
 
-/** Runs an action, reports the outcome and refreshes what's on screen; throws so a dialog can stay open on failure. */
+/** Throws so a dialog can stay open on failure. */
 export function useRun() {
     const { bump } = useContext(RefreshContext);
     const notify = useNotice();
@@ -15,7 +15,7 @@ export function useRun() {
     };
 }
 
-/** Who an action is about, as a phrase: "replica 1234 on _Node_1", "fabric:/orders", "the upgrade of fabric:/orders". */
+/** "replica 1234 on _Node_1", "fabric:/orders", "the upgrade of fabric:/orders". */
 export function subject(t: Record<string, string>) {
     if (t.replicaId) return `${t.role === "Instance" ? "instance" : "replica"} ${t.replicaId} on ${t.node}`;
     if (t.kind === "cluster" || t.kind === "application") return `the upgrade of ${t.name}`;

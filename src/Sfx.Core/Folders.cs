@@ -4,7 +4,6 @@ namespace Sfx.Core;
 /// <param name="Path">The normalized folder path, e.g. <c>prod/europe</c>.</param>
 /// <param name="Label">Short text shown next to the context name.</param>
 /// <param name="Color">One of <see cref="FolderPath.Colors"/>.</param>
-/// <param name="ReadOnly">Makes every context in the folder and its subfolders read-only.</param>
 public sealed record FolderSettings(string Path, string? Label, string? Color, bool ReadOnly);
 
 /// <summary>A saved context with its folders' rules applied.</summary>
@@ -15,7 +14,6 @@ public sealed record ResolvedContext(ClusterContext Context, string? Label, stri
 
 public static class FolderPath
 {
-    /// <summary>The colors a folder can set.</summary>
     public static IReadOnlyList<string> Colors { get; } = ["success", "warning", "danger", "accent", "neutral"];
 
     /// <summary>Trims the path, drops empty segments and leading or trailing slashes; null when nothing is left.</summary>

@@ -6,7 +6,7 @@ namespace Sfx.Web;
 /// <summary>A provisioned application type version.</summary>
 /// <param name="Status">Provisioning, Available, Unprovisioning or Failed.</param>
 /// <param name="StatusDetails">Why provisioning failed, when it did; null otherwise.</param>
-/// <param name="Applications">The names (fabric:/…) of the applications on this version.</param>
+/// <param name="Applications">Names (fabric:/…) of the applications on this version.</param>
 /// <param name="Actions">create-application and unprovision-type, where they apply.</param>
 public sealed record ApplicationTypeDto(
     string Name,
@@ -20,7 +20,6 @@ public sealed record ApplicationTypeDto(
 /// <param name="Manifest">The service manifest that declares it, and that manifest's version.</param>
 public sealed record ServiceTypeDto(string Name, bool Stateful, string Manifest, string ManifestVersion);
 
-/// <summary>One editable setting of a service.</summary>
 /// <param name="Kind">How it's typed in: count (a whole number within min and max), seconds ("30", "30s", "5m", "1h", "2d"), text, choice or flag ("true"/"false").</param>
 /// <param name="Value">Its value now; empty when the cluster's default applies.</param>
 public sealed record ServiceSettingDto(string Key, string Title, string Kind, string Value, IReadOnlyList<string>? Choices, int? Min, int? Max);
@@ -28,7 +27,6 @@ public sealed record ServiceSettingDto(string Key, string Title, string Kind, st
 /// <param name="Action">edit-service-settings, taking the changed settings by key; null when it isn't offered (read-only, or a system service).</param>
 public sealed record ServiceSettingsDto(bool Stateful, IReadOnlyList<ServiceSettingDto> Settings, ActionDto? Action);
 
-/// <summary>GET /api/types, /api/types/{name}/{version}/services and a service's /settings.</summary>
 internal static class ApiLifecycle
 {
     public static void Map(RouteGroupBuilder api)
@@ -53,7 +51,7 @@ internal static class ApiLifecycle
 
         api.MapGet("/applications/{appId}/services/{serviceId}/settings", async (UiSession s, string appId, string serviceId, CancellationToken ct) =>
         {
-            // Asked first, so an unknown id is a 404 that says so.
+            // Asked first so an unknown id is a 404 that says so.
             var service = Api.Service(await s.Inspector.GetServiceAsync(appId, serviceId, ct));
             var description = await s.Inspector.GetServiceDescriptionAsync(serviceId, ct);
             var action = WebActions.For(s, "service", Api.ServiceTarget(service, appId, description)).FirstOrDefault(a => a.Id == "edit-service-settings");

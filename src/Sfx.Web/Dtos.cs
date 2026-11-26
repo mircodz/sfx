@@ -3,7 +3,7 @@ using Sfx.Core;
 
 namespace Sfx.Web;
 
-// What the browser gets. Health is always one of the UI's words: Healthy, Warning, Error or Unknown.
+// Health is always one of the UI's words: Healthy, Warning, Error or Unknown.
 
 /// <param name="EventStore">Whether the cluster runs the event store; without it there are no events to show.</param>
 /// <param name="RepairManager">Whether it runs the repair manager; without it there are no repair tasks.</param>
@@ -26,7 +26,7 @@ public sealed record SessionDto(
     bool FaultAnalysis,
     bool ImageStore = true);
 
-/// <summary>The optional system services a cluster may run; what isn't there isn't offered.</summary>
+/// <summary>Optional system services; what the cluster doesn't run isn't offered.</summary>
 public sealed record SystemServices(bool EventStore, bool RepairManager, bool FaultAnalysis);
 
 public sealed record EvaluationDto(int Depth, string Kind, string Health, string Description);
@@ -44,10 +44,10 @@ public sealed record HealthCountDto(string Kind, long Healthy, long Warning, lon
 /// <param name="ClusterCapacity">Null when unlimited.</param>
 /// <param name="Balanced">Whether the resource balancer found the metric balanced on its last run.</param>
 /// <param name="MinNode">
-/// The name of the node with the least load (its id when the node isn't known); null when the cluster doesn't say, or
-/// when no node has any of this load.
+/// The least loaded node's name (its id when the node isn't known); null when the cluster doesn't say or no node has
+/// any of this load.
 /// </param>
-/// <param name="MaxNode">The name of the node with the most load, likewise.</param>
+/// <param name="MaxNode">The most loaded node's name, likewise.</param>
 public sealed record LoadSummaryDto(
     string Name,
     double ClusterLoad,
@@ -103,7 +103,7 @@ public sealed record ApplicationDto(string Id, string Name, string TypeName, str
 /// <param name="Overridden">Set on the application, rather than taken from the version's default.</param>
 public sealed record ParameterDto(string Name, string Value, string? Default, bool Overridden);
 
-/// <summary>A provisioned version of an application type and the parameters it declares, with their defaults.</summary>
+/// <summary>A provisioned version of the type, with its parameters' defaults.</summary>
 public sealed record VersionDto(string Version, IReadOnlyDictionary<string, string> Defaults);
 
 public sealed record ServiceDto(string Id, string Name, string TypeName, string Kind, string Status, string Health, string? Reason = null);
@@ -248,7 +248,7 @@ internal static class Dto
             .Select(e => new HealthEventDto(e.Source, e.Property, Health(e.State), e.Description, e.LastModifiedUtc, e.IsExpired))
             .ToList());
 
-    /// <summary>The counts of nodes, applications, services, partitions and replicas, in that order; other kinds are left out.</summary>
+    /// <summary>Nodes, applications, services, partitions and replicas, in that order; other kinds are left out.</summary>
     public static IReadOnlyList<HealthCountDto> HealthCounts(HealthStatistics? statistics) => HealthCounts(ClusterOverview.Counts(statistics));
 
     public static IReadOnlyList<HealthCountDto> HealthCounts(IReadOnlyList<HealthCount> counts) =>

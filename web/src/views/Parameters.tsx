@@ -9,14 +9,14 @@ import { SearchBox, Toolbar } from "../ui/Toolbar";
 const shows = ["Set", "All"] as const;
 type Show = (typeof shows)[number];
 
-/** Sets them first: what's set on the application is what's usually being looked for. */
+/** What's set on the application is usually what's being looked for. */
 export function setFirst(a: Parameter, b: Parameter) {
     return Number(b.overridden) - Number(a.overridden) || a.name.localeCompare(b.name);
 }
 
 /**
- * An application's parameters, which can run into the thousands: what's set on the application by default, everything
- * a search away. Defaults are what the application type declares; they aren't interesting until they're changed.
+ * Can run into the thousands: shows what's set on the application, everything else a search away. Defaults come from
+ * the application type and aren't interesting until changed.
  */
 export function Parameters({ parameters }: { parameters: Parameter[] }) {
     const [search, setSearch] = useState("");

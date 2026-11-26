@@ -35,10 +35,7 @@ function nodeStatusNote(nodes: { status: string }[]) {
         .join(" · ");
 }
 
-/**
- * The cluster at a glance, for a wide screen: counts, health by kind, what's wrong and why, the nodes by upgrade
- * domain, upgrades, load, and what just happened. Every tile links to the page with the rest.
- */
+/** Every tile links to the page with the rest. */
 export function Overview() {
     const cluster = useResource("cluster", api.cluster);
     const nodes = useResource("nodes", api.nodes);

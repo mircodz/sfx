@@ -47,8 +47,6 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
     private readonly ClusterQueries _queries = new(client);
     private readonly ClusterOperations _operations = new(client);
 
-    // Application types
-
     /// <summary>Registers an application package already in the image store, at its path relative to the store's root.</summary>
     /// <remarks>Provisioning continues in the background; the type shows as Provisioning until it's done.</remarks>
     public Task ProvisionAsync(string imageStorePath, CancellationToken cancellationToken)
@@ -107,8 +105,6 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
             new UnprovisionApplicationTypeDescriptionInfo(typeVersion, async: true),
             cancellationToken: cancellationToken);
     }
-
-    // Applications
 
     /// <summary>
     /// Creates an application of a provisioned type version. Parameters left out take the type's defaults; one the type
@@ -271,8 +267,6 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
         return parameters;
     }
 
-    // Running upgrades
-
     /// <summary>Switches an application's running upgrade to another plan, e.g. from manual to automatic.</summary>
     public Task ChangeUpgradePlanAsync(string applicationId, UpgradePlan plan, CancellationToken cancellationToken) =>
         _operations.ChangeApplicationUpgradePlanAsync(applicationId, plan, cancellationToken);
@@ -297,8 +291,6 @@ public sealed class ApplicationLifecycle(IServiceFabricClient client, Func<Cance
     /// <summary>Rolls the running upgrade back: domains already upgraded go back to the previous version.</summary>
     public Task RollbackUpgradeAsync(string applicationId, CancellationToken cancellationToken) =>
         _operations.RollbackApplicationUpgradeAsync(applicationId, cancellationToken);
-
-    // Services
 
     /// <summary>
     /// Creates a service in an application. Refuses a type the application's version doesn't provide, or a stateful

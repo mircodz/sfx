@@ -18,7 +18,7 @@ public sealed record RepairDto(
 /// <param name="Unavailable">Why there are no repair tasks to show, when the cluster has no repair manager.</param>
 public sealed record RepairsDto(IReadOnlyList<RepairDto> Repairs, string? Unavailable);
 
-/// <summary>GET /api/repairs: repair tasks, active ones first, then newest first.</summary>
+/// <summary>Active repair tasks first, then newest first.</summary>
 internal static class ApiRepairs
 {
     public static void Map(RouteGroupBuilder api) =>
@@ -30,7 +30,7 @@ internal static class ApiRepairs
             }
             catch (InvalidOperationException ex)
             {
-                // RepairQueries says so when the cluster has no repair manager.
+                // RepairQueries throws this when the cluster has no repair manager.
                 return new RepairsDto([], ex.Message);
             }
         });

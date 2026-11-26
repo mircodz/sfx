@@ -452,7 +452,6 @@ public sealed partial class Views
         };
     }
 
-    /// <summary>Each partition's status and how many of its replicas or instances are ready.</summary>
     private async Task<IReadOnlyList<(string Status, int Ready)>> PartitionCountsAsync(string serviceId, CancellationToken cancellationToken)
     {
         var partitions = await queries.GetPartitionsAsync(serviceId, cancellationToken);

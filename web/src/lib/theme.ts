@@ -8,7 +8,7 @@ export function storedTheme(): Theme {
     return t === "light" || t === "dark" ? t : "system";
 }
 
-/** Sets data-theme on <html>; "system" removes it so prefers-color-scheme decides. */
+/** "system" removes data-theme so prefers-color-scheme decides. */
 export function applyTheme(theme: Theme) {
     if (theme === "system") {
         delete document.documentElement.dataset.theme;

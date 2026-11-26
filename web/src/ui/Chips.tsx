@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import "./Chips.css";
 
-/** Mutually exclusive options as chips: a filter, a layout, a mode. */
+/** Mutually exclusive: a filter, a layout, a mode. */
 export function Chips<T extends string>({
     options,
     value,

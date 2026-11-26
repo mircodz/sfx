@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "@tabler/icons-webfont/dist/tabler-icons.min.css";
-// Cascadia Code, Latin only (about 130 KB): ids, versions, manifests, and the brand in its cursive italic.
+// Latin only (about 130 KB): ids, versions, manifests, and the brand in its cursive italic.
 import "@fontsource/cascadia-code/latin-400.css";
 import "@fontsource/cascadia-code/latin-500.css";
 import "@fontsource/cascadia-code/latin-400-italic.css";
