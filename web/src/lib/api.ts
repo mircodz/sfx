@@ -26,7 +26,7 @@ import type {
     ServiceSettingsInfo,
     StoreListing,
 } from "./types";
-import { observe, requestSwitch, shownConnection } from "./connection";
+import { observe, shownConnection } from "./connection";
 
 // sfx ui opens /?token=…; keep the token for this tab and strip only it from the address bar.
 const tokenKey = "sfx-token";
@@ -88,10 +88,7 @@ const seg = encodeURIComponent;
 export const api = {
     session: () => get<Session>("/session"),
     contexts: () => get<Contexts>("/contexts"),
-    connect: (name: string) => {
-        requestSwitch(name);
-        return request<void>("POST", `/contexts/${seg(name)}/connect`);
-    },
+    connect: (name: string) => request<void>("POST", `/contexts/${seg(name)}/connect`),
     dismissConnect: () => request<void>("POST", "/contexts/dismiss"),
     setPower: (on: boolean) => request<Session>("POST", "/session/power", { on }),
     cluster: () => get<Cluster>("/cluster"),

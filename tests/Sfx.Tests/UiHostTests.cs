@@ -39,6 +39,7 @@ public class UiHostTests
         var contexts = host.Contexts();
 
         Assert.Equal("dev", contexts.Current);
+        Assert.Equal(host.Current.Id, contexts.Session);
         var prod = contexts.Contexts.Single(c => c.Name == "prod-weu");
         Assert.Equal("prod/europe", prod.Folder);
         Assert.Equal("PROD", prod.Label);

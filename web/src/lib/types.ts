@@ -53,6 +53,8 @@ export interface Folder {
 
 export interface Contexts {
     current: string;
+    /** The current connection, as in the session's id. */
+    session: string;
     contexts: ClusterContext[];
     folders: Folder[];
     /** A switch in progress: sign-in messages so far (e.g. a device code), or why it failed. */

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef } from "react";
-import { onSwitch, show, switchedHere } from "./connection";
+import { follow, onSwitch, show } from "./connection";
 import type { Resource } from "./resource";
 import type { Session } from "./types";
 
@@ -14,8 +14,9 @@ export const useEventsAvailable = () => useSession()?.eventStore ?? true;
 export const useRepairsAvailable = () => useSession()?.repairManager ?? true;
 
 /**
- * Follows a switch made in another tab: once an answer says sfx ui is on another connection, loads its session, reloads
- * everything and says so, opening the overview if it's another cluster.
+ * Follows a switch made in another tab, or one this tab's contexts page stopped waiting for: once an answer says sfx ui
+ * is on another connection, loads its session, reloads everything and says so, opening the overview if it's another
+ * cluster.
  */
 export function useFollowSwitches(session: Resource<Session>, bump: () => void, notify: (text: string, ok: boolean) => void) {
     const reload = session.reload;
@@ -30,12 +31,9 @@ export function useFollowSwitches(session: Resource<Session>, bump: () => void, 
         show(next.id);
         if (!before || before.id === next.id) return;
         bump();
-        if (switchedHere(next.context)) return;
-        if (before.context === next.context) {
-            notify(`Reconnected to ${next.context} from another tab.`, true);
-        } else {
-            notify(`Switched to ${next.context} from another tab.`, true);
-            location.hash = "#/";
-        }
+        const followed = follow(before, next);
+        if (!followed) return;
+        notify(followed.notice, true);
+        if (followed.overview) location.hash = "#/";
     }, [session.data, bump, notify]);
 }

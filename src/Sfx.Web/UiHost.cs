@@ -20,9 +20,11 @@ public sealed record ContextDto(
 
 public sealed record FolderDto(string Path, string? Label, string? Color, bool ReadOnly);
 
+/// <param name="Session">The current connection's <see cref="UiSession.Id"/>.</param>
 /// <param name="ConfigPath">Where contexts are saved: ~/.sfx/config.toml, or $SFX_CONFIG.</param>
 public sealed record ContextsDto(
     string Current,
+    string Session,
     IReadOnlyList<ContextDto> Contexts,
     IReadOnlyList<FolderDto> Folders,
     ConnectingDto? Connecting,
@@ -74,6 +76,7 @@ public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterCo
             var connecting = _connecting is { Done: false } or { Error: not null } ? _connecting : null;
             return new ContextsDto(
                 _current.Context.Name,
+                _current.Id,
                 saved,
                 store.Folders.Select(f => new FolderDto(f.Path, f.Label, f.Color, f.ReadOnly)).ToList(),
                 connecting is null ? null : new ConnectingDto(connecting.Context, [.. connecting.Messages], connecting.Error),
