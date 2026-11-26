@@ -46,6 +46,7 @@ internal sealed class Shell : IActionHost
     private readonly ActionLog _log;
     private readonly SessionActivity _activity;
     private readonly Label _summary = new(StyledText.Empty());
+    private readonly bool _readOnly;
 
     private ClusterSession _session;
     private Views _views;
@@ -63,9 +64,11 @@ internal sealed class Shell : IActionHost
     private (DateTime At, string Text)? _lastError;
     private (ClusterSession Session, DateTime At, Task<IReadOnlyList<SearchHit>> Index)? _searchIndex;
 
-    public Shell(App app, ClusterSession session, ClusterConnector connector, ContextStore store, TimeSpan refreshInterval)
+    /// <param name="readOnly"><c>--readonly</c>: every context connected to in this run is read-only.</param>
+    public Shell(App app, ClusterSession session, ClusterConnector connector, ContextStore store, TimeSpan refreshInterval, bool readOnly = false)
     {
         _app = app;
+        _readOnly = readOnly;
         _session = session;
         _power = session.Context.Power;
         _views = new Views(session.Queries, this);
@@ -73,7 +76,7 @@ internal sealed class Shell : IActionHost
         _store = store;
         _log = new ActionLog(SfxHost.ActionLogPath(store));
         _activity = new SessionActivity(_log);
-        _contexts = Views.Contexts(store, () => _session.Context.Name, Connect);
+        _contexts = Views.Contexts(store, () => _session.Context.Name, Connect, Resolve);
         _contexts.Reload = Refresh;
 
         _keymap.Global.Add(GlobalActions());
@@ -953,10 +956,17 @@ internal sealed class Shell : IActionHost
         Refresh();
     }
 
-    /// <summary>Connects to a saved context, with its folders' rules applied so a read-only folder stays read-only.</summary>
+    /// <summary>A saved context with its folders' rules applied, and <c>--readonly</c> over them all.</summary>
+    internal ResolvedContext Resolve(ClusterContext saved)
+    {
+        var resolved = _store.Resolve(saved);
+        return _readOnly ? resolved with { Context = resolved.Context with { ReadOnly = true, Power = false } } : resolved;
+    }
+
+    /// <summary>Connects to a saved context, read-only if its folder or <c>--readonly</c> says so.</summary>
     private void Connect(ClusterContext saved)
     {
-        var context = _store.Resolve(saved).Context;
+        var context = Resolve(saved).Context;
         _connecting?.Cancel();
         var connecting = _connecting = new CancellationTokenSource();
         var message = StyledText.Of($"connecting to {context.Name}…");

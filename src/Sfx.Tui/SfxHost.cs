@@ -115,7 +115,7 @@ public static class SfxHost
 
         using var screen = terminal ?? new AnsiTerminal();
         using var app = new App(screen);
-        var shell = new Shell(app, session, connector, store, options.RefreshInterval);
+        var shell = new Shell(app, session, connector, store, options.RefreshInterval, options.ReadOnly);
         notify = shell.NotifyAsync;
         await app.RunAsync(CancellationToken.None);
         return 0;
@@ -184,7 +184,7 @@ public static class SfxHost
         text.AppendLine("  <endpoint>              host, host:port or URL (default port 19080)");
         text.AppendLine("  --auth <methods>        auth methods, applied in order (default: none)");
         text.AppendLine("  --refresh <interval>    auto-refresh interval: 5s, 1m, or off (default: 5s)");
-        text.AppendLine("  --readonly              hide every action that changes the cluster");
+        text.AppendLine("  --readonly              hide every action that changes a cluster, in every context");
         text.AppendLine("  --power                 unlock the riskiest actions (also :power in the UI)");
         text.AppendLine("  --version               print the version");
         text.AppendLine("  --port <n>              sfx ui: port to listen on, on 127.0.0.1 (default: any free one)");

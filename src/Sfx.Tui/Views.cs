@@ -145,11 +145,16 @@ public sealed partial class Views(ClusterQueries queries, IActionHost host)
     /// The saved contexts, grouped by folder (each folder's label and mode after its name), with the mode their
     /// folders give them; opening one calls <paramref name="use"/> instead of navigating.
     /// </summary>
-    public static ResourceView<ResolvedContext> Contexts(ContextStore store, Func<string> current, Action<ClusterContext> use) =>
+    /// <param name="resolve">How a saved context is applied; by default, its folders' rules.</param>
+    public static ResourceView<ResolvedContext> Contexts(
+        ContextStore store,
+        Func<string> current,
+        Action<ClusterContext> use,
+        Func<ClusterContext, ResolvedContext>? resolve = null) =>
         new ResourceView<ResolvedContext>(
             "contexts",
             "contexts",
-            _ => Task.FromResult<IReadOnlyList<ResolvedContext>>(store.Contexts.Select(store.Resolve).ToList()),
+            _ => Task.FromResult<IReadOnlyList<ResolvedContext>>(store.Contexts.Select(resolve ?? store.Resolve).ToList()),
             c => c.Context.Name)
             {
                 OnOpen = context =>
