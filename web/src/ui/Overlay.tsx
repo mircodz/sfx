@@ -3,11 +3,16 @@ import type { KeyboardEvent, PointerEvent, ReactNode } from "react";
 import { IconButton } from "./Button";
 import "./Overlay.css";
 
-/** Focus stays inside; Esc and the backdrop close it. `onCancel` lets the owner veto closing (e.g. unsaved edits). */
+/**
+ * Focus stays inside; Esc and the backdrop close it. `onCancel` lets the owner veto closing (e.g. unsaved edits).
+ * Focus starts on the element marked `data-autofocus`, else on the first one that takes it.
+ */
 export function useModal(onClose: () => void, onCancel?: () => boolean) {
     const ref = useRef<HTMLDialogElement>(null);
     useEffect(() => {
         ref.current?.showModal();
+        // React's autoFocus runs while the dialog is still closed, and showModal then picks the first focusable element.
+        ref.current?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
         // The page behind doesn't scroll while a modal is open; the panel body is the one place that does.
         const body = document.body.style.overflow;
         document.body.style.overflow = "hidden";

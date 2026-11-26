@@ -7,9 +7,10 @@ import { Field } from "../ui/Form";
 import { Dialog } from "../ui/Overlay";
 import { Notice } from "../ui/Notice";
 import { ActionInputField, defaultInputs } from "./inputs";
+import { canConfirm } from "./confirm";
 import { errorText, subject, useRun } from "./run";
 
-/** For actions without a form; destructive ones need the name typed. */
+/** For actions without a form; destructive ones need the name typed, and Enter only runs them once it matches. */
 export function ConfirmAction({ action, onClose }: { action: Action; onClose: () => void }) {
     const run = useRun();
     const [inputs, setInputs] = useState(() => defaultInputs(action.inputs));
@@ -17,7 +18,8 @@ export function ConfirmAction({ action, onClose }: { action: Action; onClose: ()
     const [running, setRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const destructive = action.risk === "destructive";
-    const confirmed = !destructive || !action.confirmText || confirm === action.confirmText;
+    const typed = destructive && !!action.confirmText;
+    const confirmed = canConfirm(action, confirm);
 
     const submit = async (e: FormEvent) => {
         e.preventDefault();
@@ -43,7 +45,8 @@ export function ConfirmAction({ action, onClose }: { action: Action; onClose: ()
                     <Button type="submit" form="confirm-form" variant={destructive ? "danger-filled" : "primary"} disabled={!confirmed || running}>
                         {running ? "Working…" : action.title}
                     </Button>
-                    <Button onClick={onClose} disabled={running}>
+                    {/* Focus starts here, not on the action: the Enter that opened the dialog mustn't run it. */}
+                    <Button onClick={onClose} disabled={running} data-autofocus={typed ? undefined : true}>
                         Cancel
                     </Button>
                 </>
@@ -60,7 +63,7 @@ export function ConfirmAction({ action, onClose }: { action: Action; onClose: ()
                         onChange={(v) => setInputs((s) => ({ ...s, [input.name]: v }))}
                     />
                 ))}
-                {destructive && action.confirmText && (
+                {typed && (
                     <Field
                         label={
                             <>
@@ -68,7 +71,7 @@ export function ConfirmAction({ action, onClose }: { action: Action; onClose: ()
                             </>
                         }
                     >
-                        {(id) => <input id={id} autoFocus value={confirm} onChange={(e) => setConfirm(e.target.value)} spellCheck={false} autoComplete="off" />}
+                        {(id) => <input id={id} data-autofocus value={confirm} onChange={(e) => setConfirm(e.target.value)} spellCheck={false} autoComplete="off" />}
                     </Field>
                 )}
                 {error && <Notice tone="danger">{error}</Notice>}

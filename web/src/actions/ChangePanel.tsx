@@ -94,7 +94,8 @@ export function ChangePanel({
                         <Button key="submit" variant="primary" disabled={running || draft.errors > 0 || Date.now() - reviewedAt.current < 400} onClick={submit}>
                             {running ? "Working…" : draft.submitLabel}
                         </Button>
-                        <Button key="back" disabled={running} onClick={() => setStep("edit")}>
+                        {/* Mounts with the step, so focus lands here rather than on the run button. */}
+                        <Button key="back" autoFocus disabled={running} onClick={() => setStep("edit")}>
                             Back
                         </Button>
                     </>
