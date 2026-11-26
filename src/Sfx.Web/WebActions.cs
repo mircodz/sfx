@@ -338,10 +338,12 @@ internal static class WebActions
             "service.recover",
             "service",
             "Recover partitions",
-            Risk.Confirm,
+            Risk.Destructive,
             (t, _) => $"Recover the partitions of {t["name"]}",
             (s, t, _, ct) => s.Operations.RecoverServicePartitionsAsync(t["serviceId"], ct),
-            "Partitions stuck in quorum loss are forced out of it; recent writes may be lost."),
+            "Partitions stuck in quorum loss are forced out of it; recent writes may be lost.",
+            Power: true,
+            ConfirmText: t => t["name"]),
 
         new(
             "service.delete",

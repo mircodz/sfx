@@ -79,6 +79,31 @@ public class WebActionTests
         Assert.Equal(400, ex.Status);
     }
 
+    private static Dictionary<string, string> Service => new()
+    {
+        ["serviceId"] = "shop~Counter",
+        ["applicationId"] = "shop",
+        ["name"] = "fabric:/shop/Counter",
+        ["kind"] = "Stateful",
+        ["count"] = "3",
+        ["min"] = "2",
+    };
+
+    [Fact]
+    public async Task Recovering_a_services_partitions_is_a_power_action_with_its_name_typed()
+    {
+        Assert.DoesNotContain(WebActions.For(Session(), "service", Service), a => a.Id == "service.recover");
+
+        var session = Session(power: true);
+        var recover = WebActions.For(session, "service", Service).Single(a => a.Id == "service.recover");
+        Assert.Equal("destructive", recover.Risk);
+        Assert.Equal("fabric:/shop/Counter", recover.ConfirmText);
+
+        var ex = await Assert.ThrowsAsync<ActionException>(() =>
+            WebActions.RunAsync(session, recover.Id, new ActionRequest(new(recover.Target), null, null, recover.Signature), default));
+        Assert.Equal("Type 'fabric:/shop/Counter' to confirm.", ex.Message);
+    }
+
     [Fact]
     public async Task Power_can_be_turned_off_under_an_offered_action()
     {
