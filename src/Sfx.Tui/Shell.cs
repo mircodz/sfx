@@ -1089,8 +1089,15 @@ internal sealed class Shell
         _summary.Content = StyledText.Empty();
         _summaryAt = default;
         _store.Active = session.Context.Name;
-        _store.Save();
         ShowRoot(_views.Nodes());
+        try
+        {
+            _store.Save();
+        }
+        catch (Exception ex)
+        {
+            Error($"Connected, but couldn't remember {session.Context.Name} as the current context: {ex.Message}");
+        }
     }
 
     private void RefreshIf(ClusterSession session)
