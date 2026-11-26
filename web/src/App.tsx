@@ -3,6 +3,7 @@ import { api } from "./lib/api";
 import { NoticeContext } from "./lib/notice";
 import { RefreshContext, useResource } from "./lib/resource";
 import { usePath } from "./lib/router";
+import { isFindKey, shortcutFor } from "./lib/shortcuts";
 import { Notice } from "./ui/Notice";
 import { Empty } from "./ui/Section";
 import { Sidebar } from "./Sidebar";
@@ -93,20 +94,21 @@ export function App() {
         if (generation > 0) reloadSession();
     }, [generation, reloadSession]);
 
-    // As in the terminal: "c" opens contexts, "/" the page's filter box, not while typing or in a dialog. ⌘K or ctrl+K
-    // finds anything from anywhere (ctrl+F stays the browser's own find).
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
-                e.preventDefault();
+            // Ours even when it does nothing, so it doesn't fall through to the browser's address bar.
+            if (isFindKey(e)) e.preventDefault();
+            const shortcut = shortcutFor(e, {
+                typing: !!(e.target as Element).closest?.("input, textarea, select, [contenteditable]"),
+                // Not just the target: focus can fall back to the body while a panel is open.
+                dialogOpen: !!document.querySelector("dialog[open]"),
+                onContexts: location.hash.startsWith("#/contexts"),
+            });
+            if (shortcut === "find") {
                 setFinding(true);
-                return;
-            }
-            const el = e.target as HTMLElement;
-            if (e.metaKey || e.ctrlKey || e.altKey || el.closest("input, textarea, select, [contenteditable], dialog")) return;
-            if (e.key === "c" && !location.hash.startsWith("#/contexts")) {
+            } else if (shortcut === "contexts") {
                 location.hash = "#/contexts";
-            } else if (e.key === "/" || e.key === "c") {
+            } else if (shortcut === "filter") {
                 const search = document.querySelector<HTMLInputElement>("main input[type=search]");
                 if (!search) return;
                 e.preventDefault();
