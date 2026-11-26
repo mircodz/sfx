@@ -32,7 +32,8 @@ public sealed record ContextsDto(
 /// Connecting runs in the background so sign-in (e.g. a device code) can show in the browser; the current cluster stays
 /// in use until the new one is ready, and stays if it fails.
 /// </summary>
-public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterConnector connector, ActionLog log, string version)
+/// <param name="readOnly">--readonly: every context connected in this run is read-only, not just the first.</param>
+public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterConnector connector, ActionLog log, string version, bool readOnly = false)
 {
     private readonly Lock _lock = new();
     private UiSession _current = new(initial, log, version, Labelled(store, initial.Context));
@@ -62,7 +63,7 @@ public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterCo
     {
         lock (_lock)
         {
-            var saved = store.Contexts.Select(c => Dto(store.Resolve(c), saved: true)).ToList();
+            var saved = store.Contexts.Select(c => Dto(Resolve(c), saved: true)).ToList();
             if (saved.All(c => !c.Name.Equals(_current.Context.Name, StringComparison.OrdinalIgnoreCase)))
             {
                 saved.Insert(0, Dto(new ResolvedContext(_current.Context, null, null), saved: false));
@@ -81,8 +82,7 @@ public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterCo
     public void Switch(string name)
     {
         var saved = store.Find(name) ?? throw new ActionException($"No context named '{name}'. Add it with 'sfx context add'.", StatusCodes.Status404NotFound);
-        // Folder rules apply: a context in a read-only folder connects read-only.
-        var resolved = store.Resolve(saved);
+        var resolved = Resolve(saved);
         var context = resolved.Context;
         Connecting connecting;
         lock (_lock)
@@ -142,6 +142,13 @@ public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterCo
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var full = Path.GetFullPath(path);
         return home.Length > 0 && full.StartsWith(home, StringComparison.Ordinal) ? "~" + full[home.Length..] : full;
+    }
+
+    /// <summary>A saved context as it connects in this run: folder rules apply, and so does --readonly.</summary>
+    internal ResolvedContext Resolve(ClusterContext saved)
+    {
+        var resolved = store.Resolve(saved);
+        return readOnly ? resolved with { Context = resolved.Context with { ReadOnly = true, Power = false } } : resolved;
     }
 
     private static ContextDto Dto(ResolvedContext r, bool saved)

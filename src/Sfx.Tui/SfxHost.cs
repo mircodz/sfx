@@ -110,7 +110,7 @@ public static class SfxHost
         {
             var log = new ActionLog(ActionLogPath(store));
             var web = new WebOptions(options.Port, !options.NoBrowser, Environment.GetEnvironmentVariable("SFX_UI_TOKEN"));
-            return await WebServer.RunAsync(new UiHost(session, store, connector, log, Version), web, CancellationToken.None);
+            return await WebServer.RunAsync(new UiHost(session, store, connector, log, Version, options.ReadOnly), web, CancellationToken.None);
         }
 
         using var screen = terminal ?? new AnsiTerminal();

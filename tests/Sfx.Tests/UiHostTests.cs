@@ -6,7 +6,7 @@ namespace Sfx.Tests;
 
 public class UiHostTests
 {
-    private static (UiHost Host, ContextStore Store) Host(string toml, string current = "dev")
+    private static (UiHost Host, ContextStore Store) Host(string toml, string current = "dev", bool readOnly = false)
     {
         var path = Path.Combine(Path.GetTempPath(), $"sfx-host-{Guid.NewGuid():N}.toml");
         File.WriteAllText(path, toml);
@@ -14,7 +14,7 @@ public class UiHostTests
         var context = store.Find(current) ?? new ClusterContext(current, "localhost", [], new AuthOptions());
         var session = new ClusterSession(context, new Uri("http://localhost:19080"), new ClusterQueries(null!));
         var log = new ActionLog(Path.Combine(Path.GetTempPath(), $"sfx-host-{Guid.NewGuid():N}.log"));
-        return (new UiHost(session, store, new ClusterConnector(BuiltInAuth.Providers), log, "0.0.0"), store);
+        return (new UiHost(session, store, new ClusterConnector(BuiltInAuth.Providers), log, "0.0.0", readOnly), store);
     }
 
     private const string Config = """
@@ -45,6 +45,28 @@ public class UiHostTests
         Assert.True(prod.ReadOnly);
         Assert.Contains(contexts.Folders, f => f.Path == "prod" && f.ReadOnly);
         Assert.Null(contexts.Connecting);
+    }
+
+    [Fact]
+    public void Command_line_readonly_holds_for_every_context_switched_to()
+    {
+        var (host, store) = Host(Config.Replace("endpoint = \"localhost\"", "endpoint = \"localhost\"\npower = true"), readOnly: true);
+
+        var dev = host.Resolve(store.Find("dev")!).Context;
+        Assert.True(dev.ReadOnly);
+        Assert.False(dev.Power);
+        Assert.All(host.Contexts().Contexts, c => Assert.True(c.ReadOnly));
+    }
+
+    [Fact]
+    public void Without_readonly_a_context_connects_as_saved()
+    {
+        var (host, store) = Host(Config.Replace("endpoint = \"localhost\"", "endpoint = \"localhost\"\npower = true"));
+
+        var dev = host.Resolve(store.Find("dev")!).Context;
+        Assert.False(dev.ReadOnly);
+        Assert.True(dev.Power);
+        Assert.True(host.Resolve(store.Find("prod-weu")!).Context.ReadOnly);
     }
 
     [Fact]
