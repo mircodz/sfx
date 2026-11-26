@@ -595,6 +595,21 @@ public sealed class WebLifecycleTests : IDisposable
         Assert.Equal("'P/a.txt' is in the upload twice.", twice.Message);
     }
 
+    [Fact]
+    public async Task An_upload_cut_short_says_so_rather_than_that_a_file_is_in_it_twice()
+    {
+        using var form = new MultipartFormDataContent { { new StringContent(new string('x', 10_000)), "files", "P/a.txt" } };
+        var boundary = form.Headers.ContentType!.Parameters.Single(p => p.Name == "boundary").Value!.Trim('"');
+        var bytes = await form.ReadAsByteArrayAsync();
+        using var body = new MemoryStream(bytes, 0, bytes.Length / 2);
+
+        var ex = await Assert.ThrowsAsync<ActionException>(() =>
+            ApiImageStore.ReceiveAsync(new MultipartReader(boundary, body), Path.Combine(_scratch, "files"), default));
+
+        Assert.StartsWith("Couldn't receive 'P/a.txt': ", ex.Message);
+        Assert.Equal(500, ex.Status);
+    }
+
     [Theory]
     [InlineData(null, "MyAppType_1.2.0")]
     [InlineData(" /Apps\\Shop/ ", "Apps/Shop")]

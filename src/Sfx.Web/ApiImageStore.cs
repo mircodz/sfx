@@ -260,17 +260,19 @@ internal static class ApiImageStore
             {
                 throw new ActionException($"'{fileName}' isn't a path inside the package.");
             }
+            if (File.Exists(destination) || Directory.Exists(destination) || saved.Any(p => relative.StartsWith(p + "/", StringComparison.Ordinal)))
+            {
+                throw new ActionException($"'{relative}' is in the upload twice.");
+            }
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                 await using var file = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true);
                 await section.Body.CopyToAsync(file, ct);
             }
-            catch (IOException) when (File.Exists(destination) || Directory.Exists(destination) || saved.Any(p => relative.StartsWith(
-                p + "/",
-                StringComparison.Ordinal)))
+            catch (IOException ex) when (!ct.IsCancellationRequested)
             {
-                throw new ActionException($"'{relative}' is in the upload twice.");
+                throw new ActionException($"Couldn't receive '{relative}': {ex.Message}", StatusCodes.Status500InternalServerError);
             }
             saved.Add(relative);
         }
