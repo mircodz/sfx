@@ -79,6 +79,78 @@ public class WebActionTests
         Assert.Equal(400, ex.Status);
     }
 
+    private static Dictionary<string, string> Service => new()
+    {
+        ["serviceId"] = "shop~Counter",
+        ["applicationId"] = "shop",
+        ["name"] = "fabric:/shop/Counter",
+        ["kind"] = "Stateful",
+        ["count"] = "3",
+        ["min"] = "2",
+    };
+
+    [Fact]
+    public async Task Recovering_a_services_partitions_is_a_power_action_with_its_name_typed()
+    {
+        Assert.DoesNotContain(WebActions.For(Session(), "service", Service), a => a.Id == "service.recover");
+
+        var session = Session(power: true);
+        var recover = WebActions.For(session, "service", Service).Single(a => a.Id == "service.recover");
+        Assert.Equal("destructive", recover.Risk);
+        Assert.Equal("fabric:/shop/Counter", recover.ConfirmText);
+
+        var ex = await Assert.ThrowsAsync<ActionException>(() =>
+            WebActions.RunAsync(session, recover.Id, new ActionRequest(new(recover.Target), null, null, recover.Signature), default));
+        Assert.Equal("Type 'fabric:/shop/Counter' to confirm.", ex.Message);
+    }
+
+    private static UiSession Session(FakeCluster cluster)
+    {
+        var context = new ClusterContext("test", "localhost", [], new AuthOptions(), false, true);
+        var session = new ClusterSession(context, new Uri("http://localhost:19080"), new ClusterQueries(cluster.Client));
+        return new UiSession(session, new ActionLog(Path.Combine(Path.GetTempPath(), $"sfx-test-{Guid.NewGuid():N}.log")), "0.0.0");
+    }
+
+    [Fact]
+    public async Task A_change_runs_to_the_end_when_the_tab_goes_away()
+    {
+        using var tab = new CancellationTokenSource();
+        bool? cancelled = null;
+        var cluster = new FakeCluster().OnCall("RecoverServicePartitionsAsync", args =>
+        {
+            tab.Cancel();
+            cancelled = ((CancellationToken)args[^1]!).IsCancellationRequested;
+        });
+        var session = Session(cluster);
+        var recover = WebActions.For(session, "service", Service).Single(a => a.Id == "service.recover");
+
+        var request = new ActionRequest(new(recover.Target), null, "fabric:/shop/Counter", recover.Signature);
+        var result = await WebActions.RunAsync(session, recover.Id, request, tab.Token);
+
+        Assert.False(cancelled);
+        Assert.Equal("Recover the partitions of fabric:/shop/Counter", result.Message);
+        Assert.Equal("ok", session.ReadLog(1).Single().Outcome);
+        Assert.Equal("Recover the partitions of fabric:/shop/Counter", session.GetOperations().Single().Title);
+    }
+
+    [Fact]
+    public async Task Stopping_sfx_ui_stops_a_change_and_logs_it()
+    {
+        var cluster = new FakeCluster().OnCall("RecoverServicePartitionsAsync", args => ((CancellationToken)args[^1]!).ThrowIfCancellationRequested());
+        var session = Session(cluster);
+        var recover = WebActions.For(session, "service", Service).Single(a => a.Id == "service.recover");
+
+        var ex = await Assert.ThrowsAsync<ActionException>(() => WebActions.RunAsync(
+            session,
+            recover.Id,
+            new ActionRequest(new(recover.Target), null, "fabric:/shop/Counter", recover.Signature),
+            default,
+            new CancellationToken(canceled: true)));
+
+        Assert.Equal(504, ex.Status);
+        Assert.Equal("sfx ui stopped; check the cluster", session.ReadLog(1).Single().Outcome);
+    }
+
     [Fact]
     public async Task Power_can_be_turned_off_under_an_offered_action()
     {

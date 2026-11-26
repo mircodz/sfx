@@ -24,7 +24,17 @@ public static class WebServer
 {
     public const string TokenHeader = "X-Sfx-Token";
 
-    public static async Task<int> RunAsync(UiHost host, WebOptions options, CancellationToken cancellationToken)
+    /// <summary>The connection (<see cref="UiSession.Id"/>): the tab sends the one it shows, every answer carries the current one.</summary>
+    public const string SessionHeader = "X-Sfx-Session";
+
+    /// <summary>How long the page the browser is opened on stays; the browser reads it at once.</summary>
+    private static readonly TimeSpan LaunchPageLifetime = TimeSpan.FromSeconds(60);
+
+    public static Task<int> RunAsync(UiHost host, WebOptions options, CancellationToken cancellationToken) =>
+        RunAsync(host, options, Open, cancellationToken);
+
+    /// <param name="open">Opens a file in the browser; what's passed shows on a command line.</param>
+    internal static async Task<int> RunAsync(UiHost host, WebOptions options, Action<string> open, CancellationToken cancellationToken)
     {
         // A short configured token would be guessable; anything under 16 characters gets a random one instead.
         var token = options.Token is { Length: >= 16 } configured ? configured : Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24));
@@ -55,6 +65,8 @@ public static class WebServer
                 return;
             }
 
+            // So a tab notices a switch made elsewhere (another tab) on its next poll.
+            context.Response.Headers[SessionHeader] = host.Current.Id;
             try
             {
                 await next(context);
@@ -110,14 +122,15 @@ public static class WebServer
             return 1;
         }
         var port = new Uri(app.Urls.First()).Port;
-        var url = $"http://127.0.0.1:{port}/?token={token}";
         var session = host.Current;
         Console.WriteLine($"sfx ui for {session.Context.Name} ({session.Cluster.Endpoint}){(session.ReadOnly ? ", read-only" : "")}; switch contexts in the browser");
+        var url = $"http://127.0.0.1:{port}/?token={Uri.EscapeDataString(token)}";
         Console.WriteLine($"  {url}");
         Console.WriteLine("Press Ctrl+C to stop.");
-        if (options.OpenBrowser)
+        using var page = options.OpenBrowser ? LaunchPage.Write(url, LaunchPageLifetime) : null;
+        if (page is not null)
         {
-            Open(url);
+            open(page.Path);
         }
 
         await app.WaitForShutdownAsync(cancellationToken);
@@ -168,11 +181,11 @@ public static class WebServer
         await stream.CopyToAsync(context.Response.Body, context.RequestAborted);
     }
 
-    private static void Open(string url)
+    private static void Open(string path)
     {
         try
         {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
         }
         catch (Exception)
         {

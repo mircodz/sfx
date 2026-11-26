@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.ServiceFabric.Client;
 using Microsoft.ServiceFabric.Common;
 
@@ -90,8 +91,8 @@ public sealed class DeployedQueries(IServiceFabricClient client)
                 main?.ProcessId ?? "",
                 main?.InstanceId ?? "",
                 stats?.LastExitCode ?? "",
-                long.TryParse(stats?.ActivationCount, out var activations) ? activations : 0,
-                long.TryParse(stats?.ActivationFailureCount, out var failures) ? failures : 0,
+                long.TryParse(stats?.ActivationCount, CultureInfo.InvariantCulture, out var activations) ? activations : 0,
+                long.TryParse(stats?.ActivationFailureCount, CultureInfo.InvariantCulture, out var failures) ? failures : 0,
                 c);
         }).ToList();
     }

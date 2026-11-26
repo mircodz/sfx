@@ -58,7 +58,7 @@ internal static class ApiImageStore
 
     private static readonly TimeSpan UploadTimeout = TimeSpan.FromHours(6);
 
-    public static void Map(RouteGroupBuilder api)
+    public static void Map(RouteGroupBuilder api, UiHost host)
     {
         api.MapGet("/store", async (UiSession s, string? path, CancellationToken ct) =>
         {
@@ -76,7 +76,12 @@ internal static class ApiImageStore
 
         api.MapGet("/store/size", async (UiSession s, string? path, CancellationToken ct) => new StoreSizeDto(await s.GetFolderSizeAsync(path ?? "", ct)));
 
-        api.MapPost("/store/upload", (UiSession s, HttpContext context) => UploadAsync(s, context));
+        api.MapPost("/store/upload", (UiSession s, HttpContext context) =>
+        {
+            // Before reading the body: a package meant for the cluster the tab shows mustn't land on another.
+            host.Expect(s, context);
+            return UploadAsync(s, context);
+        });
     }
 
     internal static StoreDto Listing(
@@ -255,17 +260,19 @@ internal static class ApiImageStore
             {
                 throw new ActionException($"'{fileName}' isn't a path inside the package.");
             }
+            if (File.Exists(destination) || Directory.Exists(destination) || saved.Any(p => relative.StartsWith(p + "/", StringComparison.Ordinal)))
+            {
+                throw new ActionException($"'{relative}' is in the upload twice.");
+            }
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                 await using var file = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true);
                 await section.Body.CopyToAsync(file, ct);
             }
-            catch (IOException) when (File.Exists(destination) || Directory.Exists(destination) || saved.Any(p => relative.StartsWith(
-                p + "/",
-                StringComparison.Ordinal)))
+            catch (IOException ex) when (!ct.IsCancellationRequested)
             {
-                throw new ActionException($"'{relative}' is in the upload twice.");
+                throw new ActionException($"Couldn't receive '{relative}': {ex.Message}", StatusCodes.Status500InternalServerError);
             }
             saved.Add(relative);
         }

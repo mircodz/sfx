@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
+import { switchAbandoned, switchAnnounced, switchFailed, switchStarted } from "../lib/connection";
 import { plural } from "../lib/format";
 import { useNotice } from "../lib/notice";
 import { recentContexts, rememberContext } from "../lib/recent";
@@ -50,11 +51,22 @@ export function Contexts() {
         return () => clearInterval(id);
     }, [connecting, contexts.reload]);
 
+    // Left while connecting: the switch may still complete, and the tab then says so itself.
+    useEffect(() => switchAbandoned, []);
+
+    useEffect(() => {
+        if (connecting?.error && target.current === connecting.context) {
+            target.current = null;
+            switchFailed();
+        }
+    }, [connecting]);
+
     // Connected: remember it, refresh everything for the new cluster, and open its overview.
     useEffect(() => {
         const name = target.current;
         if (name && contexts.data && !contexts.data.connecting && contexts.data.current === name) {
             target.current = null;
+            switchAnnounced(contexts.data.session);
             rememberContext(name);
             notify(`Switched to ${name}.`, true);
             bump();
@@ -65,15 +77,19 @@ export function Contexts() {
     const connect = async (name: string) => {
         try {
             target.current = name;
+            switchStarted(name);
             await api.connect(name);
             contexts.reload();
         } catch (e) {
             target.current = null;
+            switchFailed();
             notify(e instanceof Error ? e.message : String(e), false);
         }
     };
 
     const dismiss = async () => {
+        target.current = null;
+        switchFailed();
         await api.dismissConnect();
         contexts.reload();
     };

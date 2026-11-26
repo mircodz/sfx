@@ -8,6 +8,9 @@ namespace Sfx.Web;
 /// <param name="resolved">The context after folder rules, with its folder's label and color.</param>
 public sealed partial class UiSession(ClusterSession session, ActionLog log, string version, ResolvedContext? resolved = null)
 {
+    /// <summary>This connection, as tabs know it: a switch, even back to the same context, makes a new one.</summary>
+    public string Id { get; } = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+
     public string? Label => resolved?.Label;
     public string? Color => resolved?.Color;
     public ClusterSession Cluster => session;

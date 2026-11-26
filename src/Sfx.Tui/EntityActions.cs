@@ -264,14 +264,15 @@ public sealed partial class Views
 
         new(
             "Recover the service's partitions",
-            ActionRisk.Confirm,
+            ActionRisk.Destructive,
             s => host.Run(Op(
                 $"Recover the partitions of {s.Name}",
                 s.Name,
-                ActionRisk.Confirm,
+                ActionRisk.Destructive,
                 ct => _ops.RecoverServicePartitionsAsync(s.Id, ct),
                 "Partitions stuck in quorum loss are forced out of it; recent writes may be lost.")),
-            Commands: ["recover"]),
+            Commands: ["recover"],
+            Power: true),
 
         new(
             "Delete service",

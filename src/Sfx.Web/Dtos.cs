@@ -5,6 +5,7 @@ namespace Sfx.Web;
 
 // Health is always one of the UI's words: Healthy, Warning, Error or Unknown.
 
+/// <param name="Id">The connection the tab shows; it sends this back with every request, and changes need it to be current.</param>
 /// <param name="EventStore">Whether the cluster runs the event store; without it there are no events to show.</param>
 /// <param name="RepairManager">Whether it runs the repair manager; without it there are no repair tasks.</param>
 /// <param name="FaultAnalysis">Whether it runs the Fault Analysis Service, which stopping nodes and restarting partitions need.</param>
@@ -13,6 +14,7 @@ namespace Sfx.Web;
 /// isn't the native one (a file share or Azure blob storage).
 /// </param>
 public sealed record SessionDto(
+    string Id,
     string Context,
     string Endpoint,
     bool ReadOnly,

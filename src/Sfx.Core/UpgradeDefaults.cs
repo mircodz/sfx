@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Xml.Linq;
 using Microsoft.ServiceFabric.Common;
 
@@ -53,7 +54,7 @@ public static class UpgradeDefaults
     }
 
     private static int Percent(XElement? element, string attribute) =>
-        int.TryParse((string?)element?.Attribute(attribute), out var value) ? value : 0;
+        int.TryParse((string?)element?.Attribute(attribute), CultureInfo.InvariantCulture, out var value) ? value : 0;
 
     /// <summary>The health policies the application manifest sets for particular service types, by service type name.</summary>
     public static IReadOnlyDictionary<string, ServiceTypeHealthPolicy> ServiceTypeHealthPolicies(string applicationManifest)
@@ -78,15 +79,16 @@ public static class UpgradeDefaults
             .SelectMany(s => s.Parameters)
             .ToList();
         string? Value(string name) => parameters.LastOrDefault(p => p.Name == name)?.Value;
-        int Int(string name) => int.TryParse(Value(name), out var value) ? value : 0;
+        int Int(string name) => int.TryParse(Value(name), CultureInfo.InvariantCulture, out var value) ? value : 0;
 
         return new ClusterHealthPolicyDefaults(
             string.Equals(Value("ConsiderWarningAsError"), "true", StringComparison.OrdinalIgnoreCase),
             Int("MaxPercentUnhealthyNodes"),
             Int("MaxPercentUnhealthyApplications"),
             parameters
-                .Where(p => p.Name.StartsWith(perType, StringComparison.Ordinal) && p.Name.Length > perType.Length && int.TryParse(p.Value, out _))
+                .Where(p => p.Name.StartsWith(perType, StringComparison.Ordinal) && p.Name.Length > perType.Length
+                    && int.TryParse(p.Value, CultureInfo.InvariantCulture, out _))
                 .GroupBy(p => p.Name[perType.Length..])
-                .ToDictionary(g => g.Key, g => int.Parse(g.Last().Value)));
+                .ToDictionary(g => g.Key, g => int.Parse(g.Last().Value, CultureInfo.InvariantCulture)));
     }
 }

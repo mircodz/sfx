@@ -173,9 +173,10 @@ public static class Confirmations
     /// <summary>How many of a batch's operations the confirmation lists by name.</summary>
     public const int Listed = 8;
 
-    /// <summary>y/n, or typing the target for a destructive operation; its options are toggles.</summary>
-    public static ConfirmDialog For(Operation operation) =>
-        new(operation.Title)
+    /// <summary>y/n, or typing the target for a destructive operation; its options are toggles. The headline starts
+    /// with the <paramref name="cluster"/> it runs on.</summary>
+    public static ConfirmDialog For(string cluster, Operation operation) =>
+        new($"{cluster}: {operation.Title}")
         {
             Details = operation.Details,
             Warning = operation.Warning,
@@ -185,7 +186,7 @@ public static class Confirmations
         };
 
     /// <summary>One confirmation for them all: lists them, and a destructive batch asks to type how many there are.</summary>
-    public static ConfirmDialog ForBatch(string title, IReadOnlyList<Operation> operations, string? note)
+    public static ConfirmDialog ForBatch(string cluster, string title, IReadOnlyList<Operation> operations, string? note)
     {
         var details = operations.Take(Listed).Select(operation => StyledText.Of("  " + operation.Title).Fg(Theme.Current.Foreground)).ToList();
         if (operations.Count > Listed)
@@ -197,7 +198,7 @@ public static class Confirmations
             details.Add(Styles.Muted(note));
         }
 
-        return new ConfirmDialog(title)
+        return new ConfirmDialog($"{cluster}: {title}")
         {
             Details = details,
             Warning = (operations[0].Warning is { } warning ? warning + " " : "") + "They run one after another, and stop at the first that fails.",
