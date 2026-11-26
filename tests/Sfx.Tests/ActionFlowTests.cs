@@ -166,6 +166,28 @@ public class EntityActionTests
     }
 
     [Fact]
+    public void Every_quorum_loss_recovery_is_a_power_action_confirmed_by_typing_its_target()
+    {
+        var app = new ApplicationRow("App", "fabric:/App", "AppType", "1.0", "Ready", HealthState.Ok);
+        var service = Service("Stateful");
+        static bool Recovery(string title) => title.StartsWith("Recover", StringComparison.Ordinal);
+        List<(ActionRisk, bool)> recoveries =
+        [
+            .. _views.ServiceActions(app).Where(a => Recovery(a.Title)).Select(a => (a.Risk, a.Power)),
+            .. _views.PartitionActions(service).Where(a => Recovery(a.Title)).Select(a => (a.Risk, a.Power)),
+            .. _views.ClusterActions().Where(a => Recovery(a.Title)).Select(a => (a.Risk, a.Power)),
+        ];
+
+        Assert.Equal(4, recoveries.Count);
+        Assert.All(recoveries, recovery => Assert.Equal((ActionRisk.Destructive, true), recovery));
+
+        _views.ServiceActions(app).Single(a => a.Title == "Recover the service's partitions").Run(service);
+        var operation = Assert.Single(_host.Operations);
+        Assert.Equal(ActionRisk.Destructive, operation.Risk);
+        Assert.Equal(service.Name, operation.Target);
+    }
+
+    [Fact]
     public void Power_actions_are_marked_and_bound_keys_stay_consistent()
     {
         var replica = _views.ReplicaActions(Service("Stateful"), Partition);
