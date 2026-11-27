@@ -5,6 +5,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Sfx.Cli\Sfx.Cli.csproj" />
     <ProjectReference Include="..\Sfx.Core\Sfx.Core.csproj" />
     <ProjectReference Include="..\Sfx.Web\Sfx.Web.csproj" />
   </ItemGroup>
