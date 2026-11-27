@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sfx.Core\Sfx.Core.csproj" />
+    <ProjectReference Include="..\Sfx.Web\Sfx.Web.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sfx.Tests" />
+  </ItemGroup>
+
+</Project>

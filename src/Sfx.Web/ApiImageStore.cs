@@ -60,21 +60,9 @@ internal static class ApiImageStore
 
     public static void Map(RouteGroupBuilder api, UiHost host)
     {
-        api.MapGet("/store", async (UiSession s, string? path, CancellationToken ct) =>
-        {
-            var folder = ImageStore.Normalize(path);
-            var root = folder.Length == 0;
-            var listing = s.ImageStore.GetContentAsync(folder, ct);
-            var kind = KindAsync(s, ct);
-            var usage = root ? s.ImageStore.GetUsageAsync(ct) : Task.FromResult<ImageStoreUsage?>(null);
-            var packages = root ? PackagesAsync(
-                s,
-                ct) : Task.FromResult<IReadOnlyDictionary<string, ImageStorePackage>>(new Dictionary<string, ImageStorePackage>());
-            var l = await listing;
-            return Listing(s, l, await kind, await usage, await packages);
-        });
+        api.MapGet("/store", (UiSession s, string? path, CancellationToken ct) => ApiReads.StoreAsync(s, path, ct));
 
-        api.MapGet("/store/size", async (UiSession s, string? path, CancellationToken ct) => new StoreSizeDto(await s.GetFolderSizeAsync(path ?? "", ct)));
+        api.MapGet("/store/size", (UiSession s, string? path, CancellationToken ct) => ApiReads.StoreSizeAsync(s, path, ct));
 
         api.MapPost("/store/upload", (UiSession s, HttpContext context) =>
         {
@@ -132,7 +120,7 @@ internal static class ApiImageStore
         ["provision"] = provision ? "true" : "false",
     };
 
-    private static async Task<string> KindAsync(UiSession s, CancellationToken ct)
+    internal static async Task<string> KindAsync(UiSession s, CancellationToken ct)
     {
         try
         {
@@ -145,7 +133,7 @@ internal static class ApiImageStore
     }
 
     /// <summary>None when they can't be told, so the listing still shows.</summary>
-    private static async Task<IReadOnlyDictionary<string, ImageStorePackage>> PackagesAsync(UiSession s, CancellationToken ct)
+    internal static async Task<IReadOnlyDictionary<string, ImageStorePackage>> PackagesAsync(UiSession s, CancellationToken ct)
     {
         try
         {

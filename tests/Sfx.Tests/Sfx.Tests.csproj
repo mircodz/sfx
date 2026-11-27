@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Sfx.Cli\Sfx.Cli.csproj" />
     <ProjectReference Include="..\..\src\Sfx.Core\Sfx.Core.csproj" />
     <ProjectReference Include="..\..\src\Sfx.Tui\Sfx.Tui.csproj" />
     <ProjectReference Include="..\..\src\Sfx.Web\Sfx.Web.csproj" />

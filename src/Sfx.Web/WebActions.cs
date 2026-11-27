@@ -458,6 +458,12 @@ internal static class WebActions
 
     private static readonly Dictionary<string, ActionDef> ById = All.ToDictionary(a => a.Id);
 
+    /// <summary>Whether the action is offered only with power on.</summary>
+    internal static bool NeedsPower(string id) => ById.TryGetValue(id, out var action) && action.Power;
+
+    /// <summary>Whether some of the actions on this kind of entity are offered only with power on.</summary>
+    internal static bool HasPowerActions(string kind) => All.Any(a => a.Kind == kind && a.Power);
+
     /// <summary>The actions this session may run on one entity.</summary>
     public static IReadOnlyList<ActionDto> For(UiSession session, string kind, IReadOnlyDictionary<string, string> target)
     {

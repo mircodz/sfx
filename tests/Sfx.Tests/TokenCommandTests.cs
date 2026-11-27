@@ -88,4 +88,32 @@ public class TokenCommandTests
         Assert.True(ClaimsCommandAuthProvider.IsSet(options, "interactive"));
         Assert.True(provider.Options.Single(o => o.Name == "interactive").IsFlag);
     }
+
+    [Fact]
+    public async Task Off_a_terminal_never_asks_the_command_to_prompt()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        var notes = new List<string>();
+        Task Note(string message)
+        {
+            notes.Add(message);
+            return Task.CompletedTask;
+        }
+        ClaimsCommandAuth Auth(string script)
+        {
+            var options = new AuthOptions();
+            options.Add("server-cn", "server.example.com");
+            options.Add("interactive", "true");
+            options.Add("token-command", $"sh -c \"{script}\"");
+            return (ClaimsCommandAuth)new ClaimsCommandAuthProvider().Create(new AuthContext(options, Note, Interactive: false));
+        }
+
+        Assert.Contains("\"interactive\":false", await Auth("cat").GetTokenAsync(Metadata, CancellationToken.None));
+        // A silent sign-in that fails doesn't fall back to prompting.
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Auth("cat >/dev/null; exit 3").GetTokenAsync(Metadata, CancellationToken.None));
+        Assert.Empty(notes);
+    }
 }

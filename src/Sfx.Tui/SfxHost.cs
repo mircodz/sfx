@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text;
 using Cellar.Terminal;
 using Cellar.Widgets;
+using Sfx.Cli;
 using Sfx.Core;
 using Sfx.Core.Auth;
 using Sfx.Web;
@@ -29,11 +30,22 @@ public static class SfxHost
         AnsiTerminal? terminal = null;
         try
         {
-            options = CommandLine.Parse(args, flags);
+            var (cli, rest) = CliOptions.Split(args);
+            options = CommandLine.Parse(rest, flags);
             if (options.ShowVersion)
             {
                 Console.WriteLine(Version);
                 return 0;
+            }
+
+            if (options.Arguments is [var command, ..] && Scripting.IsCommand(command))
+            {
+                return await RunScriptingAsync(options, cli, () => ContextStore.Load(), connector, CliConsole.Standard(), CancellationToken.None);
+            }
+
+            if (cli.Given is { } given)
+            {
+                throw new UsageException($"{given} only applies to sfx {string.Join(", ", Scripting.Commands)}.");
             }
 
             if (options.ShowHelp)
@@ -69,7 +81,12 @@ public static class SfxHost
             context = SelectContext(options, store);
             connector.Resolve(context);
         }
-        catch (Exception ex) when (ex is UsageException or AuthConfigurationException)
+        catch (Exception ex) when (ex is UsageException or AuthConfigurationException or CliFailure && args.Any(Scripting.IsCommand))
+        {
+            terminal?.Dispose();
+            return Scripting.Fail(args, ex.Message, Console.Error);
+        }
+        catch (Exception ex) when (ex is UsageException or AuthConfigurationException or CliFailure)
         {
             terminal?.Dispose();
             return UsageError(ex.Message, connector.Providers);
@@ -102,7 +119,7 @@ public static class SfxHost
         catch (Exception ex)
         {
             terminal?.Dispose();
-            Console.Error.WriteLine($"sfx: could not connect to {context.Name}: {ex.GetBaseException().Message}");
+            Console.Error.WriteLine($"sfx: could not connect to {context.Name}: {ClusterConnector.Describe(ex)}");
             return 1;
         }
 
@@ -120,6 +137,74 @@ public static class SfxHost
         await app.RunAsync(CancellationToken.None);
         return 0;
     }
+
+    /// <summary>
+    /// A scripting command (<c>sfx get</c>, …): only prompts to sign in on a terminal, and only loads the contexts and connects once the arguments
+    /// check out. The cluster: <c>--endpoint</c> (with <c>--auth</c>), else <c>-c</c>, else the active context.
+    /// </summary>
+    internal static Task<int> RunScriptingAsync(
+        CommandLineOptions options,
+        CliOptions cli,
+        Func<ContextStore> loadStore,
+        ClusterConnector connector,
+        CliConsole console,
+        CancellationToken cancellationToken)
+    {
+        async Task<UiSession> ConnectAsync(CancellationToken ct)
+        {
+            var store = loadStore();
+            if (cli.Endpoint is null && options.Context is null && store.Active is null)
+            {
+                throw CliFailure.Usage("No cluster given and no active context. Pass -c <context> or --endpoint <endpoint>, or run 'sfx context add'.");
+            }
+
+            ClusterContext context;
+            try
+            {
+                context = SelectContext(options with { Arguments = cli.Endpoint is null ? [] : [cli.Endpoint] }, store);
+            }
+            catch (UsageException ex)
+            {
+                throw CliFailure.Usage(ex.Message);
+            }
+            connector.Resolve(context);
+
+            ClusterSession session;
+            try
+            {
+                session = await connector.ConnectAsync(
+                    context,
+                    message =>
+                    {
+                        console.Error.WriteLine(message);
+                        return Task.CompletedTask;
+                    },
+                    ct,
+                    console.Interactive);
+            }
+            catch (Exception ex) when (Find<SignInNeedsPersonException>(ex) is { } needs)
+            {
+                throw new CliFailure(
+                    $"signing in to {context.Name} needs a person ({needs.How}); run it in a terminal, or use cert or a token command",
+                    ExitCode.CannotConnect);
+            }
+            catch (Exception ex) when (ex is not (AuthConfigurationException or FormatException) && !ct.IsCancellationRequested)
+            {
+                throw new CliFailure($"could not connect to {context.Name}: {ClusterConnector.Describe(ex)}", ExitCode.CannotConnect);
+            }
+            return new UiSession(session, new ActionLog(ActionLogPath(store)), Version);
+        }
+
+        return Scripting.RunAsync(options.Arguments, cli, options.ShowHelp, ConnectAsync, console, cancellationToken);
+    }
+
+    private static T? Find<T>(Exception? ex) where T : Exception => ex switch
+    {
+        null => null,
+        T found => found,
+        AggregateException all => all.InnerExceptions.Select(Find<T>).FirstOrDefault(e => e is not null),
+        _ => Find<T>(ex.InnerException),
+    };
 
     /// <summary>Where every change made through sfx is recorded.</summary>
     public static string ActionLogPath(ContextStore store) =>
@@ -180,6 +265,7 @@ public static class SfxHost
         text.AppendLine("       sfx <endpoint> [--auth <methods>] [options]  open a cluster directly");
         text.AppendLine("       sfx context <command>                        manage saved contexts");
         text.AppendLine("       sfx ui [<endpoint> | -c <context>]           open the cluster in the browser instead");
+        text.AppendLine("       sfx get|describe|health|actions|store ...    read the cluster from scripts (see below)");
         text.AppendLine();
         text.AppendLine("  <endpoint>              host, host:port or URL (default port 19080)");
         text.AppendLine("  --auth <methods>        auth methods, applied in order (default: none)");
@@ -189,6 +275,12 @@ public static class SfxHost
         text.AppendLine("  --version               print the version");
         text.AppendLine("  --port <n>              sfx ui: port to listen on, on 127.0.0.1 (default: any free one)");
         text.AppendLine("  --no-browser            sfx ui: print the link instead of opening it");
+        text.AppendLine();
+        text.AppendLine("scripting:");
+        foreach (var line in Scripting.Usage.Split('\n'))
+        {
+            text.AppendLine(line.Trim().Length == 0 ? "" : "  " + line.TrimEnd());
+        }
         text.AppendLine();
         text.AppendLine("contexts:");
         foreach (var line in ContextCommand.Usage.Split('\n'))

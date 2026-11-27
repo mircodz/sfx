@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Sfx.Cli" />
     <InternalsVisibleTo Include="Sfx.Tests" />
   </ItemGroup>
 

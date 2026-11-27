@@ -51,16 +51,37 @@ public sealed class ClusterConnector
             : throw new AuthConfigurationException($"--{unknown} isn't an option of auth '{string.Join(",", names)}'.");
     }
 
-    public async Task<ClusterSession> ConnectAsync(ClusterContext context, Func<string, Task> notify, CancellationToken cancellationToken)
+    /// <param name="interactive">Whether sign-in may prompt; see <see cref="AuthContext.Interactive"/>.</param>
+    public async Task<ClusterSession> ConnectAsync(
+        ClusterContext context,
+        Func<string, Task> notify,
+        CancellationToken cancellationToken,
+        bool interactive = true)
     {
         var providers = Resolve(context);
         var endpoint = ClusterEndpoint.Parse(context.Endpoint, providers.Any(p => p.RequiresTls));
-        var auth = new AuthContext(context.Options, notify);
+        var auth = new AuthContext(context.Options, notify, interactive);
         var connection = new ClusterConnection(endpoint, providers.Select(p => p.Create(auth)).ToList());
 
         var queries = new ClusterQueries(await ClusterClientFactory.CreateAsync(connection, cancellationToken));
         // One real call, so auth and network errors surface here rather than on the first screen.
         await queries.GetNodesAsync(cancellationToken);
         return new ClusterSession(context, endpoint, queries);
+    }
+
+    /// <summary>
+    /// Why connecting (or a call) failed, in a line. Call it only when the caller didn't cancel: then a cancellation is the
+    /// client's own timeout, which would otherwise read "A task was canceled."
+    /// </summary>
+    public static string Describe(Exception ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            if (e is OperationCanceledException or TimeoutException)
+            {
+                return $"timed out after {ClusterClientFactory.Timeout.TotalSeconds:0}s";
+            }
+        }
+        return ex.GetBaseException().Message;
     }
 }

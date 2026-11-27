@@ -56,4 +56,40 @@ public class CoreTests
 
         Assert.Throws<AuthConfigurationException>(() => new CertificateAuthProvider().Create(context));
     }
+
+    [Fact]
+    public async Task Aad_off_a_terminal_fails_rather_than_starting_a_device_code()
+    {
+        var options = new AuthOptions();
+        options.Add("server-cn", "cluster");
+        var notified = false;
+        var auth = (AadAuth)new AadAuthProvider().Create(new AuthContext(
+            options,
+            _ =>
+            {
+                notified = true;
+                return Task.CompletedTask;
+            },
+            Interactive: false));
+        var metadata = new AadMetadata(
+            "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+            "00000000-0000-0000-0000-000000000003",
+            "https://login.microsoftonline.com",
+            "urn:ietf:wg:oauth:2.0:oob",
+            "00000000-0000-0000-0000-000000000001");
+
+        var error = await Assert.ThrowsAsync<SignInNeedsPersonException>(() => auth.GetTokenAsync(metadata, CancellationToken.None));
+
+        Assert.Equal("device code", error.How);
+        Assert.False(notified);
+    }
+
+    [Fact]
+    public void Natural_order_reads_numbers_as_numbers_and_ignores_case()
+    {
+        string[] names = ["_Node_10", "b", "_Node_2", "1.10.0", "A", "_node_1", "1.9.0", "x02", "x1"];
+
+        Assert.Equal(["1.9.0", "1.10.0", "_node_1", "_Node_2", "_Node_10", "A", "b", "x1", "x02"], names.Order(NaturalComparer.Instance));
+    }
 }

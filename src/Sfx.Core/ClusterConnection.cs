@@ -8,11 +8,14 @@ public sealed record ClusterConnection(Uri Endpoint, IReadOnlyList<IClusterAuth>
 
 public static class ClusterClientFactory
 {
+    /// <summary>How long one call to the cluster may take.</summary>
+    public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+
     public static Task<IServiceFabricClient> CreateAsync(ClusterConnection connection, CancellationToken cancellationToken = default)
     {
         var builder = new ServiceFabricClientBuilder()
             .UseEndpoints(connection.Endpoint)
-            .ConfigureClientSettings(settings => settings.ClientTimeout = TimeSpan.FromSeconds(30));
+            .ConfigureClientSettings(settings => settings.ClientTimeout = Timeout);
 
         foreach (var auth in connection.Auth)
         {
