@@ -76,9 +76,10 @@ sfx ui -c prod --port 7080 --no-browser
 
 ### Scripting
 
-`get`, `describe`, `health`, `actions` and `store` read a cluster without a UI and never prompt. They use
+`get`, `describe`, `health`, `actions` and `store` read a cluster without a UI. They use
 `-c <context>`, `--endpoint <endpoint>` (with `--auth`) or the active context. `-o json` prints what the browser
-gets (best effort until 1.0); `-o name` prints names to pass back to sfx.
+gets (best effort until 1.0); `-o name` prints names to pass back to sfx. Off a terminal they never prompt: a
+sign-in that needs a person (`aad`, `claims-command --interactive`) fails instead, so use `cert` or a token command that signs in silently there.
 
 ```bash
 sfx get nodes -c prod --health warning,error

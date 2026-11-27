@@ -190,7 +190,7 @@ public sealed class ClaimsCommandAuthProvider : IClusterAuthProvider
         new ClaimsCommandAuth(
             ServerIdentity.FromOptions(context.Options),
             TokenCommand.Parse(context.Options.Require("token-command")),
-            IsSet(context.Options, Interactive.Name),
+            IsSet(context.Options, Interactive.Name) && context.Interactive,
             context.Notify);
 
     public static bool IsSet(AuthOptions options, string flag) =>

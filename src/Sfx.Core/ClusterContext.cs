@@ -51,11 +51,16 @@ public sealed class ClusterConnector
             : throw new AuthConfigurationException($"--{unknown} isn't an option of auth '{string.Join(",", names)}'.");
     }
 
-    public async Task<ClusterSession> ConnectAsync(ClusterContext context, Func<string, Task> notify, CancellationToken cancellationToken)
+    /// <param name="interactive">Whether sign-in may prompt; see <see cref="AuthContext.Interactive"/>.</param>
+    public async Task<ClusterSession> ConnectAsync(
+        ClusterContext context,
+        Func<string, Task> notify,
+        CancellationToken cancellationToken,
+        bool interactive = true)
     {
         var providers = Resolve(context);
         var endpoint = ClusterEndpoint.Parse(context.Endpoint, providers.Any(p => p.RequiresTls));
-        var auth = new AuthContext(context.Options, notify);
+        var auth = new AuthContext(context.Options, notify, interactive);
         var connection = new ClusterConnection(endpoint, providers.Select(p => p.Create(auth)).ToList());
 
         var queries = new ClusterQueries(await ClusterClientFactory.CreateAsync(connection, cancellationToken));

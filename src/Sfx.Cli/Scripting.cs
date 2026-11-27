@@ -23,7 +23,8 @@ public static class Scripting
         -o <format>    get: table, wide, json or name; describe, health: text or json; actions: table, wide or json; store: json
         <entity>       cluster, node/<name>, fabric:/<app>[/<service>] (fabric:/ optional), partition/<id>,
                        replica/<partition id>/<id>, type/<name>[@<version>], store:/<path>
-        The cluster: -c <context>, --endpoint <endpoint> [--auth <methods>], or the active context. Never prompts.
+        The cluster: -c <context>, --endpoint <endpoint> [--auth <methods>], or the active context.
+        Only prompts (to sign in) when run in a terminal; otherwise a sign-in that needs a person fails with exit 5.
         Exit codes: 0 ok, 1 the cluster call failed or found nothing, 2 usage, 5 couldn't connect or sign in.
         Errors go to stderr: "sfx: <message>", or {"error": "<message>"} with -o json. sfx <command> --help for more.
         """;
@@ -38,8 +39,8 @@ public static class Scripting
     };
 
     /// <summary>
-    /// Runs <paramref name="args"/> (the command first). Checks the arguments before <paramref name="connect"/> is called; never
-    /// prompts. Returns the exit code; see <see cref="ExitCode"/>.
+    /// Runs <paramref name="args"/> (the command first). Checks the arguments before <paramref name="connect"/> is called.
+    /// Returns the exit code; see <see cref="ExitCode"/>.
     /// </summary>
     public static async Task<int> RunAsync(
         IReadOnlyList<string> args,

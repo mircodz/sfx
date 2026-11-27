@@ -31,6 +31,16 @@ public sealed record AuthOptionInfo(string Name, string Description, bool IsFlag
 
 /// <param name="Options">Every option the user passed; a provider reads the ones it declared.</param>
 /// <param name="Notify">Shows a message to the user, e.g. a device code to enter in a browser.</param>
-public sealed record AuthContext(AuthOptions Options, Func<string, Task> Notify);
+/// <param name="Interactive">
+/// Whether someone is there to sign in. When not, a method that would prompt throws <see cref="SignInNeedsPersonException"/>.
+/// </param>
+public sealed record AuthContext(AuthOptions Options, Func<string, Task> Notify, bool Interactive = true);
 
 public sealed class AuthConfigurationException(string message) : Exception(message);
+
+/// <summary>Signing in would prompt, and nobody is there to answer.</summary>
+/// <param name="how">How it would have prompted, e.g. "device code".</param>
+public sealed class SignInNeedsPersonException(string how) : Exception($"Signing in needs a person ({how}).")
+{
+    public string How => how;
+}

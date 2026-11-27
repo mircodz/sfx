@@ -139,7 +139,7 @@ public static class SfxHost
     }
 
     /// <summary>
-    /// A scripting command (<c>sfx get</c>, …): never prompts, and only loads the contexts and connects once the arguments
+    /// A scripting command (<c>sfx get</c>, …): only prompts to sign in on a terminal, and only loads the contexts and connects once the arguments
     /// check out. The cluster: <c>--endpoint</c> (with <c>--auth</c>), else <c>-c</c>, else the active context.
     /// </summary>
     internal static Task<int> RunScriptingAsync(
@@ -179,7 +179,14 @@ public static class SfxHost
                         console.Error.WriteLine(message);
                         return Task.CompletedTask;
                     },
-                    ct);
+                    ct,
+                    console.Interactive);
+            }
+            catch (Exception ex) when (Find<SignInNeedsPersonException>(ex) is { } needs)
+            {
+                throw new CliFailure(
+                    $"signing in to {context.Name} needs a person ({needs.How}); run it in a terminal, or use cert or a token command",
+                    ExitCode.CannotConnect);
             }
             catch (Exception ex) when (ex is not (AuthConfigurationException or FormatException) && !ct.IsCancellationRequested)
             {
@@ -190,6 +197,14 @@ public static class SfxHost
 
         return Scripting.RunAsync(options.Arguments, cli, options.ShowHelp, ConnectAsync, console, cancellationToken);
     }
+
+    private static T? Find<T>(Exception? ex) where T : Exception => ex switch
+    {
+        null => null,
+        T found => found,
+        AggregateException all => all.InnerExceptions.Select(Find<T>).FirstOrDefault(e => e is not null),
+        _ => Find<T>(ex.InnerException),
+    };
 
     /// <summary>Where every change made through sfx is recorded.</summary>
     public static string ActionLogPath(ContextStore store) =>

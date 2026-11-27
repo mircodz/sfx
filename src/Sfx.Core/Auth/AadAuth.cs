@@ -5,8 +5,11 @@ using Microsoft.ServiceFabric.Common.Security;
 
 namespace Sfx.Core.Auth;
 
-/// <summary>Microsoft Entra ID (Azure AD) sign-in using the device code flow, which needs no browser redirect.</summary>
-public sealed class AadAuth(ServerIdentity server, Func<string, Task> notify) : IClusterAuth
+/// <summary>
+/// Microsoft Entra ID (Azure AD) sign-in using the device code flow, which needs no browser redirect. Not
+/// <paramref name="interactive"/>, it only signs in silently.
+/// </summary>
+public sealed class AadAuth(ServerIdentity server, Func<string, Task> notify, bool interactive = true) : IClusterAuth
 {
     private readonly SemaphoreSlim _lock = new(1, 1);
     private IPublicClientApplication? _app;
@@ -15,7 +18,7 @@ public sealed class AadAuth(ServerIdentity server, Func<string, Task> notify) : 
         builder.UseAzureActiveDirectorySecurity(_ => Task.FromResult<SecuritySettings>(
             new AzureActiveDirectorySecuritySettings(GetTokenAsync, server.ToRemoteSettings())));
 
-    private async Task<string> GetTokenAsync(AadMetadata metadata, CancellationToken cancellationToken)
+    internal async Task<string> GetTokenAsync(AadMetadata metadata, CancellationToken cancellationToken)
     {
         // Serialized so concurrent requests don't each start a device code prompt.
         await _lock.WaitAsync(cancellationToken);
@@ -34,6 +37,10 @@ public sealed class AadAuth(ServerIdentity server, Func<string, Task> notify) : 
                 catch (MsalUiRequiredException)
                 {
                 }
+            }
+            if (!interactive)
+            {
+                throw new SignInNeedsPersonException("device code");
             }
 
             var result = await _app
@@ -59,5 +66,5 @@ public sealed class AadAuthProvider : IClusterAuthProvider
     public IReadOnlyList<AuthOptionInfo> Options => ServerIdentity.Options;
 
     public IClusterAuth Create(AuthContext context) =>
-        new AadAuth(ServerIdentity.FromOptions(context.Options), context.Notify);
+        new AadAuth(ServerIdentity.FromOptions(context.Options), context.Notify, context.Interactive);
 }

@@ -752,7 +752,7 @@ public sealed class CliTests : IDisposable
         public IClusterAuth Create(AuthContext context) => create(context);
     }
 
-    private async Task<(int Code, string Error)> Connect(IClusterAuthProvider provider)
+    private async Task<(int Code, string Error)> Connect(IClusterAuthProvider provider, bool interactive = false)
     {
         var store = ContextStore.Load(Path.Combine(_scratch, "config.toml"));
         store.Set(new ClusterContext("prod", "http://prod:19080", [provider.Name], new AuthOptions()));
@@ -765,7 +765,7 @@ public sealed class CliTests : IDisposable
             cli,
             () => ContextStore.Load(store.Path),
             new ClusterConnector([.. BuiltInAuth.Providers, provider]),
-            new CliConsole(TextWriter.Null, error, false),
+            new CliConsole(TextWriter.Null, error, false, interactive),
             default);
         return (code, error.ToString().ReplaceLineEndings("\n"));
     }
@@ -804,5 +804,24 @@ public sealed class CliTests : IDisposable
             ct => Task.FromException<UiSession>(new OperationCanceledException(ct)),
             new CliConsole(TextWriter.Null, TextWriter.Null, false),
             cancel.Token));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Signs_in_interactively_only_on_a_terminal(bool terminal)
+    {
+        bool? interactive = null;
+        var provider = new FailingAuthProvider("sso", auth =>
+        {
+            interactive = auth.Interactive;
+            throw new SignInNeedsPersonException("device code");
+        });
+
+        var (code, error) = await Connect(provider, terminal);
+
+        Assert.Equal(terminal, interactive);
+        Assert.Equal(5, code);
+        Assert.Equal("sfx: signing in to prod needs a person (device code); run it in a terminal, or use cert or a token command\n", error);
     }
 }

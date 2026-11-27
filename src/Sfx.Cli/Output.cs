@@ -6,10 +6,15 @@ using Sfx.Web;
 namespace Sfx.Cli;
 
 /// <summary>Where a scripting command writes. <paramref name="Color"/>: whether to colour health words.</summary>
-public sealed record CliConsole(TextWriter Out, TextWriter Error, bool Color)
+/// <param name="Interactive">Whether stdin and stdout are a terminal, so signing in may prompt.</param>
+public sealed record CliConsole(TextWriter Out, TextWriter Error, bool Color, bool Interactive = false)
 {
     public static CliConsole Standard() =>
-        new(Console.Out, Console.Error, UseColor(!Console.IsOutputRedirected, Environment.GetEnvironmentVariable("NO_COLOR")));
+        new(
+            Console.Out,
+            Console.Error,
+            UseColor(!Console.IsOutputRedirected, Environment.GetEnvironmentVariable("NO_COLOR")),
+            !Console.IsInputRedirected && !Console.IsOutputRedirected);
 
     /// <summary>Only on a terminal, and not when <c>NO_COLOR</c> is set to anything.</summary>
     public static bool UseColor(bool terminal, string? noColor) => terminal && string.IsNullOrEmpty(noColor);

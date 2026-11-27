@@ -56,4 +56,32 @@ public class CoreTests
 
         Assert.Throws<AuthConfigurationException>(() => new CertificateAuthProvider().Create(context));
     }
+
+    [Fact]
+    public async Task Aad_off_a_terminal_fails_rather_than_starting_a_device_code()
+    {
+        var options = new AuthOptions();
+        options.Add("server-cn", "cluster");
+        var notified = false;
+        var auth = (AadAuth)new AadAuthProvider().Create(new AuthContext(
+            options,
+            _ =>
+            {
+                notified = true;
+                return Task.CompletedTask;
+            },
+            Interactive: false));
+        var metadata = new AadMetadata(
+            "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+            "00000000-0000-0000-0000-000000000003",
+            "https://login.microsoftonline.com",
+            "urn:ietf:wg:oauth:2.0:oob",
+            "00000000-0000-0000-0000-000000000001");
+
+        var error = await Assert.ThrowsAsync<SignInNeedsPersonException>(() => auth.GetTokenAsync(metadata, CancellationToken.None));
+
+        Assert.Equal("device code", error.How);
+        Assert.False(notified);
+    }
 }
