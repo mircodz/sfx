@@ -31,18 +31,7 @@ internal static class ApiLifecycle
 {
     public static void Map(RouteGroupBuilder api)
     {
-        api.MapGet("/types", async (UiSession s, CancellationToken ct) =>
-        {
-            var types = s.Queries.GetApplicationTypesAsync(ct);
-            var apps = (await s.Queries.GetApplicationsAsync(ct))
-                .Where(a => a.Id != ClusterQueries.SystemApplicationId)
-                .ToLookup(a => (a.TypeName, a.TypeVersion), a => a.Name);
-            return (await types)
-                .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(t => t.Version, VersionComparer.Instance)
-                .Select(t => Type(s, t, apps[(t.Name, t.Version)].Order(StringComparer.OrdinalIgnoreCase).ToList()))
-                .ToList();
-        });
+        api.MapGet("/types", (UiSession s, CancellationToken ct) => ApiReads.TypesAsync(s, ct));
 
         api.MapGet("/types/{name}/{version}/services", async (UiSession s, string name, string version, CancellationToken ct) =>
             (await s.Queries.GetServiceTypesAsync(name, version, ct))

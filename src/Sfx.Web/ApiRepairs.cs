@@ -21,21 +21,9 @@ public sealed record RepairsDto(IReadOnlyList<RepairDto> Repairs, string? Unavai
 /// <summary>Active repair tasks first, then newest first.</summary>
 internal static class ApiRepairs
 {
-    public static void Map(RouteGroupBuilder api) =>
-        api.MapGet("/repairs", async (UiSession s, CancellationToken ct) =>
-        {
-            try
-            {
-                return new RepairsDto((await s.Repairs.GetRepairTasksAsync(ct)).Select(Repair).ToList(), null);
-            }
-            catch (InvalidOperationException ex)
-            {
-                // RepairQueries throws this when the cluster has no repair manager.
-                return new RepairsDto([], ex.Message);
-            }
-        });
+    public static void Map(RouteGroupBuilder api) => api.MapGet("/repairs", (UiSession s, CancellationToken ct) => ApiReads.RepairsAsync(s, ct));
 
-    private static RepairDto Repair(RepairTaskRow row) => new(
+    internal static RepairDto Repair(RepairTaskRow row) => new(
         row.Id,
         row.Action,
         row.State,
