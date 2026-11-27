@@ -27,6 +27,7 @@ sfx [-c <context>]
 sfx <endpoint> [--auth <methods>] [options]
 sfx context <command>
 sfx ui [<endpoint> | -c <context>]
+sfx get|describe|health|actions|store ...
 ```
 
 ```bash
@@ -72,6 +73,25 @@ readonly = true
 sfx ui -c prod
 sfx ui -c prod --port 7080 --no-browser
 ```
+
+### Scripting
+
+`get`, `describe`, `health`, `actions` and `store` read a cluster without a UI and never prompt. They use
+`-c <context>`, `--endpoint <endpoint>` (with `--auth`) or the active context. `-o json` prints what the browser
+gets (best effort until 1.0); `-o name` prints names to pass back to sfx.
+
+```bash
+sfx get nodes -c prod --health warning,error
+sfx get services orders -o wide
+sfx get partitions fabric:/orders/Counter -o name
+sfx describe node/_Node_0 -o json
+sfx health fabric:/orders            # why it's unhealthy, down to the events
+sfx actions node/_Node_0 --power     # what can be done to it; runs nothing
+sfx store du store:/Store
+```
+
+Exit codes: 0 ok, 1 the cluster call failed or found nothing, 2 usage, 5 couldn't connect or sign in. Errors go to
+stderr. `sfx <command> --help` has the details.
 
 ### Keys
 
