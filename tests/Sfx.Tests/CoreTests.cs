@@ -84,4 +84,12 @@ public class CoreTests
         Assert.Equal("device code", error.How);
         Assert.False(notified);
     }
+
+    [Fact]
+    public void Natural_order_reads_numbers_as_numbers_and_ignores_case()
+    {
+        string[] names = ["_Node_10", "b", "_Node_2", "1.10.0", "A", "_node_1", "1.9.0", "x02", "x1"];
+
+        Assert.Equal(["1.9.0", "1.10.0", "_node_1", "_Node_2", "_Node_10", "A", "b", "x1", "x02"], names.Order(NaturalComparer.Instance));
+    }
 }

@@ -824,4 +824,30 @@ public sealed class CliTests : IDisposable
         Assert.Equal(5, code);
         Assert.Equal("sfx: signing in to prod needs a person (device code); run it in a terminal, or use cert or a token command\n", error);
     }
+
+    [Fact]
+    public async Task Lists_in_the_browser_order()
+    {
+        static NodeInfo Node(string name) => new(name: new NodeName(name), nodeStatus: NodeStatus.Up, healthState: HealthState.Ok);
+        var cluster = Cluster()
+            .Paged("GetNodeInfoListAsync", Node("_Node_4"), Node("_Node_10"), Node("_node_2"))
+            .Paged("GetApplicationInfoListAsync", ShopOrders, Orders)
+            .Paged(
+                "GetApplicationTypeInfoListAsync",
+                new ApplicationTypeInfo("OrdersType", "1.9.0", status: ApplicationTypeStatus.Available),
+                new ApplicationTypeInfo("OrdersType", "1.10.0", status: ApplicationTypeStatus.Available),
+                new ApplicationTypeInfo("Api10Type", "1.0.0", status: ApplicationTypeStatus.Available),
+                new ApplicationTypeInfo("Api9Type", "1.0.0", status: ApplicationTypeStatus.Available));
+        var session = Session(cluster);
+
+        var nodes = await Run(session, "get", "nodes", "-o", "name");
+        var json = await Run(session, "get", "nodes", "-o", "json");
+        var types = await Run(session, "get", "types", "-o", "name");
+        var apps = await Run(session, "get", "apps", "-o", "name");
+
+        Assert.Equal("node/_node_2\nnode/_Node_4\nnode/_Node_10\n", nodes.Out);
+        Assert.Equal(["_node_2", "_Node_4", "_Node_10"], JsonNode.Parse(json.Out)!.AsArray().Select(n => (string?)n!["name"]));
+        Assert.Equal("type/Api9Type@1.0.0\ntype/Api10Type@1.0.0\ntype/OrdersType@1.10.0\ntype/OrdersType@1.9.0\n", types.Out);
+        Assert.Equal("fabric:/System\nfabric:/orders\nfabric:/shop/orders\n", apps.Out);
+    }
 }

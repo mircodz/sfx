@@ -1,3 +1,4 @@
+using System.Globalization;
 using Sfx.Core;
 using Sfx.Web;
 
@@ -101,7 +102,7 @@ internal static class GetCommand
 
     private static async Task NodesAsync(UiSession s, string? name, Printer print, CancellationToken ct)
     {
-        var nodes = await ApiReads.NodesAsync(s, ct);
+        var nodes = Sorted(await ApiReads.NodesAsync(s, ct), n => n.Name);
         if (name is null)
         {
             print.List(nodes, NodeColumns, n => $"node/{n.Name}", n => n.Health);
@@ -116,7 +117,10 @@ internal static class GetCommand
 
     private static async Task ApplicationsAsync(UiSession s, string? name, Printer print, CancellationToken ct)
     {
-        var apps = await ApiReads.ApplicationsAsync(s, ct);
+        var apps = (await ApiReads.ApplicationsAsync(s, ct))
+            .OrderBy(a => a.Id != ClusterQueries.SystemApplicationId)
+            .ThenBy(a => a.Name, NaturalComparer.Instance)
+            .ToList();
         if (name is null)
         {
             print.List(apps, ApplicationColumns, a => a.Name, a => a.Health);
@@ -132,7 +136,7 @@ internal static class GetCommand
         switch (await new Resolver(s).ResolveAsync(EntityRef.Parse(name), ct))
         {
             case Entity.Application app:
-                print.List(await ApiReads.ServicesAsync(s, app.Id, ct), ServiceColumns, v => v.Name, v => v.Health);
+                print.List(Sorted(await ApiReads.ServicesAsync(s, app.Id, ct), v => v.Name), ServiceColumns, v => v.Name, v => v.Health);
                 break;
             case Entity.Service service:
                 var one = (await ApiReads.ServicesAsync(s, service.ApplicationId, ct)).FirstOrDefault(v => v.Id == service.Id)
@@ -149,7 +153,7 @@ internal static class GetCommand
         switch (await new Resolver(s).ResolveAsync(EntityRef.Parse(name), ct))
         {
             case Entity.Service service:
-                print.List(await ApiReads.PartitionsAsync(s, service.Id, ct), PartitionColumns, p => $"partition/{p.Id}", p => p.Health);
+                print.List(ByKey(await ApiReads.PartitionsAsync(s, service.Id, ct)), PartitionColumns, p => $"partition/{p.Id}", p => p.Health);
                 break;
             case Entity.Partition partition:
                 var partitions = await ApiReads.PartitionsAsync(s, partition.ServiceId, ct);
@@ -202,7 +206,10 @@ internal static class GetCommand
     private static async Task TypesAsync(UiSession s, string? name, Printer print, CancellationToken ct)
     {
         static string NameOf(ApplicationTypeDto t) => $"type/{t.Name}@{t.Version}";
-        var types = await ApiReads.TypesAsync(s, ct);
+        var types = (await ApiReads.TypesAsync(s, ct))
+            .OrderBy(t => t.Name, NaturalComparer.Instance)
+            .ThenByDescending(t => t.Version, NaturalComparer.Instance)
+            .ToList();
         if (name is null)
         {
             print.List(types, TypeColumns, NameOf, null);
@@ -264,6 +271,20 @@ internal static class GetCommand
         }
         var repair = repairs.Repairs.FirstOrDefault(r => r.Id == id) ?? throw CliFailure.NotFound($"There's no repair task {id}.");
         print.One(repair, RepairColumns, r => r.Id, null);
+    }
+
+    /// <summary>In the browser's order: by name, as people read numbers.</summary>
+    internal static List<T> Sorted<T>(IEnumerable<T> items, Func<T, string> name) => items.OrderBy(name, NaturalComparer.Instance).ToList();
+
+    /// <summary>Ranged partitions in key order, as the browser shows them; named ones by name.</summary>
+    private static IReadOnlyList<PartitionDto> ByKey(IReadOnlyList<PartitionDto> partitions)
+    {
+        static long? Key(PartitionDto p) => long.TryParse(p.LowKey, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var key) ? key : null;
+        if (partitions.All(p => Key(p) is not null))
+        {
+            return partitions.OrderBy(Key).ToList();
+        }
+        return partitions.All(p => p.Name is not null) ? Sorted(partitions, p => p.Name!) : partitions;
     }
 
     private static T? One<T>(IEnumerable<T> matches, string typed, Func<T, string> name) where T : class => matches.ToList() switch

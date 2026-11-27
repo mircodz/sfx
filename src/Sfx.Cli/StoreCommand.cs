@@ -52,6 +52,11 @@ internal static class StoreCommand
     private static async Task ListAsync(UiSession s, string path, bool json, CliOptions options, CliConsole console, CancellationToken ct)
     {
         var listing = await ApiReads.StoreAsync(s, path, ct);
+        listing = listing with
+        {
+            Folders = GetCommand.Sorted(listing.Folders, f => f.Name),
+            Files = GetCommand.Sorted(listing.Files, f => f.Name),
+        };
         if (json)
         {
             Output.WriteJson(console.Out, listing);
