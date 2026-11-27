@@ -63,4 +63,20 @@ public sealed class ClusterConnector
         await queries.GetNodesAsync(cancellationToken);
         return new ClusterSession(context, endpoint, queries);
     }
+
+    /// <summary>
+    /// Why connecting (or a call) failed, in a line. Call it only when the caller didn't cancel: then a cancellation is the
+    /// client's own timeout, which would otherwise read "A task was canceled."
+    /// </summary>
+    public static string Describe(Exception ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            if (e is OperationCanceledException or TimeoutException)
+            {
+                return $"timed out after {ClusterClientFactory.Timeout.TotalSeconds:0}s";
+            }
+        }
+        return ex.GetBaseException().Message;
+    }
 }

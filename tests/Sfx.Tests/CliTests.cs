@@ -738,4 +738,71 @@ public sealed class CliTests : IDisposable
         Assert.Equal(0, code);
         Assert.StartsWith("usage: sfx store ls", output.ToString());
     }
+
+    private sealed class FailingAuthProvider(string name, Func<AuthContext, IClusterAuth> create) : IClusterAuthProvider
+    {
+        public string Name => name;
+
+        public string Description => "";
+
+        public bool RequiresTls => false;
+
+        public IReadOnlyList<AuthOptionInfo> Options => [];
+
+        public IClusterAuth Create(AuthContext context) => create(context);
+    }
+
+    private async Task<(int Code, string Error)> Connect(IClusterAuthProvider provider)
+    {
+        var store = ContextStore.Load(Path.Combine(_scratch, "config.toml"));
+        store.Set(new ClusterContext("prod", "http://prod:19080", [provider.Name], new AuthOptions()));
+        store.Save();
+        var (cli, rest) = CliOptions.Split(["get", "nodes", "-c", "prod"]);
+        using var error = new StringWriter();
+
+        var code = await SfxHost.RunScriptingAsync(
+            CommandLine.Parse(rest, new HashSet<string>()),
+            cli,
+            () => ContextStore.Load(store.Path),
+            new ClusterConnector([.. BuiltInAuth.Providers, provider]),
+            new CliConsole(TextWriter.Null, error, false),
+            default);
+        return (code, error.ToString().ReplaceLineEndings("\n"));
+    }
+
+    [Fact]
+    public async Task A_connect_that_times_out_cannot_connect()
+    {
+        var (code, error) = await Connect(new FailingAuthProvider("slow", _ => throw new TaskCanceledException()));
+
+        Assert.Equal(5, code);
+        Assert.Equal("sfx: could not connect to prod: timed out after 30s\n", error);
+    }
+
+    [Fact]
+    public async Task A_call_that_times_out_is_a_cluster_failure()
+    {
+        var cluster = Cluster().Throws("GetNodeInfoListAsync", new TaskCanceledException());
+
+        var result = await Run(Session(cluster), "get", "nodes");
+
+        Assert.Equal(1, result.Code);
+        Assert.Equal("sfx: the cluster didn't answer: timed out after 30s\n", result.Error);
+    }
+
+    [Fact]
+    public async Task Cancelling_is_not_a_timeout()
+    {
+        using var cancel = new CancellationTokenSource();
+        await cancel.CancelAsync();
+        var (options, rest) = CliOptions.Split(["get", "nodes"]);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Scripting.RunAsync(
+            rest,
+            options,
+            help: false,
+            ct => Task.FromException<UiSession>(new OperationCanceledException(ct)),
+            new CliConsole(TextWriter.Null, TextWriter.Null, false),
+            cancel.Token));
+    }
 }

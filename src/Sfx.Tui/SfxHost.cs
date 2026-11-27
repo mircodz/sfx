@@ -119,7 +119,7 @@ public static class SfxHost
         catch (Exception ex)
         {
             terminal?.Dispose();
-            Console.Error.WriteLine($"sfx: could not connect to {context.Name}: {ex.GetBaseException().Message}");
+            Console.Error.WriteLine($"sfx: could not connect to {context.Name}: {ClusterConnector.Describe(ex)}");
             return 1;
         }
 
@@ -181,9 +181,9 @@ public static class SfxHost
                     },
                     ct);
             }
-            catch (Exception ex) when (ex is not (AuthConfigurationException or FormatException or OperationCanceledException))
+            catch (Exception ex) when (ex is not (AuthConfigurationException or FormatException) && !ct.IsCancellationRequested)
             {
-                throw new CliFailure($"could not connect to {context.Name}: {ex.GetBaseException().Message}", ExitCode.CannotConnect);
+                throw new CliFailure($"could not connect to {context.Name}: {ClusterConnector.Describe(ex)}", ExitCode.CannotConnect);
             }
             return new UiSession(session, new ActionLog(ActionLogPath(store)), Version);
         }

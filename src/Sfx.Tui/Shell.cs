@@ -1073,7 +1073,7 @@ internal sealed class Shell
                     if (_connecting == connecting)
                     {
                         _connecting = null;
-                        Error($"{context.Name}: {ex.GetBaseException().Message}");
+                        Error($"{context.Name}: {ClusterConnector.Describe(ex)}");
                     }
                 });
             }

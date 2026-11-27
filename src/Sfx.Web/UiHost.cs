@@ -124,7 +124,7 @@ public sealed class UiHost(ClusterSession initial, ContextStore store, ClusterCo
             {
                 lock (_lock)
                 {
-                    connecting.Error = $"Couldn't connect to {name}: {ex.GetBaseException().Message.TrimEnd('.')}. Still on {_current.Context.Name}.";
+                    connecting.Error = $"Couldn't connect to {name}: {ClusterConnector.Describe(ex).TrimEnd('.')}. Still on {_current.Context.Name}.";
                 }
             }
         });

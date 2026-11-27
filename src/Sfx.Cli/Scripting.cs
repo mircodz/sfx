@@ -1,4 +1,5 @@
 using Microsoft.ServiceFabric.Common.Exceptions;
+using Sfx.Core;
 using Sfx.Core.Auth;
 using Sfx.Web;
 
@@ -73,14 +74,14 @@ public static class Scripting
             {
                 session = await connect(ct);
             }
-            catch (Exception ex) when (ex is not (CliFailure or OperationCanceledException or AuthConfigurationException or FormatException))
+            catch (Exception ex) when (ex is not (CliFailure or AuthConfigurationException or FormatException) && !ct.IsCancellationRequested)
             {
-                throw new CliFailure($"could not connect: {ex.GetBaseException().Message}", ExitCode.CannotConnect);
+                throw new CliFailure($"could not connect: {ClusterConnector.Describe(ex)}", ExitCode.CannotConnect);
             }
             await run(session, ct);
             return ExitCode.Ok;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
         {
             var (message, code) = Failure(ex);
             console.Error.WriteLine(json ? Output.JsonError(message) : $"sfx: {message}");
@@ -109,6 +110,7 @@ public static class Scripting
         CliFailure f => (f.Message, f.Code),
         AuthConfigurationException or FormatException => (ex.Message, ExitCode.Usage),
         ActionException or ServiceFabricException => (ex.Message, ExitCode.ClusterFailed),
+        OperationCanceledException or TimeoutException => ($"the cluster didn't answer: {ClusterConnector.Describe(ex)}", ExitCode.ClusterFailed),
         _ => (ex.GetBaseException().Message, ExitCode.ClusterFailed),
     };
 
